@@ -1,101 +1,244 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { supabase } from '../../lib/supabaseClient';
+import { useState } from 'react';
 
+import Header from './components/Header';
+import SummaryCards from './components/SummaryCards';
+import SideMenu from './components/SideMenu';
+import AttendanceTable from './components/AttendanceTable';
+import UnitTabs from './components/UnitTabs';
 
-export default function DashboardPage() {
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+import { Teacher, UserProfile } from './types';
 
-  useEffect(() => {
-    // Session бэлэн болохыг шалгах
-    const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session?.user) {
-        setUser(session.user);
-        setLoading(false);
-      } else {
-  setLoading(false);
-  console.log('Session not found');
-}
-    };
+export default function DashboardV2() {
+  const [activeCategory, setActiveCategory] = useState<
+    'Ирц' | 'Сургалт' | 'Үнэлгээ'
+  >('Ирц');
 
-    getInitialSession();
+  const [activeUnit, setActiveUnit] = useState<
+    'НИЙТ' | 'БАЗАН' | 'БУЗАН' | 'НУЗАН'
+  >('НИЙТ');
 
-    // Auth төлөв өөрчлөгдөх үед чагнаж унших
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session) {
-        setUser(session.user);
-        setLoading(false);
-      } else if (event === 'SIGNED_OUT') {
-        window.location.href = '/';
-      }
-    });
+  const [selectedMonth, setSelectedMonth] = useState('2026-03');
 
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
-  }, []);
+  const user: UserProfile = {
+    last_name: 'Админ',
+    first_name: 'Систем',
+    email: 'admin@moes.edu.mn',
+    unit: 'БАЗАН',
+    subject: 'Administrator',
+    role: 'admin',
+  };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
+  const [teachers, setTeachers] = useState<Teacher[]>([
+    {
+      id: 1,
+      last_name: 'Батболд',
+      first_name: 'Бат',
+      email: 'teacher1@moes.edu.mn',
+      unit: 'БАЗАН',
+      subject: 'Математик',
+      attendance: 'Ирсэн',
+      monthly_attendance_rate: 96,
+      training_status: 'Хамрагдсан',
+      rating: 92,
+      monthly_login_count: 20,
+    },
+    {
+      id: 2,
+      last_name: 'Сүрэн',
+      first_name: 'Од',
+      email: 'teacher2@moes.edu.mn',
+      unit: 'БУЗАН',
+      subject: 'Физик',
+      attendance: 'Хоцорсон',
+      monthly_attendance_rate: 87,
+      training_status: 'Хамрагдаагүй',
+      rating: 88,
+      monthly_login_count: 18,
+    },
+    {
+      id: 3,
+      last_name: 'Эрдэнэ',
+      first_name: 'Туяа',
+      email: 'teacher3@moes.edu.mn',
+      unit: 'НУЗАН',
+      subject: 'Монгол хэл',
+      attendance: 'Ирсэн',
+      monthly_attendance_rate: 98,
+      training_status: 'Хамрагдсан',
+      rating: 95,
+      monthly_login_count: 24,
+    },
+  ]);
+
+  const displayTeachers =
+    activeUnit === 'НИЙТ'
+      ? teachers
+      : teachers.filter((t) => t.unit === activeUnit);
+
+  const handleLogout = () => {
     window.location.href = '/';
   };
 
-  if (loading) {
-    return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        minHeight: '100vh',
-        fontFamily: 'sans-serif'
-      }}>
-        <h2>Ачаалж байна...</h2>
-      </div>
+  const handleAttendanceChange = (
+    id: number,
+    status: Teacher['attendance']
+  ) => {
+    setTeachers((prev) =>
+      prev.map((t) =>
+        t.id === id
+          ? {
+              ...t,
+              attendance: status,
+            }
+          : t
+      )
     );
-  }
+  };
+
+  const handleTeacherSelect = (teacher: Teacher) => {
+    alert(
+      `${teacher.last_name} ${teacher.first_name} багшийн дэлгэрэнгүй мэдээлэл`
+    );
+  };
+
+  const totalTeachers = teachers.length;
+
+  const bazanTeachers = teachers.filter((t) => t.unit === 'БАЗАН');
+  const buzanTeachers = teachers.filter((t) => t.unit === 'БУЗАН');
+  const nuzanTeachers = teachers.filter((t) => t.unit === 'НУЗАН');
 
   return (
-    <div style={{ padding: '32px', fontFamily: 'sans-serif' }}>
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '24px',
-        borderBottom: '1px solid #e2e8f0',
-        paddingBottom: '16px'
-      }}>
-        <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>
-          72 дугаар сургууль - Багшийн систем
-        </h1>
-        <button
-          onClick={handleLogout}
+    <div
+      style={{
+        minHeight: '100vh',
+        backgroundColor: '#f8fafc',
+        padding: '24px',
+      }}
+    >
+      <Header user={user} onLogout={handleLogout} />
+
+<div
+  style={{
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    marginTop: '16px',
+  }}
+>
+
+  <UnitTabs
+    activeUnit={activeUnit}
+    setActiveUnit={setActiveUnit}
+    isAdmin={false}
+    onDownload={() => {}}
+  />
+
+  <div
+    style={{
+      display: 'flex',
+      justifyContent: 'flex-end',
+      gap: '12px',
+    }}
+  >
+    <button
+      style={{
+        backgroundColor: '#107c41',
+        color: 'white',
+        border: 'none',
+        padding: '10px 18px',
+        borderRadius: '8px',
+        fontWeight: 'bold',
+        cursor: 'pointer',
+      }}
+    >
+      📊 Excel Тайлан Татах
+    </button>
+
+    <button
+      style={{
+        backgroundColor: '#dc2626',
+        color: 'white',
+        border: 'none',
+        padding: '10px 18px',
+        borderRadius: '8px',
+        fontWeight: 'bold',
+        cursor: 'pointer',
+      }}
+    >
+      📄 PDF Тайлан Татах
+    </button>
+  </div>
+
+</div>
+
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '220px 1fr',
+          gap: '20px',
+          marginTop: '24px',
+        }}
+      >
+        <SideMenu
+          activeCategory={activeCategory}
+          setActiveCategory={setActiveCategory}
+        />
+
+        <div
           style={{
-            padding: '8px 16px',
-            backgroundColor: '#ef4444',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer'
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            padding: '20px',
+            border: '1px solid #e2e8f0',
           }}
         >
-          Гарах
-        </button>
-      </div>
+          {activeCategory === 'Ирц' && (
+            <AttendanceTable
+              teachers={displayTeachers}
+              activeUnit={activeUnit}
+              selectedMonth={selectedMonth}
+              setSelectedMonth={setSelectedMonth}
+              onSelectTeacher={handleTeacherSelect}
+              onAttendanceChange={handleAttendanceChange}
+            />
+          )}
 
-      <div style={{
-        backgroundColor: '#f8fafc',
-        padding: '20px',
-        borderRadius: '8px',
-        border: '1px solid #e2e8f0'
-      }}>
-        <h2>Тавтай морил!</h2>
-        <p>И-мэйл: <strong>{user?.email}</strong></p>
-        <p>Системд амжилттай нэвтэрлээ.</p>
+          {activeCategory === 'Сургалт' && (
+            <div>
+              <h3>📚 Сургалтын модуль</h3>
+              <p>Дараагийн алхамд холбоно.</p>
+            </div>
+          )}
+
+          {activeCategory === 'Үнэлгээ' && (
+            <div>
+              <h3>⭐ Үнэлгээний модуль</h3>
+              <p>Дараагийн алхамд холбоно.</p>
+            </div>
+          )}
+        </div>
       </div>
+      <div style={{ marginTop: '12px' }}>
+  <SummaryCards
+    totalTeachers={totalTeachers}
+    bazan={{
+      total: bazanTeachers.length,
+      active: bazanTeachers.length,
+    }}
+    buzan={{
+      total: buzanTeachers.length,
+      active: buzanTeachers.length,
+    }}
+    nuzan={{
+      total: nuzanTeachers.length,
+      active: nuzanTeachers.length,
+    }}
+    updatedCount={teachers.length}
+  />
+</div>
     </div>
   );
 }

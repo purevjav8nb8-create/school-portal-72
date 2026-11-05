@@ -31,16 +31,7 @@ export default function UnitTabs({ activeUnit, setActiveUnit, onDownload, isAdmi
         ))}
       </div>
 
-      {isAdmin && (
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button onClick={() => onDownload('excel')} style={{ backgroundColor: '#107c41', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>
-            📊 Excel Тайлан Татах
-          </button>
-          <button onClick={() => onDownload('pdf')} style={{ backgroundColor: '#dc2626', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>
-            📄 PDF Тайлан Татах
-          </button>
-        </div>
-      )}
+      
     </div>
   );
 }
