@@ -1,156 +1,100 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 
-export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
-  const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg('');
-    setLoading(true);
+export default function DashboardPage() {
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-    const loginEmail = email.trim() === 'admin' ? 'admin@moes.edu.mn' : email.trim();
-
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: loginEmail,
-        password: password,
-      });
-
-      if (error) {
-        setErrorMsg('Нэвтрэх нэр эсвэл нууц үг буруу байна.');
+  useEffect(() => {
+    // Session бэлэн болохыг шалгах
+    const getInitialSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        setUser(session.user);
+        setLoading(false);
       } else {
-        window.location.href = '/dashboard';
+  setLoading(false);
+  console.log('Session not found');
+}
+    };
+
+    getInitialSession();
+
+    // Auth төлөв өөрчлөгдөх үед чагнаж унших
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        setUser(session.user);
+        setLoading(false);
+      } else if (event === 'SIGNED_OUT') {
+        window.location.href = '/';
       }
-    } catch (err: any) {
-      setErrorMsg('Сүлжээний алдаа гарлаа. Дахин оролдоно уу.');
-    } finally {
-      setLoading(false);
-    }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    window.location.href = '/';
   };
 
-  return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: '100vh',
-      backgroundColor: '#f1f5f9'
-    }}>
+  if (loading) {
+    return (
       <div style={{
-        width: '100%',
-        maxWidth: '380px',
-        padding: '32px',
-        backgroundColor: '#ffffff',
-        borderRadius: '16px',
-        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '100vh',
+        fontFamily: 'sans-serif'
+      }}>
+        <h2>Ачаалж байна...</h2>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: '32px', fontFamily: 'sans-serif' }}>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '24px',
+        borderBottom: '1px solid #e2e8f0',
+        paddingBottom: '16px'
+      }}>
+        <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>
+          72 дугаар сургууль - Багшийн систем
+        </h1>
+        <button
+          onClick={handleLogout}
+          style={{
+            padding: '8px 16px',
+            backgroundColor: '#ef4444',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer'
+          }}
+        >
+          Гарах
+        </button>
+      </div>
+
+      <div style={{
+        backgroundColor: '#f8fafc',
+        padding: '20px',
+        borderRadius: '8px',
         border: '1px solid #e2e8f0'
       }}>
-        <h2 style={{
-          fontSize: '20px',
-          fontWeight: '700',
-          textAlign: 'center',
-          color: '#0f172a',
-          marginBottom: '24px'
-        }}>
-          72 дугаар сургууль Багш систем
-        </h2>
-
-        {errorMsg && (
-          <div style={{
-            marginBottom: '16px',
-            padding: '10px 14px',
-            borderRadius: '8px',
-            backgroundColor: '#fef2f2',
-            border: '1px solid #fecaca',
-            color: '#dc2626',
-            fontSize: '13px'
-          }}>
-            {errorMsg}
-          </div>
-        )}
-
-        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div>
-            <label style={{
-              display: 'block',
-              fontSize: '13px',
-              fontWeight: '600',
-              color: '#334155',
-              marginBottom: '6px'
-            }}>
-              Нэвтрэх нэр эсвэл И-мэйл:
-            </label>
-            <input
-              type="text"
-              placeholder="teacher@moes.edu.mn"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                borderRadius: '8px',
-                border: '1px solid #cbd5e1',
-                fontSize: '14px',
-                boxSizing: 'border-box',
-                outline: 'none'
-              }}
-            />
-          </div>
-
-          <div>
-            <label style={{
-              display: 'block',
-              fontSize: '13px',
-              fontWeight: '600',
-              color: '#334155',
-              marginBottom: '6px'
-            }}>
-              Нууц үг:
-            </label>
-            <input
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                borderRadius: '8px',
-                border: '1px solid #cbd5e1',
-                fontSize: '14px',
-                boxSizing: 'border-box',
-                outline: 'none'
-              }}
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              width: '100%',
-              padding: '11px',
-              backgroundColor: loading ? '#94a3b8' : '#2563eb',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '8px',
-              fontWeight: '600',
-              fontSize: '14px',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              marginTop: '6px'
-            }}
-          >
-            {loading ? 'Нэвтэрч байна...' : 'Нэвтрэх'}
-          </button>
-        </form>
+        <h2>Тавтай морил!</h2>
+        <p>И-мэйл: <strong>{user?.email}</strong></p>
+        <p>Системд амжилттай нэвтэрлээ.</p>
       </div>
     </div>
   );
