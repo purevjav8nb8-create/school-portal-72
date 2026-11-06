@@ -1,16 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { supabase } from '../../lib/supabaseClient';
 
 import Header from './components/Header';
-import SummaryCards from './components/SummaryCards';
 import SideMenu from './components/SideMenu';
 import AttendanceTable from './components/AttendanceTable';
 import UnitTabs from './components/UnitTabs';
+import QuickActions from './components/QuickActions';
 
 import { Teacher, UserProfile } from './types';
 
-export default function DashboardV2() {
+import { useTeachers } from './hooks/useTeachers';
+
+export default function DashboardPage() {
   const [activeCategory, setActiveCategory] = useState<
     'Ирц' | 'Сургалт' | 'Үнэлгээ'
   >('Ирц');
@@ -19,7 +22,28 @@ export default function DashboardV2() {
     'НИЙТ' | 'БАЗАН' | 'БУЗАН' | 'НУЗАН'
   >('НИЙТ');
 
-  const [selectedMonth, setSelectedMonth] = useState('2026-03');
+  const [selectedMonth, setSelectedMonth] =
+    useState('2026-03');
+
+  const [loading, setLoading] =
+    useState(true);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        window.location.href = '/';
+        return;
+      }
+
+      setLoading(false);
+    };
+
+    checkAuth();
+  }, []);
 
   const user: UserProfile = {
     last_name: 'Админ',
@@ -30,52 +54,11 @@ export default function DashboardV2() {
     role: 'admin',
   };
 
-  const [teachers, setTeachers] = useState<Teacher[]>([
-    {
-      id: 1,
-      last_name: 'Батболд',
-      first_name: 'Бат',
-      email: 'teacher1@moes.edu.mn',
-      unit: 'БАЗАН',
-      subject: 'Математик',
-      attendance: 'Ирсэн',
-      monthly_attendance_rate: 96,
-      training_status: 'Хамрагдсан',
-      rating: 92,
-      monthly_login_count: 20,
-    },
-    {
-      id: 2,
-      last_name: 'Сүрэн',
-      first_name: 'Од',
-      email: 'teacher2@moes.edu.mn',
-      unit: 'БУЗАН',
-      subject: 'Физик',
-      attendance: 'Хоцорсон',
-      monthly_attendance_rate: 87,
-      training_status: 'Хамрагдаагүй',
-      rating: 88,
-      monthly_login_count: 18,
-    },
-    {
-      id: 3,
-      last_name: 'Эрдэнэ',
-      first_name: 'Туяа',
-      email: 'teacher3@moes.edu.mn',
-      unit: 'НУЗАН',
-      subject: 'Монгол хэл',
-      attendance: 'Ирсэн',
-      monthly_attendance_rate: 98,
-      training_status: 'Хамрагдсан',
-      rating: 95,
-      monthly_login_count: 24,
-    },
-  ]);
-
-  const displayTeachers =
-    activeUnit === 'НИЙТ'
-      ? teachers
-      : teachers.filter((t) => t.unit === activeUnit);
+  const {
+    teachers,
+    setTeachers,
+    displayTeachers,
+  } = useTeachers(activeUnit);
 
   const handleLogout = () => {
     window.location.href = '/';
@@ -86,159 +69,188 @@ export default function DashboardV2() {
     status: Teacher['attendance']
   ) => {
     setTeachers((prev) =>
-      prev.map((t) =>
-        t.id === id
+      prev.map((teacher) =>
+        teacher.id === id
           ? {
-              ...t,
+              ...teacher,
               attendance: status,
             }
-          : t
+          : teacher
       )
     );
   };
 
-  const handleTeacherSelect = (teacher: Teacher) => {
+  const handleTeacherSelect = (
+    teacher: Teacher
+  ) => {
     alert(
       `${teacher.last_name} ${teacher.first_name} багшийн дэлгэрэнгүй мэдээлэл`
     );
   };
 
-  const totalTeachers = teachers.length;
-
-  const bazanTeachers = teachers.filter((t) => t.unit === 'БАЗАН');
-  const buzanTeachers = teachers.filter((t) => t.unit === 'БУЗАН');
-  const nuzanTeachers = teachers.filter((t) => t.unit === 'НУЗАН');
+  if (loading) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+      >
+        Ачаалж байна...
+      </div>
+    );
+  }
 
   return (
     <div
       style={{
         minHeight: '100vh',
         backgroundColor: '#f8fafc',
-        padding: '24px',
+        padding: '10px',
       }}
     >
-      <Header user={user} onLogout={handleLogout} />
-
-<div
-  style={{
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px',
-    marginTop: '16px',
-  }}
->
-
-  <UnitTabs
-    activeUnit={activeUnit}
-    setActiveUnit={setActiveUnit}
-    isAdmin={false}
-    onDownload={() => {}}
-  />
-
-  <div
-    style={{
-      display: 'flex',
-      justifyContent: 'flex-end',
-      gap: '12px',
-    }}
-  >
-    <button
-      style={{
-        backgroundColor: '#107c41',
-        color: 'white',
-        border: 'none',
-        padding: '10px 18px',
-        borderRadius: '8px',
-        fontWeight: 'bold',
-        cursor: 'pointer',
-      }}
-    >
-      📊 Excel Тайлан Татах
-    </button>
-
-    <button
-      style={{
-        backgroundColor: '#dc2626',
-        color: 'white',
-        border: 'none',
-        padding: '10px 18px',
-        borderRadius: '8px',
-        fontWeight: 'bold',
-        cursor: 'pointer',
-      }}
-    >
-      📄 PDF Тайлан Татах
-    </button>
-  </div>
-
-</div>
-
+      <Header
+        user={user}
+        onLogout={handleLogout}
+      />
 
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '220px 1fr',
+          gridTemplateColumns:
+            '180px 1fr 220px',
           gap: '20px',
-          marginTop: '24px',
+          marginTop: '16px',
+          alignItems: 'start',
         }}
       >
-        <SideMenu
-          activeCategory={activeCategory}
-          setActiveCategory={setActiveCategory}
-        />
-
-        <div
-          style={{
-            backgroundColor: 'white',
-            borderRadius: '12px',
-            padding: '20px',
-            border: '1px solid #e2e8f0',
-          }}
-        >
-          {activeCategory === 'Ирц' && (
-            <AttendanceTable
-              teachers={displayTeachers}
-              activeUnit={activeUnit}
-              selectedMonth={selectedMonth}
-              setSelectedMonth={setSelectedMonth}
-              onSelectTeacher={handleTeacherSelect}
-              onAttendanceChange={handleAttendanceChange}
-            />
-          )}
-
-          {activeCategory === 'Сургалт' && (
-            <div>
-              <h3>📚 Сургалтын модуль</h3>
-              <p>Дараагийн алхамд холбоно.</p>
-            </div>
-          )}
-
-          {activeCategory === 'Үнэлгээ' && (
-            <div>
-              <h3>⭐ Үнэлгээний модуль</h3>
-              <p>Дараагийн алхамд холбоно.</p>
-            </div>
-          )}
+        <div>
+          <SideMenu
+            activeCategory={activeCategory}
+            setActiveCategory={
+              setActiveCategory
+            }
+          />
         </div>
+
+        <div>
+          <UnitTabs
+            activeUnit={activeUnit}
+            setActiveUnit={setActiveUnit}
+            totalTeachers={teachers.length}
+            activeTeachers={
+              teachers.filter(
+                (t) =>
+                  t.attendance !==
+                  'Тасалсан'
+              ).length
+            }
+            bazanTotal={
+              teachers.filter(
+                (t) =>
+                  t.unit === 'БАЗАН'
+              ).length
+            }
+            bazanActive={
+              teachers.filter(
+                (t) =>
+                  t.unit === 'БАЗАН' &&
+                  t.attendance !==
+                    'Тасалсан'
+              ).length
+            }
+            buzanTotal={
+              teachers.filter(
+                (t) =>
+                  t.unit === 'БУЗАН'
+              ).length
+            }
+            buzanActive={
+              teachers.filter(
+                (t) =>
+                  t.unit === 'БУЗАН' &&
+                  t.attendance !==
+                    'Тасалсан'
+              ).length
+            }
+            nuzanTotal={
+              teachers.filter(
+                (t) =>
+                  t.unit === 'НУЗАН'
+              ).length
+            }
+            nuzanActive={
+              teachers.filter(
+                (t) =>
+                  t.unit === 'НУЗАН' &&
+                  t.attendance !==
+                    'Тасалсан'
+              ).length
+            }
+          />
+
+          <div
+            style={{
+              backgroundColor:
+                'white',
+              borderRadius: '14px',
+              padding: '16px',
+              boxShadow:
+                '0 2px 10px rgba(0,0,0,0.06)',
+            }}
+          >
+            {activeCategory ===
+              'Ирц' && (
+              <AttendanceTable
+                teachers={
+                  displayTeachers
+                }
+                activeUnit={
+                  activeUnit
+                }
+                selectedMonth={
+                  selectedMonth
+                }
+                setSelectedMonth={
+                  setSelectedMonth
+                }
+                onSelectTeacher={
+                  handleTeacherSelect
+                }
+                onAttendanceChange={
+                  handleAttendanceChange
+                }
+              />
+            )}
+
+            {activeCategory ===
+              'Сургалт' && (
+              <div>
+                <h2>📚 Сургалт</h2>
+                <p>
+                  Сургалтын модуль
+                  энд орно.
+                </p>
+              </div>
+            )}
+
+            {activeCategory ===
+              'Үнэлгээ' && (
+              <div>
+                <h2>⭐ Үнэлгээ</h2>
+                <p>
+                  Үнэлгээний модуль
+                  энд орно.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <QuickActions />
       </div>
-      <div style={{ marginTop: '12px' }}>
-  <SummaryCards
-    totalTeachers={totalTeachers}
-    bazan={{
-      total: bazanTeachers.length,
-      active: bazanTeachers.length,
-    }}
-    buzan={{
-      total: buzanTeachers.length,
-      active: buzanTeachers.length,
-    }}
-    nuzan={{
-      total: nuzanTeachers.length,
-      active: nuzanTeachers.length,
-    }}
-    updatedCount={teachers.length}
-  />
-</div>
     </div>
   );
 }
