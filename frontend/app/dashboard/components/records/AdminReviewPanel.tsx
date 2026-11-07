@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../../../lib/supabaseClient';
 import FileAttachmentActions from './FileAttachmentActions';
-import { romanGrade } from './ClassFields';
 
 const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://127.0.0.1:8000';
 const evaluationLevels = ['VIII', 'VII', 'VI', 'V', 'IV', 'III', 'II', 'I'] as const;
@@ -33,8 +32,16 @@ type TeacherRecords = {
   teacher: { name: string; email: string; unit: string; subject: string };
   program_plan?: { documentUrl: string; note: string; grade?: number; section?: string; subject?: string; approved: boolean; submittedAt: string };
   activities: Activity[];
+  awards: { id: string; name: string; certificate_number: string; certificate_url: string; organization?: string; status?: string; application_url?: string; meeting_minutes_url?: string; reference_url?: string; justification?: string; awarded_date?: string }[];
+  professional_degrees: { id: string; name: string; certificate_number: string; certificate_url: string; status: string; issued_date?: string }[];
   evaluations: { id: string; grade: number; section: string; subject: string; level: string; students_count: number; average_score: number; evaluation_date: string }[];
 };
+
+function formatTeacherName(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return name.trim();
+  return `${parts[0].charAt(0)}. ${parts.slice(1).join(' ')}`;
+}
 
 interface Props {
   summaryOnly?: boolean;
@@ -69,7 +76,21 @@ export default function AdminReviewPanel({ summaryOnly = false }: Props) {
       const result = await request('/api/teachers/review');
       setRecords(Array.isArray(result) ? result.map((record) => ({
         ...record,
-        evaluations: Array.isArray(record.evaluations) ? record.evaluations : [],
+        evaluations: Array.isArray(record.evaluations) ? record.evaluations.filter((evaluation) => {
+          const grade = Number(evaluation.grade);
+          const studentsCount = Number(evaluation.students_count);
+          const averageScore = Number(evaluation.average_score);
+          return Number.isInteger(grade)
+            && grade > 0
+            && String(evaluation.section ?? '').trim().length > 0
+            && String(evaluation.subject ?? '').trim().length > 0
+            && evaluationLevels.includes(evaluation.level as typeof evaluationLevels[number])
+            && Number.isFinite(studentsCount)
+            && studentsCount >= 0
+            && Number.isFinite(averageScore);
+        }) : [],
+        awards: Array.isArray(record.awards) ? record.awards : [],
+        professional_degrees: Array.isArray(record.professional_degrees) ? record.professional_degrees : [],
       })) : []);
       setErrorMessage('');
     } catch (error) {
@@ -91,7 +112,7 @@ export default function AdminReviewPanel({ summaryOnly = false }: Props) {
   };
 
   const evaluationSummary = useMemo(() => {
-    const summary = new Map<string, { levels: Record<string, number>; students: number; weightedScore: number; entries: number }>();
+    const summary = new Map<string, { levels: Record<string, number>; students: number; weightedScore: number; entries: number; teachers: Set<string> }>();
     for (const record of records) {
       for (const evaluation of record.evaluations) {
         const grade = Number(evaluation.grade);
@@ -109,12 +130,14 @@ export default function AdminReviewPanel({ summaryOnly = false }: Props) {
           !Number.isFinite(averageScore)
         ) continue;
         const key = `${grade}-${section}-${subject}`;
-        const current = summary.get(key) ?? { levels: {}, students: 0, weightedScore: 0, entries: 0 };
+        const current = summary.get(key) ?? { levels: {}, students: 0, weightedScore: 0, entries: 0, teachers: new Set<string>() };
+        current.teachers.add(formatTeacherName(record.teacher.name));
         summary.set(key, {
           levels: { ...current.levels, [evaluation.level]: (current.levels[evaluation.level] ?? 0) + studentsCount },
           students: current.students + studentsCount,
           weightedScore: current.weightedScore + averageScore * studentsCount,
           entries: current.entries + 1,
+          teachers: current.teachers,
         });
       }
     }
@@ -126,6 +149,7 @@ export default function AdminReviewPanel({ summaryOnly = false }: Props) {
           section,
           subject: subjectParts.join('-'),
           ...value,
+          teacherNames: [...value.teachers].join(', '),
           average: value.students ? value.weightedScore / value.students : 0,
         };
       })
@@ -144,6 +168,7 @@ export default function AdminReviewPanel({ summaryOnly = false }: Props) {
 
   const activeSubject = subjectsInBand.includes(selectedSubject) ? selectedSubject : (subjectsInBand[0] ?? '');
   const activeSubjectSummary = bandSummary.filter((item) => item.subject === activeSubject);
+  const submittedRecords = records.filter((record) => record.program_plan);
   const activeSubjectTotals = useMemo(() => ({
     levels: Object.fromEntries(evaluationLevels.map((level) => [
       level,
@@ -183,13 +208,14 @@ export default function AdminReviewPanel({ summaryOnly = false }: Props) {
             </div>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 12 }}>
-                <thead><tr>{['Анги', 'VIII', 'VII', 'VI', 'V', 'IV', 'III', 'II', 'I', 'Нийт', 'Дундаж'].map((label) => <th key={label} style={{ padding: '4px 6px', background: '#fff' }}>{label}</th>)}</tr></thead>
+                <thead><tr>{['Анги', 'VIII', 'VII', 'VI', 'V', 'IV', 'III', 'II', 'I', 'Нийт', 'Дундаж', 'Багш'].map((label) => <th key={label} style={{ padding: '4px 6px', background: '#fff' }}>{label}</th>)}</tr></thead>
                 <tbody>{activeSubjectSummary.map((item) => (
                   <tr key={`${item.grade}-${item.section}-${item.subject}`} style={{ borderTop: '1px solid #e2e8f0' }}>
                     <td style={{ padding: '4px 6px', fontWeight: 600 }}>{item.grade}-{item.section}</td>
                     {evaluationLevels.map((level) => <td key={level} style={{ padding: '4px 6px' }}>{item.levels[level] ?? 0}</td>)}
                     <td style={{ padding: '4px 6px' }}>{item.students}</td>
                     <td style={{ padding: '4px 6px' }}>{item.average.toFixed(1)}</td>
+                    <td style={{ padding: '4px 6px' }}>{item.teacherNames}</td>
                   </tr>
                 ))}
                 <tr style={{ borderTop: '2px solid #94a3b8', background: '#e2e8f0', fontWeight: 700 }}>
@@ -197,6 +223,7 @@ export default function AdminReviewPanel({ summaryOnly = false }: Props) {
                   {evaluationLevels.map((level) => <td key={level} style={{ padding: '4px 6px' }}>{activeSubjectTotals.levels[level]}</td>)}
                   <td style={{ padding: '4px 6px' }}>{activeSubjectTotals.students}</td>
                   <td style={{ padding: '4px 6px' }}>{activeSubjectTotals.average.toFixed(1)}</td>
+                  <td style={{ padding: '4px 6px' }} />
                 </tr>
                 </tbody>
               </table>
@@ -204,44 +231,34 @@ export default function AdminReviewPanel({ summaryOnly = false }: Props) {
           </>
         )}
       </section>}
-      {!summaryOnly && records.length === 0 && <p>Багшийн материал алга.</p>}
-      {!summaryOnly && <div style={{ display: 'grid', gap: 16 }}>
-        {records.map((record) => (
-          <article key={record.user_id} style={{ padding: 16, border: '1px solid #e2e8f0', borderRadius: 8 }}>
-            <h3 style={{ margin: '0 0 4px' }}>{record.teacher.name}</h3>
-            <p style={{ margin: '0 0 12px', color: '#64748b' }}>{record.teacher.email} · {record.teacher.unit} · {record.teacher.subject}</p>
-            <div style={{ padding: 12, background: '#f8fafc', borderRadius: 6 }}>
-              <strong>Хөтөлбөр, төлөвлөгөө</strong>
-              {!record.program_plan ? <p>Материал ирээгүй.</p> : (
-                <>
-                  <p><FileAttachmentActions attachment={{ name: 'Хөтөлбөр, төлөвлөгөө.pdf', url: record.program_plan.documentUrl, file_type: 'document' }} /></p>
-                  {(record.program_plan.grade || record.program_plan.section || record.program_plan.subject) && <p>{record.program_plan.grade}-р анги {record.program_plan.section} бүлэг · {record.program_plan.subject}</p>}
-                  {record.program_plan.note && <p>{record.program_plan.note}</p>}
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <input type="checkbox" checked={record.program_plan.approved} onChange={(event) => void reviewPlan(record.user_id, event.target.checked)} />
-                    Баталсан
-                  </label>
-                </>
-              )}
+      {!summaryOnly && submittedRecords.length === 0 && <p>Илгээсэн материал алга.</p>}
+      {!summaryOnly && <div style={{ display: 'grid', gap: 4 }}>
+        {submittedRecords.map((record) => (
+          <article key={record.user_id} style={{ padding: 6, border: '1px solid #bfdbfe', borderRadius: 6, background: '#fff' }}>
+            <h3 style={{ margin: '-6px -6px 3px', padding: '5px 6px', color: '#0f3b78', background: 'linear-gradient(90deg, #dbeafe, #eff6ff)', borderBottom: '1px solid #bfdbfe', borderRadius: '6px 6px 0 0', fontSize: 15 }}>{record.teacher.name}</h3>
+            <p style={{ margin: '0 0 3px', color: '#64748b' }}>{record.teacher.email} · {record.teacher.unit} · {record.teacher.subject}</p>
+            <div style={{ padding: 5, background: '#f8fafc', borderRadius: 5, border: '1px solid #e2e8f0' }}>
+              <strong style={{ display: 'block', margin: '-5px -5px 3px', padding: '4px 5px', color: '#155e75', background: '#cffafe', borderBottom: '1px solid #a5f3fc', borderRadius: '5px 5px 0 0' }}>Хөтөлбөр, төлөвлөгөө</strong>
+              <p style={{ margin: '2px 0' }}><FileAttachmentActions attachment={{ name: 'Хөтөлбөр, төлөвлөгөө.pdf', url: record.program_plan.documentUrl, file_type: 'document' }} /></p>
+              {(record.program_plan.grade || record.program_plan.section || record.program_plan.subject) && <p style={{ margin: '2px 0' }}>{record.program_plan.grade}-р анги {record.program_plan.section} бүлэг · {record.program_plan.subject}</p>}
+              {record.program_plan.note && <p style={{ margin: '2px 0' }}>{record.program_plan.note}</p>}
+              <label style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <input type="checkbox" checked={record.program_plan.approved} onChange={(event) => void reviewPlan(record.user_id, event.target.checked)} />
+                Баталсан
+              </label>
             </div>
-            <h4>Түвшний үнэлгээ</h4>
-            {record.evaluations.length === 0 ? <p>Үнэлгээ оруулаагүй.</p> : (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                  <thead><tr>{['Анги', 'Хичээл', 'Түвшин', 'Үнэлэгдсэн', 'Дундаж', 'Огноо'].map((label) => <th key={label} style={{ padding: 8 }}>{label}</th>)}</tr></thead>
-                  <tbody>{record.evaluations.map((evaluation) => (
-                    <tr key={evaluation.id} style={{ borderTop: '1px solid #e2e8f0' }}>
-                      <td style={{ padding: 8 }}>{romanGrade(evaluation.grade)}-{evaluation.section}</td>
-                      <td style={{ padding: 8 }}>{evaluation.subject}</td>
-                      <td style={{ padding: 8 }}>{evaluation.level}</td>
-                      <td style={{ padding: 8 }}>{evaluation.students_count}</td>
-                      <td style={{ padding: 8 }}>{evaluation.average_score}</td>
-                      <td style={{ padding: 8 }}>{evaluation.evaluation_date}</td>
-                    </tr>
-                  ))}</tbody>
-                </table>
-              </div>
-            )}
+            {(record.awards.length > 0 || record.professional_degrees.length > 0) && <div style={{ marginTop: 8, padding: 8, background: '#f8fafc', borderRadius: 8 }}>
+              <strong>Шагнал, мэргэжлийн зэрэг</strong>
+              {record.awards.map((award) => <div key={award.id} style={{ margin: '6px 0' }}>
+                <p style={{ margin: '2px 0' }}>Шагнал: {award.name}{award.certificate_number && ` · №${award.certificate_number}`} {award.organization && `· ${award.organization}`} {award.status === 'Хүсэлт' ? '· Хүсэлт' : null}</p>
+                {award.justification && <p style={{ margin: '2px 0' }}>Үндэслэл: {award.justification}</p>}
+                {award.certificate_url && <FileAttachmentActions attachment={{ name: 'Үнэмлэх PDF', url: award.certificate_url, file_type: 'document' }} />}
+                {award.application_url && <FileAttachmentActions attachment={{ name: 'Анкет PDF', url: award.application_url, file_type: 'document' }} />}
+                {award.meeting_minutes_url && <FileAttachmentActions attachment={{ name: 'Хамт олны хурлын протокол PDF', url: award.meeting_minutes_url, file_type: 'document' }} />}
+                {award.reference_url && <FileAttachmentActions attachment={{ name: 'Тодорхойлолт PDF', url: award.reference_url, file_type: 'document' }} />}
+              </div>)}
+              {record.professional_degrees.map((degree) => <p key={degree.id} style={{ margin: '6px 0' }}>Зэрэг: {degree.name}{degree.certificate_number && ` · №${degree.certificate_number}`} · {degree.status} {degree.certificate_url && <FileAttachmentActions attachment={{ name: 'Үнэмлэх PDF', url: degree.certificate_url, file_type: 'document' }} />}</p>)}
+            </div>}
           </article>
         ))}
       </div>}

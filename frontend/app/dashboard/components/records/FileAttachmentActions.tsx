@@ -7,6 +7,7 @@ import { AnnouncementAttachment } from './AnnouncementAttachments';
 interface Props {
   attachment: AnnouncementAttachment;
   inlinePreview?: boolean;
+  showName?: boolean;
 }
 
 function normalizeCloudinaryUrl(url: string) {
@@ -27,7 +28,7 @@ function cloudinaryPdfPreview(url: string) {
     : normalizedUrl;
 }
 
-export default function FileAttachmentActions({ attachment, inlinePreview = false }: Props) {
+export default function FileAttachmentActions({ attachment, inlinePreview = false, showName = true }: Props) {
   const [open, setOpen] = useState(false);
   const extension = attachment.name.split('.').pop()?.toLowerCase();
   const isImage = attachment.file_type === 'image';
@@ -52,7 +53,7 @@ export default function FileAttachmentActions({ attachment, inlinePreview = fals
   return (
     <>
       <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-        <span>{attachment.name}</span>
+        {showName && <span>{attachment.name}</span>}
         {canPreview && (
           <button type="button" title="Файлыг харах" aria-label={`${attachment.name} харах`} onClick={() => setOpen(true)} style={{ display: 'grid', placeItems: 'center', width: 28, height: 28, border: '1px solid #cbd5e1', borderRadius: 6, background: '#fff', cursor: 'pointer' }}>
             <Eye size={16} />

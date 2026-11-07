@@ -41,7 +41,7 @@ export default function QuickActions({ unit, category, month, showReports = true
   const [previewFormat, setPreviewFormat] = useState<'excel' | 'pdf'>();
   const [errorMessage, setErrorMessage] = useState('');
   const reportCategory = category === 'Сургалт' || category === 'Үнэлгээ' ? category : 'Ирц';
-  const reportQuery = new URLSearchParams({ unit, category: reportCategory, month }).toString();
+  const reportQuery = new URLSearchParams({ unit: unit.trim().toUpperCase(), category: reportCategory, month }).toString();
 
   const requestReport = async (path: string) => {
     const { data: { session } } = await supabase.auth.getSession();

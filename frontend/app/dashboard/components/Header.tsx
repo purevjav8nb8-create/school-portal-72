@@ -18,11 +18,12 @@ export default function Header({
         gridTemplateColumns: '110px 1fr auto',
         alignItems: 'center',
         marginBottom: '10px',
-        backgroundColor: 'white',
+        background: 'linear-gradient(90deg, #dbeafe 0%, #eff6ff 48%, #ffffff 100%)',
         borderRadius: '16px',
         padding: '0 4px',
         boxShadow:
-          '0 2px 10px rgba(0,0,0,0.06)',
+          '0 2px 10px rgba(37,99,235,0.14)',
+        border: '1px solid #bfdbfe',
       }}
     >
       <div>
@@ -47,7 +48,7 @@ export default function Header({
             margin: 0,
             fontSize: '20px',
             fontWeight: 800,
-            color: '#0f172a',
+            color: '#174a8b',
             lineHeight: 1.1,
           }}
         >

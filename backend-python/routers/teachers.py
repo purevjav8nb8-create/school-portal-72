@@ -1,13 +1,14 @@
 from fastapi import APIRouter, File, Header, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from schemas.teacher_records import ActivityCreate, ActivityReview, AnnouncementCreate, EvaluationCreate, ProgramPlanReview, ProgramPlanSubmit
+from schemas.teacher_records import ActivityCreate, ActivityReview, AnnouncementCreate, AwardCreate, EvaluationCreate, ProfessionalDegreeCreate, ProgramPlanReview, ProgramPlanSubmit, SurveyCreate, SurveyResponseCreate, SurveySubmissionCreate
 from schemas.teachers import AttendanceUpdate, TeacherCreate, TeacherUpdate, TeachingClassesUpdate, TrainingCreate
 from services.school_announcements import create_announcement, list_announcements
+from services.school_surveys import create_survey, list_surveys, respond_survey, submit_survey
 from services.teacher_accounts import create_teacher_account, delete_teacher_account, list_teacher_accounts, update_teacher_account
 from services.teacher_auth import get_authenticated_user, require_admin, require_teacher
 from services.teacher_import import import_teacher_file
-from services.teacher_portal import add_evaluation, add_my_activity, add_my_training, delete_evaluation, get_my_teacher_data, submit_program_plan, update_my_teaching_classes, update_teacher_attendance
+from services.teacher_portal import add_evaluation, add_my_activity, add_my_award, add_my_professional_degree, add_my_training, delete_evaluation, get_my_teacher_data, submit_program_plan, update_my_teaching_classes, update_teacher_attendance
 from services.mock_school_data import get_mock_teacher_by_email, mock_data_enabled
 from services.teacher_records import list_teacher_records, review_activity, review_program_plan
 
@@ -109,9 +110,8 @@ def submit_my_program_plan(
 
 
 @router.get("/announcements")
-def get_announcements(authorization: str | None = Header(default=None)):
-    get_authenticated_user(authorization)
-    return list_announcements()
+def get_announcements(kind: str | None = None, authorization: str | None = Header(default=None)):
+    return list_announcements(get_authenticated_user(authorization), kind)
 
 
 @router.post("/announcements")
@@ -123,10 +123,40 @@ def publish_announcement(
     return {"announcement": create_announcement(user, announcement)}
 
 
+@router.get("/surveys")
+def get_surveys(authorization: str | None = Header(default=None)):
+    return list_surveys(get_authenticated_user(authorization))
+
+
+@router.post("/surveys")
+def publish_survey(survey: SurveyCreate, authorization: str | None = Header(default=None)):
+    return {"survey": create_survey(get_authenticated_user(authorization), survey)}
+
+
+@router.post("/surveys/{survey_id}/responses")
+def submit_survey_response(survey_id: str, response: SurveyResponseCreate, authorization: str | None = Header(default=None)):
+    return {"response": respond_survey(require_teacher(authorization), survey_id, response)}
+
+
+@router.post("/surveys/{survey_id}/submit")
+def submit_survey_answers(survey_id: str, submission: SurveySubmissionCreate, authorization: str | None = Header(default=None)):
+    return {"responses": submit_survey(require_teacher(authorization), survey_id, submission)}
+
+
 @router.get("/review")
 def get_teacher_records_for_review(authorization: str | None = Header(default=None)):
     require_admin(authorization)
     return list_teacher_records()
+
+
+@router.post("/me/awards")
+def create_my_award(award: AwardCreate, authorization: str | None = Header(default=None)):
+    return {"award": add_my_award(require_teacher(authorization), award)}
+
+
+@router.post("/me/professional-degrees")
+def create_my_professional_degree(degree: ProfessionalDegreeCreate, authorization: str | None = Header(default=None)):
+    return {"degree": add_my_professional_degree(require_teacher(authorization), degree)}
 
 
 @router.patch("/review/{user_id}/program-plan")

@@ -6,7 +6,7 @@ from uuid import uuid4
 from fastapi import HTTPException
 
 from database import supabase
-from schemas.teacher_records import ActivityCreate, EvaluationCreate, ProgramPlanSubmit
+from schemas.teacher_records import ActivityCreate, AwardCreate, EvaluationCreate, ProfessionalDegreeCreate, ProgramPlanSubmit
 from schemas.teachers import AttendanceUpdate, TeachingClassesUpdate, TrainingCreate, VALID_ATTENDANCE
 from services.mock_school_data import get_mock_teacher_by_id, mock_data_enabled, update_mock_teacher_attendance, update_mock_teacher_classes, update_mock_teacher_portal
 
@@ -73,6 +73,8 @@ def get_my_teacher_data(user) -> dict[str, Any]:
             "evaluations": teacher.get("evaluations", []),
             "program_plan": teacher.get("program_plan"),
             "activities": teacher.get("activities", []),
+            "awards": teacher.get("awards", []),
+            "professional_degrees": teacher.get("professional_degrees", []),
         }
 
 
@@ -115,8 +117,26 @@ def get_my_teacher_data(user) -> dict[str, Any]:
         "evaluations": portal.get("evaluations", []),
         "program_plan": portal.get("program_plan"),
         "activities": portal.get("activities", []),
+        "awards": portal.get("awards", []),
+        "professional_degrees": portal.get("professional_degrees", []),
         "teaching_classes": portal.get("teaching_classes", []),
     }
+
+
+def add_my_award(user, submission: AwardCreate) -> dict[str, Any]:
+    item = {**submission.model_dump(mode="json"), "id": str(uuid4()), "createdAt": datetime.now(timezone.utc).isoformat()}
+    portal = teacher_portal_data(user)
+    portal["awards"] = [*portal.get("awards", []), item]
+    save_teacher_portal_data(user, portal)
+    return item
+
+
+def add_my_professional_degree(user, submission: ProfessionalDegreeCreate) -> dict[str, Any]:
+    item = {**submission.model_dump(mode="json"), "id": str(uuid4()), "createdAt": datetime.now(timezone.utc).isoformat()}
+    portal = teacher_portal_data(user)
+    portal["professional_degrees"] = [*portal.get("professional_degrees", []), item]
+    save_teacher_portal_data(user, portal)
+    return item
 
 
 def update_my_teaching_classes(user, submission: TeachingClassesUpdate) -> list[dict[str, Any]]:

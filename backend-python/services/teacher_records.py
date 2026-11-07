@@ -48,6 +48,8 @@ def list_teacher_records() -> list[dict[str, Any]]:
             "program_plan": portal.get("program_plan"),
             "activities": portal.get("activities", []),
             "evaluations": portal.get("evaluations", []),
+            "awards": portal.get("awards", []),
+            "professional_degrees": portal.get("professional_degrees", []),
         })
     return records
 

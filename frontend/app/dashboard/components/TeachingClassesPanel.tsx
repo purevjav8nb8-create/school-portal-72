@@ -79,13 +79,34 @@ export default function TeachingClassesPanel({ unit, initialClasses }: Props) {
     }
   };
 
+  const removeClass = async (item: TeachingClass) => {
+    const nextClasses = classes.filter((current) => current !== item);
+    try {
+      await persistClasses(nextClasses);
+      setClasses(nextClasses);
+      setMessage('');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Анги устгагдсангүй.');
+    }
+  };
+
   return (
     <section style={{ marginTop: 10, marginBottom: 10, padding: 8, border: '1px solid #cbd5e1', borderRadius: 8, fontSize: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-        <h3 style={{ margin: 0, fontSize: 14 }}>Заадаг ангиуд</h3>
-        <FloatingComposer title="Заадаг анги нэмэх" label="Заадаг анги нэмэх" trigger={<button type="button" aria-label="Анги нэмэх" title="Анги нэмэх" style={{ width: 28, height: 28, padding: 0, border: 0, borderRadius: 5, background: '#2563eb', color: '#fff', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>+</button>}>
+        <FloatingComposer title="Заадаг ангиуд" label="Заадаг ангиуд" trigger={<button type="button" style={{ width: '100%', padding: '7px 8px', border: 0, borderRadius: 6, background: '#2563eb', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>Заадаг ангиуд ({classes.length})</button>}>
           {(close) => (
             <div style={{ display: 'grid', gap: 10 }}>
+              <div style={{ display: 'grid', gap: 6 }}>
+                <strong style={{ color: '#172554' }}>Одоогийн жагсаалт</strong>
+                {classes.length === 0 ? <p style={{ margin: 0, color: '#64748b' }}>Анги бүртгэгдээгүй байна.</p> : classes.map((item) => (
+                  <div key={`${item.grade}-${item.section}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '7px 9px', border: '1px solid #e2e8f0', borderRadius: 7, background: '#f8fafc' }}>
+                    <span>{item.grade}-р анги {item.section} · {item.weekly_hours} цаг</span>
+                    <button type="button" onClick={() => void removeClass(item)} aria-label={`${item.grade}-р анги ${item.section} устгах`} title="Анги устгах" style={{ padding: '3px 7px', border: 0, borderRadius: 5, background: '#fee2e2', color: '#b91c1c', cursor: 'pointer' }}>×</button>
+                  </div>
+                ))}
+              </div>
+              <hr style={{ width: '100%', border: 0, borderTop: '1px solid #e2e8f0' }} />
+              <strong style={{ color: '#172554' }}>Шинэ анги нэмэх</strong>
               <label>Анги<select value={draft.grade} onChange={(event) => setDraft({ ...draft, grade: Number(event.target.value) })} style={fieldStyle}>{grades.map((grade) => <option key={grade} value={grade}>{romanGrade(grade)} анги</option>)}</select></label>
               <label>Бүлэг<select value={draft.section} onChange={(event) => setDraft({ ...draft, section: event.target.value })} style={fieldStyle}>{['А', 'Б', 'В', 'Г', 'Д', 'Е'].map((section) => <option key={section}>{section}</option>)}</select></label>
               <label>7 хоногийн цаг<input type="number" min={1} value={draft.weekly_hours} onChange={(event) => setDraft({ ...draft, weekly_hours: Math.max(1, Number(event.target.value)) })} style={fieldStyle} /></label>
@@ -94,19 +115,6 @@ export default function TeachingClassesPanel({ unit, initialClasses }: Props) {
           )}
         </FloatingComposer>
       </div>
-      {classes.length === 0 ? <p style={{ color: '#64748b' }}>Анги бүртгэгдээгүй байна.</p> : (
-        <ul style={{ margin: '6px 0', paddingLeft: 18 }}>{classes.map((item) => (
-          <li key={`${item.grade}-${item.section}`} style={{ margin: '4px 0' }}>
-            <button
-              type="button"
-              onClick={() => openClassActions(item)}
-              style={{ padding: 0, border: 0, background: 'transparent', color: '#2563eb', cursor: 'pointer', fontSize: 12, textDecoration: 'underline' }}
-            >
-              {item.grade}-р анги {item.section} · {item.weekly_hours} цаг
-            </button>
-          </li>
-        ))}</ul>
-      )}
       <div style={{ display: 'grid', gap: 2, marginTop: 6, fontSize: 12, lineHeight: 1.2 }}>
         <b>Нийт: {classes.reduce((sum, item) => sum + item.weekly_hours, 0)} цаг</b>
         <b>Илүү цаг: {Math.max(0, classes.reduce((sum, item) => sum + item.weekly_hours, 0) - 19)} цаг</b>

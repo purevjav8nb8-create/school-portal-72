@@ -41,7 +41,6 @@ export default function AttendanceTable({
   const attendanceRate = readOnly
     ? (monthRecords.length > 0 ? Math.round((presentCount / monthRecords.length) * 100) : 0)
     : (teachers.length > 0 ? Math.round((presentCount / teachers.length) * 100) : 0);
-  const overtimeHours = teachers.reduce((total, teacher) => total + (teacher.overtime_hours ?? 0), 0);
 
   return (
     <div>
@@ -72,9 +71,6 @@ export default function AttendanceTable({
             <div style={{ width: `${attendanceRate}%`, height: '100%', backgroundColor: '#16a34a' }}></div>
           </div>
           </div>
-          <div style={{ color: overtimeHours > 0 ? '#dc2626' : '#475569', fontSize: 13, fontWeight: 'bold' }}>
-            Илүү цаг: {overtimeHours} цаг
-          </div>
         </div>
         <div style={{ display: 'flex', gap: '10px', fontSize: '12px' }}>
           <span style={{ color: '#16a34a' }}>🟢 Ирсэн: <b>{presentCount}</b></span>
@@ -94,6 +90,7 @@ export default function AttendanceTable({
               <th style={{ padding: '5px 8px' }}>Нэгдэл</th>
               <th style={{ padding: '5px 8px' }}>Мэргэжил</th>
               <th style={{ padding: '5px 8px' }}>7 хоногийн цаг</th>
+              <th style={{ padding: '5px 8px' }}>Илүү цаг</th>
               <th style={{ padding: '5px 8px' }}>Сарын ирц (%)</th>
               <th style={{ padding: '5px 8px' }}>Өнөөдрийн Ирц</th>
             </tr>
@@ -120,6 +117,9 @@ export default function AttendanceTable({
                 <td style={{ padding: '5px 8px' }}>{t.unit}</td>
                 <td style={{ padding: '5px 8px' }}>{t.subject}</td>
                 <td style={{ padding: '5px 8px' }}>{t.weekly_teaching_hours ?? 0}</td>
+                <td style={{ padding: '5px 8px', color: '#0f172a', fontWeight: 'bold' }}>
+                  {t.overtime_hours ?? Math.max(0, (t.weekly_teaching_hours ?? 0) - 19)}
+                </td>
                 <td style={{ padding: '5px 8px' }}>
                   <span style={{ padding: '3px 6px', borderRadius: '4px', fontSize: '11px', backgroundColor: '#dcfce7', color: '#15803d', fontWeight: 'bold' }}>
                     {rate}%

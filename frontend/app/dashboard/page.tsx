@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabaseClient';
 import AdminDashboardView from './components/AdminDashboardView';
 import { DashboardCategory, Teacher, UserProfile } from './types';
 import { useTeachers } from './hooks/useTeachers';
+import { useNotifications } from './hooks/useNotifications';
 
 const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://127.0.0.1:8000';
 
@@ -19,6 +20,7 @@ export default function DashboardPage() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const { teachers, setTeachers, displayTeachers } = useTeachers(activeUnit);
+  const { counts: notificationCounts, markRead } = useNotifications('admin');
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -96,6 +98,8 @@ export default function DashboardPage() {
         setTeachers((current) => current.map((teacher) => teacher.auth_id === updatedTeacher.auth_id ? updatedTeacher : teacher));
         setSelectedTeacher(updatedTeacher);
       }}
+      notificationCounts={notificationCounts}
+      onCategoryChange={(category) => { markRead(category); setActiveCategory(category); }}
     />
   );
 }

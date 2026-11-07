@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import TeacherDashboardView, { TeacherTraining } from '../components/TeacherDashboardView';
 import { ActivityInput } from '../components/records/ActivityForm';
 import { TeacherActivity } from '../components/records/ActivityPanel';
@@ -9,6 +9,7 @@ import { EvaluationRecord } from '../components/records/EvaluationPanel';
 import { supabase } from '../../../lib/supabaseClient';
 import { DashboardCategory, Teacher, UserProfile } from '../types';
 import { AttendanceRecord } from '../utils/attendance';
+import { useNotifications } from '../hooks/useNotifications';
 
 const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://127.0.0.1:8000';
 
@@ -19,6 +20,8 @@ type TeacherWorkspace = {
 	evaluations: EvaluationRecord[];
 	program_plan?: ProgramPlan;
 	activities: TeacherActivity[];
+	awards: { id: string; name: string; certificate_number: string; certificate_url: string; organization: string; awarded_date?: string; note: string }[];
+	professional_degrees: { id: string; name: string; certificate_number: string; certificate_url: string; status: string; issued_date?: string; note: string }[];
 };
 
 export default function TeacherDashboardPage() {
@@ -28,6 +31,8 @@ export default function TeacherDashboardPage() {
 	const [evaluations, setEvaluations] = useState<TeacherWorkspace['evaluations']>([]);
 	const [programPlan, setProgramPlan] = useState<ProgramPlan | undefined>();
 	const [activities, setActivities] = useState<TeacherActivity[]>([]);
+	const [awards, setAwards] = useState<TeacherWorkspace['awards']>([]);
+	const [degrees, setDegrees] = useState<TeacherWorkspace['professional_degrees']>([]);
 	const [activeCategory, setActiveCategory] = useState<DashboardCategory>('Ирц');
 	const [selectedMonth, setSelectedMonth] = useState(() => {
 		const now = new Date();
@@ -37,6 +42,11 @@ export default function TeacherDashboardPage() {
 	const [busy, setBusy] = useState(false);
 	const [errorMessage, setErrorMessage] = useState('');
 	const [successMessage, setSuccessMessage] = useState('');
+	const personalNotificationItems = useMemo(() => [
+		...awards.map((item) => ({ id: item.id, category: 'Шагнал' as const })),
+		...degrees.map((item) => ({ id: item.id, category: 'Зэрэг' as const })),
+	], [awards, degrees]);
+	const { counts: notificationCounts, markRead } = useNotifications('teacher', personalNotificationItems);
 
 	useEffect(() => {
 		const loadProfile = async () => {
@@ -59,6 +69,8 @@ export default function TeacherDashboardPage() {
 					setEvaluations(result.evaluations);
 					setProgramPlan(result.program_plan);
 					setActivities(result.activities ?? []);
+					setAwards(result.awards ?? []);
+					setDegrees(result.professional_degrees ?? []);
 				} catch (error) {
 					window.localStorage.removeItem('school-portal-mock-token');
 					window.location.href = '/';
@@ -96,6 +108,8 @@ export default function TeacherDashboardPage() {
 				setEvaluations(workspace.evaluations);
 				setProgramPlan(workspace.program_plan);
 				setActivities(workspace.activities ?? []);
+				setAwards(workspace.awards ?? []);
+				setDegrees(workspace.professional_degrees ?? []);
 			} catch (error) {
 				const metadata = authUser.user_metadata ?? {};
 				setUser({
@@ -173,6 +187,17 @@ export default function TeacherDashboardPage() {
 		} catch (error) {
 			setErrorMessage(error instanceof Error ? error.message : 'Тэмдэглэл хадгалагдсангүй.');
 			throw error;
+		} finally {
+			setBusy(false);
+		}
+	};
+
+	const saveProfessional = async (path: string, payload: object) => {
+		setBusy(true);
+		try {
+			const result = await saveRecord(path, payload);
+			if (path.includes('/awards')) setAwards((current) => [...current, result.award as TeacherWorkspace['awards'][number]]);
+			else setDegrees((current) => [...current, result.degree as TeacherWorkspace['professional_degrees'][number]]);
 		} finally {
 			setBusy(false);
 		}
@@ -263,6 +288,8 @@ export default function TeacherDashboardPage() {
 			evaluations={evaluations}
 			programPlan={programPlan}
 			activities={activities}
+			awards={awards}
+			degrees={degrees}
 			activeCategory={activeCategory}
 			selectedMonth={selectedMonth}
 			setSelectedMonth={setSelectedMonth}
@@ -276,6 +303,9 @@ export default function TeacherDashboardPage() {
 			onActivity={addActivity}
 			onEvaluation={addEvaluation}
 			onDeleteEvaluation={deleteEvaluation}
+			onProfessionalSave={saveProfessional}
+			notificationCounts={notificationCounts}
+			onNotificationCategoryChange={(category) => { markRead(category); setActiveCategory(category); }}
 		/>
 	);
 }

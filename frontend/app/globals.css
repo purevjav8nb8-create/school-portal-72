@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+.announcement-image-preview:hover .announcement-image-actions {
+  opacity: 1 !important;
+}
+
 html,
 body {
   padding: 0;
@@ -14,4 +18,107 @@ body {
 
 * {
   box-sizing: border-box;
+}
+
+.dashboard-compact {
+  font-size: 13px;
+}
+
+.dashboard-compact h1,
+.dashboard-compact h2,
+.dashboard-compact h3,
+.dashboard-compact h4 {
+  line-height: 1.25;
+}
+
+.dashboard-compact h1 {
+  font-size: 20px;
+}
+
+.dashboard-compact h2 {
+  font-size: 18px;
+}
+
+.dashboard-compact h3 {
+  font-size: 15px;
+}
+
+.dashboard-compact h4 {
+  font-size: 14px;
+}
+
+.dashboard-compact table {
+  font-size: 12px;
+}
+
+.dashboard-compact th,
+.dashboard-compact td {
+  padding: 4px 6px !important;
+}
+
+.dashboard-compact p {
+  margin-top: 4px;
+  margin-bottom: 4px;
+  line-height: 1.35;
+}
+
+.dashboard-compact button,
+.dashboard-compact input,
+.dashboard-compact select,
+.dashboard-compact textarea {
+  font-size: 13px;
+}
+
+.dashboard-content {
+  font-size: 13px;
+}
+
+.dashboard-content h2,
+.dashboard-content h3,
+.dashboard-content h4 {
+  margin-top: 8px;
+  margin-bottom: 6px;
+  line-height: 1.25;
+}
+
+.dashboard-content h2 {
+  font-size: 18px;
+}
+
+.dashboard-content h3 {
+  font-size: 15px;
+}
+
+.dashboard-content h4 {
+  font-size: 14px;
+}
+
+.dashboard-content article,
+.dashboard-content fieldset {
+  border-radius: 8px;
+}
+
+.dashboard-content table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.dashboard-content th,
+.dashboard-content td {
+  padding: 4px 6px !important;
+  line-height: 1.25;
+}
+
+.dashboard-content p {
+  margin-top: 2px;
+  margin-bottom: 2px;
+  line-height: 1.35;
+}
+
+.dashboard-content button,
+.dashboard-content input,
+.dashboard-content select,
+.dashboard-content textarea {
+  font-size: 13px;
 }

@@ -47,13 +47,14 @@ export default function AdminTrainingPanel({ teachers }: Props) {
       {rows.length === 0 ? <p>Сургалтын бүртгэл алга.</p> : (
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead><tr>{['Багш', 'Сургалтын нэр', 'Хугацаа', 'Файл'].map((item) => <th key={item} style={cell}>{item}</th>)}</tr></thead>
+            <thead><tr>{['Багш', 'Сургалтын нэр', 'Төрөл', 'Хугацаа', 'Файл'].map((item) => <th key={item} style={cell}>{item}</th>)}</tr></thead>
             <tbody>{rows.map(({ teacher, training }) => (
               <tr key={`${teacher.auth_id}-${training.id}`} style={{ borderTop: '1px solid #e2e8f0' }}>
                 <td style={cell}>{teacher.last_name} {teacher.first_name}</td>
                 <td style={cell}>
                   <button type="button" onClick={() => setSelected({ teacher, training })} style={linkButton}>{training.name}</button>
                 </td>
+                <td style={cell}>{training.trainingType || 'Бусад'}</td>
                 <td style={cell}>{training.startDate} – {training.endDate}</td>
                 <td style={cell}><FileAttachmentActions attachment={{ name: 'Сертификат', url: training.certificateUrl, file_type: training.certificateUrl.toLowerCase().includes('.pdf') ? 'document' : 'image' }} /></td>
               </tr>
@@ -68,7 +69,7 @@ export default function AdminTrainingPanel({ teachers }: Props) {
               <h3 style={{ margin: 0 }}>{selected.training.name}</h3>
               <button type="button" onClick={() => setSelected(null)} style={closeButton}>Хаах</button>
             </header>
-            <p style={{ margin: '10px 0', color: '#475569' }}>{selected.teacher.last_name} {selected.teacher.first_name} · {selected.training.startDate} – {selected.training.endDate}</p>
+            <p style={{ margin: '10px 0', color: '#475569' }}>{selected.teacher.last_name} {selected.teacher.first_name} · {selected.training.trainingType || 'Бусад'} · {selected.training.startDate} – {selected.training.endDate}</p>
             <div style={attachmentGrid}>
               <div style={attachmentCard}>
                 <strong>Сертификат</strong>

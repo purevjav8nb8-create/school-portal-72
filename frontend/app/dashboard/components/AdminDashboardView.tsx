@@ -8,9 +8,11 @@ import SideMenu from './SideMenu';
 import UnitTabs from './UnitTabs';
 import AdminReviewPanel from './records/AdminReviewPanel';
 import AnnouncementBoard from './records/AnnouncementBoard';
+import SurveyBoard from './records/SurveyBoard';
 import TeacherDetailModal from './TeacherDetailModal';
 import AdminTrainingPanel from './AdminTrainingPanel';
 import { DashboardCategory, Teacher, UserProfile } from '../types';
+import { NotificationCounts } from '../hooks/useNotifications';
 
 interface Props {
   user: UserProfile;
@@ -30,6 +32,8 @@ interface Props {
   selectedTeacher: Teacher | null;
   onCloseTeacher: () => void;
   onTeacherUpdated: (teacher: Teacher) => void;
+  notificationCounts?: NotificationCounts;
+  onCategoryChange?: (category: DashboardCategory) => void;
 }
 
 export default function AdminDashboardView({
@@ -50,6 +54,8 @@ export default function AdminDashboardView({
   selectedTeacher,
   onCloseTeacher,
   onTeacherUpdated,
+  notificationCounts = {},
+  onCategoryChange,
 }: Props) {
   const activeTeachers = teachers.filter((teacher) => teacher.attendance !== 'Тасалсан').length;
   const unitStats = {
@@ -62,14 +68,15 @@ export default function AdminDashboardView({
   };
 
   return (
-    <main style={{ height: '100vh', overflow: 'hidden', backgroundColor: '#f8fafc', padding: 8 }}>
+    <main className="dashboard-compact" style={{ height: '100vh', overflow: 'hidden', backgroundColor: '#f8fafc', padding: 6 }}>
       <Header user={user} onLogout={onLogout} />
-      <div style={{ display: 'grid', gridTemplateColumns: '150px minmax(0, 1fr) 180px', gap: 12, marginTop: 10, height: 'calc(100vh - 108px)', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '150px minmax(0, 1fr) 180px', gap: 8, marginTop: 7, height: 'calc(100vh - 100px)', alignItems: 'start' }}>
         <aside style={{ overflow: 'hidden' }}>
           <SideMenu
             activeCategory={activeCategory}
-            setActiveCategory={setActiveCategory}
-            categories={['Ирц', 'Сургалт', 'Үнэлгээ', 'Хянах', 'Зар']}
+            setActiveCategory={onCategoryChange ?? setActiveCategory}
+            notificationCounts={notificationCounts}
+            categories={['Ирц', 'Сургалт', 'Үнэлгээ', 'Судалгаа', 'Мэдээлэл', 'Зар', 'Хянах']}
           />
           <AdminTeacherTools teachers={teachers} onTeachersAdded={onTeachersAdded} onTeacherRemoved={onTeacherRemoved} />
         </aside>
@@ -81,7 +88,7 @@ export default function AdminDashboardView({
               activeTeachers={activeTeachers}
               {...unitStats}
             />}
-          <div style={{ padding: 10, background: '#fff', borderRadius: 14, boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+          <div className="dashboard-content" style={{ padding: 8, background: '#fff', borderRadius: 10, boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
             {activeCategory === 'Ирц' && (
               <AttendanceTable
                 teachers={displayTeachers}
@@ -95,7 +102,9 @@ export default function AdminDashboardView({
             {activeCategory === 'Сургалт' && <AdminTrainingPanel teachers={teachers} />}
             {activeCategory === 'Үнэлгээ' && <AdminReviewPanel summaryOnly />}
             {activeCategory === 'Хянах' && <AdminReviewPanel />}
-            {activeCategory === 'Зар' && <AnnouncementBoard />}
+            {activeCategory === 'Судалгаа' && <SurveyBoard isAdmin />}
+            {activeCategory === 'Мэдээлэл' && <AnnouncementBoard boardType="Мэдээлэл" />}
+            {activeCategory === 'Зар' && <AnnouncementBoard boardType="Зар" />}
           </div>
         </section>
         <QuickActions unit={activeUnit} category={activeCategory} month={selectedMonth} />

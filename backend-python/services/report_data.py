@@ -1,3 +1,4 @@
+import calendar
 import os
 from typing import Any
 
@@ -14,18 +15,44 @@ def _base_row(teacher: dict[str, Any]) -> dict[str, Any]:
 	return {
 		"Овог": teacher.get("last_name", ""),
 		"Нэр": teacher.get("first_name", ""),
-		"Нэгдэл": teacher.get("unit", ""),
 		"Мэргэжил": teacher.get("subject", ""),
 	}
+
+
+def _attendance_mark(status: Any) -> str:
+	marks = {
+		"Ирсэн": "И",
+		"Өвчтэй": "Ө",
+		"Тасалсан": "Т",
+		"Чөлөөтэй": "Ч",
+		"Хоцорсон": "Х",
+	}
+	return marks.get(str(status).strip(), "")
 
 
 def _rows_for_teacher(teacher: dict[str, Any], category: str, month: str) -> list[dict[str, Any]]:
 	base = _base_row(teacher)
 	if category == "Ирц":
-		records = [item for item in teacher.get("daily_records", []) if item.get("date", "").startswith(month)]
-		if not records:
-			return [{**base, "Огноо": month, "Ирц": "Бүртгэгдээгүй"}]
-		return [{**base, "Огноо": item["date"], "Ирц": item["status"]} for item in records]
+		year = month_number = None
+		try:
+			year, month_number = (int(value) for value in month.split("-", 1))
+			days_in_month = calendar.monthrange(year, month_number)[1]
+		except (TypeError, ValueError):
+			days_in_month = 31
+
+		attendance_by_day = {
+			item.get("date", "")[-2:]: item.get("status", "")
+			for item in teacher.get("daily_records", [])
+			if item.get("date", "").startswith(month)
+		}
+		working_days = [
+			day for day in range(1, days_in_month + 1)
+			if calendar.weekday(year, month_number, day) < 5
+		] if year is not None and month_number is not None else list(range(1, days_in_month + 1))
+		return [{
+			**base,
+			**{str(day): _attendance_mark(attendance_by_day.get(f"{day:02d}", "")) for day in working_days},
+		}]
 	if category == "Сургалт":
 		trainings = teacher.get("training_records", [])
 		if not trainings:
@@ -64,9 +91,14 @@ def build_report_data(authorization: str | None, unit: str, category: str, month
 
 	if is_admin:
 		teachers = list_teacher_accounts()
-		if unit != "НИЙТ":
-			teachers = [teacher for teacher in teachers if teacher.get("unit") == unit]
+		selected_unit = str(unit or "НИЙТ").strip().upper()
+		if selected_unit != "НИЙТ":
+			teachers = [
+				teacher for teacher in teachers
+				if str(teacher.get("unit", "")).strip().upper() == selected_unit
+			]
 	else:
+		selected_unit = str(unit or "").strip().upper()
 		teacher_user = require_teacher(authorization)
 		workspace = get_my_teacher_data(teacher_user)
 		profile = workspace["profile"]
@@ -78,4 +110,4 @@ def build_report_data(authorization: str | None, unit: str, category: str, month
 		}]
 
 	rows = [row for teacher in teachers for row in _rows_for_teacher(teacher, category, month)]
-	return {"category": category, "unit": unit, "month": month, "rows": rows}
+	return {"category": category, "unit": selected_unit, "month": month, "rows": rows}
