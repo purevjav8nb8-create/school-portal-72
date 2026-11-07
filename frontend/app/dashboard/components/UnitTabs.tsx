@@ -60,9 +60,9 @@ export default function UnitTabs({
         display: 'flex',
         justifyContent: 'space-around',
         alignItems: 'center',
-        marginBottom: '16px',
+        marginBottom: '8px',
         borderBottom: '1px solid #e2e8f0',
-        paddingBottom: '12px',
+        paddingBottom: '7px',
       }}
     >
       {tabs.map((tab) => (

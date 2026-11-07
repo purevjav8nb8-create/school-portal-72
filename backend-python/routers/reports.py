@@ -1,123 +1,120 @@
-from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import StreamingResponse
-from urllib.parse import quote
-from services.teacher_service import get_teachers_list
-import pandas as pd
+import html
 import io
+import os
+from datetime import date
+from urllib.parse import quote
+
+import pandas as pd
+from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi.responses import StreamingResponse
+
+from services.report_data import build_report_data
 
 router = APIRouter(prefix="/api/reports", tags=["Reports"])
 
-@router.get("/export/excel")
-def export_teachers_excel(
+
+def _get_report(authorization: str | None, unit: str, category: str, month: str):
+    report_month = month or date.today().strftime("%Y-%m")
+    return build_report_data(authorization, unit, category, report_month)
+
+
+def _filename(report: dict, extension: str) -> str:
+    return quote(f"Report_{report['unit']}_{report['category']}_{report['month']}.{extension}")
+
+
+@router.get("/preview")
+def preview_report(
+    authorization: str | None = Header(default=None),
     unit: str = Query("НИЙТ"),
     category: str = Query("Ирц"),
-    month: str = Query("2026-03")
+    month: str = Query(""),
 ):
-    try:
-        teachers = get_teachers_list()
-        if unit != "НИЙТ":
-            teachers = [t for t in teachers if t["unit"] == unit]
+    return _get_report(authorization, unit, category, month)
 
-        export_data = []
-        for t in teachers:
-            item = {
-                "Овог": t["last_name"],
-                "Нэр": t["first_name"],
-                "Нэгдэл": t["unit"],
-                "Мэргэжил": t["subject"],
-            }
-            if category == "Ирц":
-                item["Өнөөдрийн ирц"] = t["attendance"]
-                item["Сарын ирцийн хувь"] = f"{t['monthly_attendance_rate']}%"
-            elif category == "Сургалт":
-                item["Сургалтын төлөв"] = t["training_status"]
-            elif category == "Үнэлгээ":
-                item["Үнэлгээний оноо"] = t["rating"]
-                
-            export_data.append(item)
 
-        df = pd.DataFrame(export_data)
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df.to_excel(writer, index=False, sheet_name="Report")
-        output.seek(0)
+@router.get("/export/excel")
+def export_teachers_excel(
+    authorization: str | None = Header(default=None),
+    unit: str = Query("НИЙТ"),
+    category: str = Query("Ирц"),
+    month: str = Query(""),
+):
+    report = _get_report(authorization, unit, category, month)
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        pd.DataFrame(report["rows"]).to_excel(writer, index=False, sheet_name="Тайлан")
+    output.seek(0)
+    return StreamingResponse(
+        output,
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{_filename(report, 'xlsx')}"},
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
 
-        filename = f"Report_{unit}_{category}_{month}.xlsx"
-        encoded_filename = quote(filename)
-
-        return StreamingResponse(
-            output, 
-            headers={'Content-Disposition': f"attachment; filename*=UTF-8''{encoded_filename}"}, 
-            media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/export/pdf")
 def export_teachers_pdf(
+    authorization: str | None = Header(default=None),
     unit: str = Query("НИЙТ"),
     category: str = Query("Ирц"),
-    month: str = Query("2026-03")
+    month: str = Query(""),
+    disposition: str = Query("attachment"),
 ):
+    report = _get_report(authorization, unit, category, month)
     try:
-        from reportlab.lib.pagesizes import letter
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-        from reportlab.lib.styles import getSampleStyleSheet
         from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+    except ImportError as error:
+        raise HTTPException(status_code=503, detail="PDF тайлангийн сан тохируулагдаагүй байна.") from error
 
-        teachers = get_teachers_list()
-        if unit != "НИЙТ":
-            teachers = [t for t in teachers if t["unit"] == unit]
+    font_path = os.getenv("REPORT_FONT_PATH") or next((
+        path for path in (r"C:\Windows\Fonts\arial.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+        if os.path.exists(path)
+    ), "")
+    font_name = "Helvetica"
+    if font_path:
+        try:
+            pdfmetrics.registerFont(TTFont("SchoolReportFont", font_path))
+            font_name = "SchoolReportFont"
+        except Exception:
+            pass
 
-        buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=letter)
-        elements = []
-        styles = getSampleStyleSheet()
+    rows = report["rows"]
+    columns = list(rows[0]) if rows else ["Мэдээлэл"]
+    styles = getSampleStyleSheet()
+    cell_style = ParagraphStyle("ReportCell", parent=styles["BodyText"], fontName=font_name, fontSize=8, leading=10)
+    title_style = ParagraphStyle("ReportTitle", parent=styles["Title"], fontName=font_name, fontSize=14)
+    table_data = [[Paragraph(html.escape(str(column)), cell_style) for column in columns]]
+    table_data.extend([[Paragraph(html.escape(str(row.get(column, ""))), cell_style) for column in columns] for row in rows])
 
-        title_text = f"School Portal 72 - {unit} ({category} report - {month})"
-        elements.append(Paragraph(f"<b>{title_text}</b>", styles['Title']))
-        elements.append(Spacer(1, 12))
-
-        if category == "Ирц":
-            headers = ["Last Name", "First Name", "Unit", "Subject", "Status", "Rate"]
-            col_widths = [80, 80, 80, 100, 80, 60]
-        elif category == "Сургалт":
-            headers = ["Last Name", "First Name", "Unit", "Subject", "Training"]
-            col_widths = [90, 90, 90, 110, 100]
-        else:
-            headers = ["Last Name", "First Name", "Unit", "Subject", "Score"]
-            col_widths = [90, 90, 90, 110, 100]
-
-        table_data = [headers]
-        for t in teachers:
-            if category == "Ирц":
-                row = [t["last_name"], t["first_name"], t["unit"], t["subject"], t["attendance"], f"{t['monthly_attendance_rate']}%"]
-            elif category == "Сургалт":
-                row = [t["last_name"], t["first_name"], t["unit"], t["subject"], t["training_status"]]
-            else:
-                row = [t["last_name"], t["first_name"], t["unit"], t["subject"], f"{t['rating']} pts"]
-            table_data.append(row)
-
-        t = Table(table_data, colWidths=col_widths)
-        t.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1E3A8A')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-        ]))
-        elements.append(t)
-        doc.build(elements)
-        buffer.seek(0)
-
-        filename = f"Report_{unit}_{category}_{month}.pdf"
-        encoded_filename = quote(filename)
-
-        return StreamingResponse(
-            buffer,
-            headers={'Content-Disposition': f"attachment; filename*=UTF-8''{encoded_filename}"},
-            media_type='application/pdf'
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    output = io.BytesIO()
+    document = SimpleDocTemplate(output, pagesize=landscape(A4), repeatRows=1)
+    table = Table(table_data, repeatRows=1)
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f766e")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cbd5e1")),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("FONTNAME", (0, 0), (-1, -1), font_name),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    document.build([
+        Paragraph(f"School Portal 72 · {html.escape(report['unit'])} · {html.escape(report['category'])} · {report['month']}", title_style),
+        Spacer(1, 14),
+        table,
+    ])
+    output.seek(0)
+    response_mode = "inline" if disposition == "inline" else "attachment"
+    return StreamingResponse(
+        output,
+        headers={"Content-Disposition": f"{response_mode}; filename*=UTF-8''{_filename(report, 'pdf')}"},
+        media_type="application/pdf",
+    )

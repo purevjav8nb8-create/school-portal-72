@@ -17,10 +17,10 @@ export default function Header({
         display: 'grid',
         gridTemplateColumns: '110px 1fr auto',
         alignItems: 'center',
-        marginBottom: '20px',
+        marginBottom: '10px',
         backgroundColor: 'white',
         borderRadius: '16px',
-        padding: '2px 4px',
+        padding: '0 4px',
         boxShadow:
           '0 2px 10px rgba(0,0,0,0.06)',
       }}
@@ -30,8 +30,8 @@ export default function Header({
           src="/logo.png"
           alt="Logo"
           style={{
-            width: '72px',
-            height: '72px',
+            width: '56px',
+            height: '56px',
             objectFit: 'contain',
           }}
         />
@@ -45,13 +45,13 @@ export default function Header({
         <h1
           style={{
             margin: 0,
-            fontSize: '22px',
+            fontSize: '20px',
             fontWeight: 800,
             color: '#0f172a',
             lineHeight: 1.1,
           }}
         >
-          Админ хяналт самбар
+          {user?.role === 'admin' ? 'Админ хяналт самбар' : 'Багшийн самбар'}
         </h1>
 
         <div
@@ -77,7 +77,7 @@ export default function Header({
           <div style={{ textAlign: 'right' }}>
             <span
               style={{
-                fontSize: '14px',
+                fontSize: '13px',
                 fontWeight: 'bold',
                 display: 'block',
                 color: '#1e293b',
@@ -89,7 +89,7 @@ export default function Header({
             <small
               style={{
                 color: '#64748b',
-                fontSize: '12px',
+                fontSize: '11px',
               }}
             >
               {user.role === 'admin'

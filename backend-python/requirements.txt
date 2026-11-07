@@ -9,3 +9,4 @@ pydantic
 httpx
 python-multipart
 sqlalchemy
+PyMuPDF

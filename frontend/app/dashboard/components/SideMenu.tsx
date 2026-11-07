@@ -1,14 +1,19 @@
 'use client';
 
+import { DashboardCategory } from '../types';
+
 interface Props {
-  activeCategory: string;
-  setActiveCategory: (category: 'Ирц' | 'Сургалт' | 'Үнэлгээ') => void;
+  activeCategory: DashboardCategory;
+  setActiveCategory: (category: DashboardCategory) => void;
+  categories?: DashboardCategory[];
 }
 
-export default function SideMenu({ activeCategory, setActiveCategory }: Props) {
+const defaultCategories: DashboardCategory[] = ['Ирц', 'Сургалт', 'Үнэлгээ'];
+
+export default function SideMenu({ activeCategory, setActiveCategory, categories = defaultCategories }: Props) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      {(['Ирц', 'Сургалт', 'Үнэлгээ'] as const).map((category) => {
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      {categories.map((category) => {
         const isActive = activeCategory === category;
         return (
           <button
@@ -18,10 +23,10 @@ export default function SideMenu({ activeCategory, setActiveCategory }: Props) {
               backgroundColor: isActive ? '#ea580c' : '#fb923c',
               color: 'white',
               border: 'none',
-              padding: '10px 20px',
+              padding: '7px 12px',
               borderRadius: '24px',
               fontWeight: 'bold',
-              fontSize: '15px',
+              fontSize: '14px',
               cursor: 'pointer',
               boxShadow: isActive ? '0 4px 10px rgba(234, 88, 12, 0.4)' : 'none',
               transform: isActive ? 'scale(1.05)' : 'none',

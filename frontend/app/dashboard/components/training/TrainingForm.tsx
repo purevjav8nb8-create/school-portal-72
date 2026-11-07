@@ -2,12 +2,14 @@
 
 import { useState } from 'react';
 import CertificateUpload from '../../../../components/CertificateUpload';
+import FloatingComposer from '../records/FloatingComposer';
 
 interface Props {
   onAddTraining: (training: {
     name: string;
     startDate: string;
     endDate: string;
+    trainingType: 'Үндсэн' | 'Төрөлжсөн' | 'Сонголтот' | 'Ажлын байран дээрх сургалт' | 'Бусад';
     certificateUrl: string;
     imageUrl?: string;
   }) => void;
@@ -17,13 +19,14 @@ export default function TrainingForm({ onAddTraining }: Props) {
   const [name, setName] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [trainingType, setTrainingType] = useState<'' | 'Үндсэн' | 'Төрөлжсөн' | 'Сонголтот' | 'Ажлын байран дээрх сургалт' | 'Бусад'>('');
   const [certificateUrl, setCertificateUrl] = useState('');
   const [imageUrl, setImageUrl] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !startDate || !endDate || !certificateUrl) {
-      alert('Сургалтын нэр, огноо болон сертификатын файлыг заавал оруулна уу!');
+    if (!name || !trainingType || !startDate || !endDate || !certificateUrl) {
+      alert('Сургалтын нэр, төрөл, огноо болон сертификатын файлыг заавал оруулна уу!');
       return;
     }
 
@@ -31,6 +34,7 @@ export default function TrainingForm({ onAddTraining }: Props) {
       name,
       startDate,
       endDate,
+      trainingType,
       certificateUrl,
       imageUrl: imageUrl || undefined,
     });
@@ -38,12 +42,14 @@ export default function TrainingForm({ onAddTraining }: Props) {
     setName('');
     setStartDate('');
     setEndDate('');
+    setTrainingType('');
     setCertificateUrl('');
     setImageUrl('');
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '8px', marginBottom: '20px', border: '1px solid #cbd5e1' }}>
+    <FloatingComposer title="Шинэ сургалт бүртгэх" label="Шинэ сургалт бүртгэх">
+    {(close) => <form onSubmit={(event) => { handleSubmit(event); if (name && trainingType && startDate && endDate && certificateUrl) close(); }} style={{ display: 'grid', gap: 12, backgroundColor: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
       <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#334155' }}>➕ Шинэ сургалт бүртгэх</h4>
       
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
@@ -58,6 +64,13 @@ export default function TrainingForm({ onAddTraining }: Props) {
             style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
           />
         </div>
+        <label style={{ fontSize: '12px', fontWeight: 'bold', display: 'grid', gap: 4 }}>
+          Сургалтын төрөл *
+          <select required value={trainingType} onChange={(event) => setTrainingType(event.target.value as typeof trainingType)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}>
+            <option value="" disabled>Сургалтын төрөл сонгох</option>
+            {['Үндсэн', 'Төрөлжсөн', 'Сонголтот', 'Ажлын байран дээрх сургалт', 'Бусад'].map((item) => <option key={item}>{item}</option>)}
+          </select>
+        </label>
 
         <div style={{ display: 'flex', gap: '8px' }}>
           <div style={{ flex: 1 }}>
@@ -86,14 +99,14 @@ export default function TrainingForm({ onAddTraining }: Props) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
         <div>
           <label style={{ fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '4px', color: '#dc2626' }}>
-            📄 Сертификат (Cloudinary-аар заавал) *
+            📄 Сертификат *
           </label>
           <CertificateUpload onUploadSuccess={(url) => setCertificateUrl(url)} />
         </div>
 
         <div>
           <label style={{ fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '4px', color: '#475569' }}>
-            🖼️ Зурган файл (Сонголттой)
+            🖼️ Зурган файл
           </label>
           <CertificateUpload onUploadSuccess={(url) => setImageUrl(url)} />
         </div>
@@ -101,20 +114,21 @@ export default function TrainingForm({ onAddTraining }: Props) {
 
       <button 
         type="submit"
-        disabled={!certificateUrl}
+        disabled={!certificateUrl || !trainingType}
         style={{
-          backgroundColor: certificateUrl ? '#ea580c' : '#cbd5e1',
+          backgroundColor: certificateUrl && trainingType ? '#ea580c' : '#cbd5e1',
           color: 'white',
           border: 'none',
           padding: '10px 20px',
           borderRadius: '6px',
           fontWeight: 'bold',
-          cursor: certificateUrl ? 'pointer' : 'not-allowed',
+          cursor: certificateUrl && trainingType ? 'pointer' : 'not-allowed',
           width: '100%',
         }}
       >
         Нэмэх & Хадгалах
       </button>
-    </form>
+    </form>}
+    </FloatingComposer>
   );
 }

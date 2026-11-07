@@ -2,255 +2,100 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
-
-import Header from './components/Header';
-import SideMenu from './components/SideMenu';
-import AttendanceTable from './components/AttendanceTable';
-import UnitTabs from './components/UnitTabs';
-import QuickActions from './components/QuickActions';
-
-import { Teacher, UserProfile } from './types';
-
+import AdminDashboardView from './components/AdminDashboardView';
+import { DashboardCategory, Teacher, UserProfile } from './types';
 import { useTeachers } from './hooks/useTeachers';
 
+const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://127.0.0.1:8000';
+
 export default function DashboardPage() {
-  const [activeCategory, setActiveCategory] = useState<
-    'Ирц' | 'Сургалт' | 'Үнэлгээ'
-  >('Ирц');
-
-  const [activeUnit, setActiveUnit] = useState<
-    'НИЙТ' | 'БАЗАН' | 'БУЗАН' | 'НУЗАН'
-  >('НИЙТ');
-
-  const [selectedMonth, setSelectedMonth] =
-    useState('2026-03');
-
-  const [loading, setLoading] =
-    useState(true);
+  const [activeCategory, setActiveCategory] = useState<DashboardCategory>('Ирц');
+  const [activeUnit, setActiveUnit] = useState<'НИЙТ' | 'БАЗАН' | 'БУЗАН' | 'НУЗАН'>('НИЙТ');
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
+  const { teachers, setTeachers, displayTeachers } = useTeachers(activeUnit);
 
   useEffect(() => {
     const checkAuth = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) {
         window.location.href = '/';
         return;
       }
-
+      if (authUser.app_metadata?.role !== 'admin' && authUser.email?.toLowerCase() !== 'admin@moes.edu.mn') {
+        window.location.href = '/dashboard/teacher';
+        return;
+      }
+      setUser({
+        last_name: authUser.user_metadata?.last_name ?? 'Системийн',
+        first_name: authUser.user_metadata?.first_name ?? 'Админ',
+        email: authUser.email ?? '',
+        unit: authUser.user_metadata?.unit ?? 'Захиргаа',
+        subject: authUser.user_metadata?.subject ?? 'Администратор',
+        role: 'admin',
+      });
       setLoading(false);
     };
-
-    checkAuth();
+    void checkAuth();
   }, []);
 
-  const user: UserProfile = {
-    last_name: 'Админ',
-    first_name: 'Систем',
-    email: 'admin@moes.edu.mn',
-    unit: 'БАЗАН',
-    subject: 'Administrator',
-    role: 'admin',
-  };
-
-  const {
-    teachers,
-    setTeachers,
-    displayTeachers,
-  } = useTeachers(activeUnit);
-
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     window.location.href = '/';
   };
 
-  const handleAttendanceChange = (
-    id: number,
-    status: Teacher['attendance']
-  ) => {
-    setTeachers((prev) =>
-      prev.map((teacher) =>
-        teacher.id === id
-          ? {
-              ...teacher,
-              attendance: status,
-            }
-          : teacher
-      )
-    );
+  const handleAttendanceChange = async (id: number, status: Teacher['attendance']) => {
+    const teacher = teachers.find((item) => item.id === id);
+    if (!teacher?.auth_id) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    try {
+      const response = await fetch(`${apiUrl}/api/teachers/${teacher.auth_id}/attendance`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: new Date().toISOString().slice(0, 10), status }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.detail ?? 'Ирц хадгалагдсангүй.');
+      setTeachers((current) => current.map((item) => item.id === id ? { ...item, attendance: status } : item));
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Ирц хадгалагдсангүй.');
+    }
   };
 
-  const handleTeacherSelect = (
-    teacher: Teacher
-  ) => {
-    alert(
-      `${teacher.last_name} ${teacher.first_name} багшийн дэлгэрэнгүй мэдээлэл`
-    );
-  };
-
-  if (loading) {
-    return (
-      <div
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}
-      >
-        Ачаалж байна...
-      </div>
-    );
-  }
+  if (loading) return <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>Ачаалж байна...</div>;
+  if (!user) return null;
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        backgroundColor: '#f8fafc',
-        padding: '10px',
+    <AdminDashboardView
+      user={user}
+      activeCategory={activeCategory}
+      setActiveCategory={setActiveCategory}
+      activeUnit={activeUnit}
+      setActiveUnit={setActiveUnit}
+      selectedMonth={selectedMonth}
+      setSelectedMonth={setSelectedMonth}
+      teachers={teachers}
+      displayTeachers={displayTeachers}
+      onLogout={handleLogout}
+      onTeacherSelect={setSelectedTeacher}
+      selectedTeacher={selectedTeacher}
+      onCloseTeacher={() => setSelectedTeacher(null)}
+      onAttendanceChange={handleAttendanceChange}
+      onTeachersAdded={(newTeachers) => setTeachers((current) => [...newTeachers, ...current])}
+      onTeacherRemoved={(authId) => {
+        setTeachers((current) => current.filter((teacher) => teacher.auth_id !== authId));
+        setSelectedTeacher((current) => current?.auth_id === authId ? null : current);
       }}
-    >
-      <Header
-        user={user}
-        onLogout={handleLogout}
-      />
-
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns:
-            '180px 1fr 220px',
-          gap: '20px',
-          marginTop: '16px',
-          alignItems: 'start',
-        }}
-      >
-        <div>
-          <SideMenu
-            activeCategory={activeCategory}
-            setActiveCategory={
-              setActiveCategory
-            }
-          />
-        </div>
-
-        <div>
-          <UnitTabs
-            activeUnit={activeUnit}
-            setActiveUnit={setActiveUnit}
-            totalTeachers={teachers.length}
-            activeTeachers={
-              teachers.filter(
-                (t) =>
-                  t.attendance !==
-                  'Тасалсан'
-              ).length
-            }
-            bazanTotal={
-              teachers.filter(
-                (t) =>
-                  t.unit === 'БАЗАН'
-              ).length
-            }
-            bazanActive={
-              teachers.filter(
-                (t) =>
-                  t.unit === 'БАЗАН' &&
-                  t.attendance !==
-                    'Тасалсан'
-              ).length
-            }
-            buzanTotal={
-              teachers.filter(
-                (t) =>
-                  t.unit === 'БУЗАН'
-              ).length
-            }
-            buzanActive={
-              teachers.filter(
-                (t) =>
-                  t.unit === 'БУЗАН' &&
-                  t.attendance !==
-                    'Тасалсан'
-              ).length
-            }
-            nuzanTotal={
-              teachers.filter(
-                (t) =>
-                  t.unit === 'НУЗАН'
-              ).length
-            }
-            nuzanActive={
-              teachers.filter(
-                (t) =>
-                  t.unit === 'НУЗАН' &&
-                  t.attendance !==
-                    'Тасалсан'
-              ).length
-            }
-          />
-
-          <div
-            style={{
-              backgroundColor:
-                'white',
-              borderRadius: '14px',
-              padding: '16px',
-              boxShadow:
-                '0 2px 10px rgba(0,0,0,0.06)',
-            }}
-          >
-            {activeCategory ===
-              'Ирц' && (
-              <AttendanceTable
-                teachers={
-                  displayTeachers
-                }
-                activeUnit={
-                  activeUnit
-                }
-                selectedMonth={
-                  selectedMonth
-                }
-                setSelectedMonth={
-                  setSelectedMonth
-                }
-                onSelectTeacher={
-                  handleTeacherSelect
-                }
-                onAttendanceChange={
-                  handleAttendanceChange
-                }
-              />
-            )}
-
-            {activeCategory ===
-              'Сургалт' && (
-              <div>
-                <h2>📚 Сургалт</h2>
-                <p>
-                  Сургалтын модуль
-                  энд орно.
-                </p>
-              </div>
-            )}
-
-            {activeCategory ===
-              'Үнэлгээ' && (
-              <div>
-                <h2>⭐ Үнэлгээ</h2>
-                <p>
-                  Үнэлгээний модуль
-                  энд орно.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <QuickActions />
-      </div>
-    </div>
+      onTeacherUpdated={(updatedTeacher) => {
+        setTeachers((current) => current.map((teacher) => teacher.auth_id === updatedTeacher.auth_id ? updatedTeacher : teacher));
+        setSelectedTeacher(updatedTeacher);
+      }}
+    />
   );
 }

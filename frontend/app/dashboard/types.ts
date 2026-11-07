@@ -4,6 +4,8 @@ export interface UserProfile {
   email: string;
   unit: string;
   subject: string;
+  subjects?: string[];
+  teaching_classes?: Array<{ grade: number; section: string; weekly_hours: number }>;
   role: 'admin' | 'teacher';
   lms_username?: string;
 }
@@ -15,6 +17,7 @@ export interface DailyAttendance {
 
 export interface Teacher {
   id: number;
+  auth_id?: string;
   last_name: string;
   first_name: string;
   email: string;
@@ -25,5 +28,19 @@ export interface Teacher {
   training_status: 'Хамрагдсан' | 'Хамрагдаж байгаа' | 'Хамрагдаагүй';
   rating: number;
   monthly_login_count: number;
-  daily_records?: Record<string, DailyAttendance[]>; // "2026-01": [{day: 1, status: 'Ирсэн'}, ...]
+  teaching_classes?: Array<{ grade: number; section: string; weekly_hours: number }>;
+  weekly_teaching_hours?: number;
+  overtime_hours?: number;
+  daily_records?: Array<{ date: string; status: DailyAttendance['status'] }>;
+  training_records?: Array<{
+    id: string;
+    name: string;
+    startDate: string;
+    endDate: string;
+    trainingType?: 'Үндсэн' | 'Төрөлжсөн' | 'Сонголтот' | 'Ажлын байран дээрх сургалт' | 'Бусад';
+    certificateUrl: string;
+    imageUrl?: string | null;
+  }>;
 }
+
+export type DashboardCategory = 'Ирц' | 'Сургалт' | 'Үнэлгээ' | 'Хөтөлбөр' | 'Оролцоо' | 'Хянах' | 'Зар';

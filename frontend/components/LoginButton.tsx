@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { supabase } from '../lib/supabaseClient'
 
 export default function LoginButton() {
   const handleGoogleLogin = async () => {
