@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { backendBaseUrl } from '../../../lib/backendApi';
 import { supabase } from '../../../lib/supabaseClient';
 import { DashboardCategory } from '../types';
 import ReportPreviewDialog from './records/ReportPreviewDialog';
@@ -33,7 +34,7 @@ type PreviewData = {
   rows: Record<string, string | number>[];
 };
 
-const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://127.0.0.1:8000';
+const apiUrl = backendBaseUrl;
 
 export default function QuickActions({ unit, category, month, showReports = true }: Props) {
   const [preview, setPreview] = useState<PreviewData>();

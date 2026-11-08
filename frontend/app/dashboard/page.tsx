@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { backendBaseUrl } from '../../lib/backendApi';
 import { supabase } from '../../lib/supabaseClient';
 import AdminDashboardView from './components/AdminDashboardView';
 import { DashboardCategory, Teacher, UserProfile } from './types';
 import { useTeachers } from './hooks/useTeachers';
 import { useNotifications } from './hooks/useNotifications';
 
-const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://127.0.0.1:8000';
+const apiUrl = backendBaseUrl;
 
 export default function DashboardPage() {
   const [activeCategory, setActiveCategory] = useState<DashboardCategory>('Ирц');

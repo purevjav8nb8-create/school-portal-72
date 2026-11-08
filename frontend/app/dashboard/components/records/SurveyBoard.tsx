@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
+import { backendBaseUrl } from '../../../../lib/backendApi';
 import { supabase } from '../../../../lib/supabaseClient';
 import FloatingComposer from './FloatingComposer';
 
@@ -28,7 +29,7 @@ export default function SurveyBoard({ isAdmin = false }: { isAdmin?: boolean }) 
   const request = async (path: string, method = 'GET', body?: object) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Дахин нэвтэрнэ үү.');
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://127.0.0.1:8000'}${path}`, {
+    const response = await fetch(`${backendBaseUrl}${path}`, {
       method, headers: { Authorization: `Bearer ${session.access_token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
       ...(body ? { body: JSON.stringify(body) } : {}),
     });

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { backendBaseUrl } from '../../../lib/backendApi';
 import TeacherDashboardView, { TeacherTraining } from '../components/TeacherDashboardView';
 import { ActivityInput } from '../components/records/ActivityForm';
 import { TeacherActivity } from '../components/records/ActivityPanel';
@@ -11,7 +12,7 @@ import { DashboardCategory, Teacher, UserProfile } from '../types';
 import { AttendanceRecord } from '../utils/attendance';
 import { useNotifications } from '../hooks/useNotifications';
 
-const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://127.0.0.1:8000';
+const apiUrl = backendBaseUrl;
 
 type TeacherWorkspace = {
 	profile: UserProfile;

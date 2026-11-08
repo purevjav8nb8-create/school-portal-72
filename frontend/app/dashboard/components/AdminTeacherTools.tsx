@@ -2,6 +2,7 @@
 
 import { FormEvent, useRef, useState } from 'react';
 import { FileUp, Trash2, UserPlus } from 'lucide-react';
+import { backendBaseUrl } from '../../../lib/backendApi';
 import { supabase } from '../../../lib/supabaseClient';
 import { Teacher } from '../types';
 import FloatingComposer from './records/FloatingComposer';
@@ -23,7 +24,7 @@ interface Props {
   onTeacherRemoved: (authId: string) => void;
 }
 
-const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://127.0.0.1:8000';
+const apiUrl = backendBaseUrl;
 
 function toTeacher(record: CreatedTeacher, id: number): Teacher {
   return {

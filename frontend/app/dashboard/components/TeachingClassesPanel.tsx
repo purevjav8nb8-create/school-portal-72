@@ -1,13 +1,14 @@
 'use client';
 
 import { useState } from 'react';
+import { backendBaseUrl } from '../../../lib/backendApi';
 import { Teacher } from '../types';
 import FloatingComposer from './records/FloatingComposer';
 import { gradesForUnit, romanGrade } from './records/ClassFields';
 import { supabase } from '../../../lib/supabaseClient';
 
 type TeachingClass = NonNullable<Teacher['teaching_classes']>[number];
-const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://127.0.0.1:8000';
+const apiUrl = backendBaseUrl;
 
 interface Props {
   unit: string;

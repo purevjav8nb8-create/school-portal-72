@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
+import { backendBaseUrl } from '../../../lib/backendApi';
 import { Teacher } from '../types';
 import { supabase } from '../../../lib/supabaseClient';
 
-const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://127.0.0.1:8000';
+const apiUrl = backendBaseUrl;
 
 export function useTeachers(activeUnit: string) {
   const [teachers, setTeachers] = useState<Teacher[]>([]);

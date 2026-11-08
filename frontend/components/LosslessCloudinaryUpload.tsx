@@ -1,6 +1,7 @@
 'use client';
 
 import { ChangeEvent, useState } from 'react';
+import { backendBaseUrl } from '../lib/backendApi';
 
 export type UploadedFile = {
   name: string;
@@ -46,7 +47,7 @@ async function compressFile(file: File): Promise<File> {
     || extension === 'xlsx'
     || extension === 'pptx';
   if (serverCompressed) {
-    const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://127.0.0.1:8000';
+    const apiUrl = backendBaseUrl;
     const formData = new FormData();
     formData.append('file', file);
     const response = await fetch(`${apiUrl}/api/files/compress`, { method: 'POST', body: formData });

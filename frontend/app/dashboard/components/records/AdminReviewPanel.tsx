@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { backendBaseUrl } from '../../../../lib/backendApi';
 import { supabase } from '../../../../lib/supabaseClient';
 import FileAttachmentActions from './FileAttachmentActions';
 
-const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://127.0.0.1:8000';
+const apiUrl = backendBaseUrl;
 const evaluationLevels = ['VIII', 'VII', 'VI', 'V', 'IV', 'III', 'II', 'I'] as const;
 const gradeBands = [
   { id: 'Бага', label: 'Бага (1–5)', min: 1, max: 5 },

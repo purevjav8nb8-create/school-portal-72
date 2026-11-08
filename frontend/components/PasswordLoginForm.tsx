@@ -2,9 +2,8 @@
 
 import { FormEvent, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
+import { backendBaseUrl } from '../lib/backendApi';
 import { supabase } from '../lib/supabaseClient';
-
-const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://127.0.0.1:8000';
 
 export default function PasswordLoginForm() {
   const [email, setEmail] = useState('');
@@ -24,7 +23,7 @@ export default function PasswordLoginForm() {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email: loginEmail, password });
       if (error) {
-        const mockResponse = await fetch(`${apiUrl}/api/teachers/mock-login`, {
+        const mockResponse = await fetch(`${backendBaseUrl}/api/teachers/mock-login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: loginEmail, password }),

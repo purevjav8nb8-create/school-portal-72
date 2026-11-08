@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { backendBaseUrl } from '../../../lib/backendApi';
 import { supabase } from '../../../lib/supabaseClient';
 import { DashboardCategory } from '../types';
 
@@ -8,7 +9,7 @@ export type NotificationCounts = Partial<Record<DashboardCategory, number>>;
 type NotificationItem = { id: string; category: DashboardCategory };
 
 const categories: DashboardCategory[] = ['Мэдээлэл', 'Зар', 'Судалгаа', 'Үнэлгээ', 'Шагнал', 'Зэрэг'];
-const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://127.0.0.1:8000';
+const apiUrl = backendBaseUrl;
 const emptyItems: NotificationItem[] = [];
 
 export function useNotifications(role: 'admin' | 'teacher', personalItems: NotificationItem[] = emptyItems) {

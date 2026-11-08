@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { backendBaseUrl } from '../../../lib/backendApi';
 import { supabase } from '../../../lib/supabaseClient';
 import { Teacher } from '../types';
 import { subjectsForUnit } from './records/ClassFields';
@@ -51,7 +52,7 @@ export default function TeacherDetailModal({ teacher, selectedMonth, onClose, on
             try {
               const { data: { session } } = await supabase.auth.getSession();
               if (!session) throw new Error('Нэвтрэх эрх дууссан байна.');
-              const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://127.0.0.1:8000'}/api/teachers/${teacher.auth_id}`, {
+              const response = await fetch(`${backendBaseUrl}/api/teachers/${teacher.auth_id}`, {
                 method: 'PATCH',
                 headers: { Authorization: 'Bearer ' + session.access_token, 'Content-Type': 'application/json' },
                 body: JSON.stringify(form),

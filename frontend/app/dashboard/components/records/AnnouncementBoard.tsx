@@ -2,12 +2,13 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { Download, Eye } from 'lucide-react';
+import { backendBaseUrl } from '../../../../lib/backendApi';
 import { supabase } from '../../../../lib/supabaseClient';
 import AnnouncementAttachments, { AnnouncementAttachment } from './AnnouncementAttachments';
 import FloatingComposer from './FloatingComposer';
 import FileAttachmentActions from './FileAttachmentActions';
 
-const apiUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://127.0.0.1:8000';
+const apiUrl = backendBaseUrl;
 
 type Announcement = {
   id: string;
