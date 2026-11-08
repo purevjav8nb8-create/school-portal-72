@@ -2,9 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-.announcement-image-preview:hover .announcement-image-actions {
+/*.announcement-image-preview:hover .announcement-image-actions {
   opacity: 1 !important;
-}
+}*/
 
 html,
 body {
