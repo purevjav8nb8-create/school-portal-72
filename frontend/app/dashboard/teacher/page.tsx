@@ -16,6 +16,7 @@ const apiUrl = backendBaseUrl;
 
 type TeacherWorkspace = {
 	profile: UserProfile;
+	teaching_classes?: NonNullable<UserProfile['teaching_classes']>;
 	attendance: AttendanceRecord[];
 	trainings: TeacherTraining[];
 	evaluations: EvaluationRecord[];
@@ -64,7 +65,12 @@ export default function TeacherDashboardPage() {
 					});
 					const result = await response.json() as TeacherWorkspace;
 					if (!response.ok) throw new Error('Загвар багшийн мэдээлэл уншигдсангүй.');
-					setUser({ ...result.profile, unit: result.profile.unit.trim().toUpperCase(), role: 'teacher' });
+					setUser({
+						...result.profile,
+						unit: result.profile.unit.trim().toUpperCase(),
+						teaching_classes: result.profile.teaching_classes ?? result.teaching_classes ?? [],
+						role: 'teacher',
+					});
 					setAttendance(result.attendance);
 					setTrainings(result.trainings);
 					setEvaluations(result.evaluations);
@@ -102,6 +108,7 @@ export default function TeacherDashboardPage() {
 				setUser({
 					...workspace.profile,
 					unit: workspace.profile.unit.trim().toUpperCase(),
+					teaching_classes: workspace.profile.teaching_classes ?? workspace.teaching_classes ?? [],
 					role: 'teacher',
 				});
 				setAttendance(workspace.attendance);
