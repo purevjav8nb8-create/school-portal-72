@@ -72,6 +72,7 @@ export default function AnnouncementBoard({ boardType }: Props) {
       const result = await response.json();
       if (!response.ok) throw new Error(result.detail ?? 'Мэдээлэл уншигдсангүй.');
       setAnnouncements(result as Announcement[]);
+      setMessage('');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Зар уншигдсангүй.');
     }
