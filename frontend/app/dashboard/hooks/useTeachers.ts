@@ -1,28 +1,29 @@
 import { useEffect, useState } from 'react';
-import { backendBaseUrl } from '../../../lib/backendApi';
+import { backendBaseUrl, fetchWithAuth } from '../../../lib/backendApi';
 import { Teacher } from '../types';
-import { supabase } from '../../../lib/supabaseClient';
 
 const apiUrl = backendBaseUrl;
 
 export function useTeachers(activeUnit: string) {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     let active = true;
     const loadTeachers = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      const mockToken = window.localStorage.getItem('school-portal-mock-token');
-      if (!session && !mockToken) return;
       try {
-        const response = await fetch(`${apiUrl}/api/teachers`, {
-          headers: { Authorization: `Bearer ${session?.access_token ?? mockToken}` },
-        });
-        if (!response.ok) throw new Error('Багшийн жагсаалт уншигдсангүй.');
+        const response = await fetchWithAuth(`${apiUrl}/api/teachers`);
+        if (!response.ok) {
+          const result = await response.json().catch(() => ({}));
+          throw new Error(result.detail ?? `Багшийн жагсаалт уншигдсангүй (${response.status}).`);
+        }
         const records = await response.json() as Teacher[];
-        if (active && Array.isArray(records)) setTeachers(records);
-      } catch {
-        if (active) setTeachers([]);
+        if (active && Array.isArray(records)) {
+          setTeachers(records);
+          setErrorMessage('');
+        }
+      } catch (error) {
+        if (active) setErrorMessage(error instanceof Error ? error.message : 'Багшийн жагсаалт уншигдсангүй.');
       }
     };
     void loadTeachers();
@@ -40,5 +41,6 @@ export function useTeachers(activeUnit: string) {
     teachers,
     setTeachers,
     displayTeachers,
+    errorMessage,
   };
 }

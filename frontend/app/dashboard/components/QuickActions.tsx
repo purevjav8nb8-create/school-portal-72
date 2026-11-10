@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { backendBaseUrl } from '../../../lib/backendApi';
+import { backendBaseUrl, fetchWithAuth } from '../../../lib/backendApi';
 import { supabase } from '../../../lib/supabaseClient';
 import { DashboardCategory } from '../types';
 import ReportPreviewDialog from './records/ReportPreviewDialog';
@@ -47,7 +47,7 @@ export default function QuickActions({ unit, category, month, showReports = true
   const requestReport = async (path: string) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Дахин нэвтэрнэ үү.');
-    const response = await fetch(`${apiUrl}${path}`, { headers: { Authorization: `Bearer ${session.access_token}` } });
+    const response = await fetchWithAuth(`${apiUrl}${path}`, { headers: { Authorization: `Bearer ${session.access_token}` } });
     if (!response.ok) {
       const result = await response.json();
       throw new Error(result.detail ?? 'Тайлан бэлэн болсонгүй.');

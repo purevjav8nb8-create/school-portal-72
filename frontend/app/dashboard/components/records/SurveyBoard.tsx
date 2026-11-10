@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
-import { backendBaseUrl } from '../../../../lib/backendApi';
+import { backendBaseUrl, fetchWithAuth } from '../../../../lib/backendApi';
 import { supabase } from '../../../../lib/supabaseClient';
 import FloatingComposer from './FloatingComposer';
 
@@ -30,7 +30,7 @@ export default function SurveyBoard({ isAdmin = false }: { isAdmin?: boolean }) 
   const request = async (path: string, method = 'GET', body?: object) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Дахин нэвтэрнэ үү.');
-    const response = await fetch(`${backendBaseUrl}${path}`, {
+    const response = await fetchWithAuth(`${backendBaseUrl}${path}`, {
       method, headers: { Authorization: `Bearer ${session.access_token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
@@ -68,7 +68,7 @@ export default function SurveyBoard({ isAdmin = false }: { isAdmin?: boolean }) 
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Дахин нэвтэрнэ үү.');
-      const response = await fetch(`${backendBaseUrl}/api/teachers/surveys/${survey.id}/export`, {
+      const response = await fetchWithAuth(`${backendBaseUrl}/api/teachers/surveys/${survey.id}/export`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       if (!response.ok) {

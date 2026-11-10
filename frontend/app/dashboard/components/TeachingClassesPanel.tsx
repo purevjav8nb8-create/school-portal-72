@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { backendBaseUrl } from '../../../lib/backendApi';
+import { backendBaseUrl, fetchWithAuth } from '../../../lib/backendApi';
 import { Teacher } from '../types';
 import FloatingComposer from './records/FloatingComposer';
 import { gradesForUnit, romanGrade } from './records/ClassFields';
@@ -28,7 +28,7 @@ export default function TeachingClassesPanel({ unit, initialClasses }: Props) {
     const mockToken = window.localStorage.getItem('school-portal-mock-token');
     const token = mockToken ?? session?.access_token;
     if (!token) throw new Error('Нэвтрэх эрх дууссан байна.');
-    const response = await fetch(`${apiUrl}/api/teachers/me/teaching-classes`, {
+    const response = await fetchWithAuth(`${apiUrl}/api/teachers/me/teaching-classes`, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ classes: nextClasses }),

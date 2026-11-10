@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { Download, Eye } from 'lucide-react';
-import { backendBaseUrl } from '../../../../lib/backendApi';
+import { backendBaseUrl, fetchWithAuth } from '../../../../lib/backendApi';
 import { supabase } from '../../../../lib/supabaseClient';
 import AnnouncementAttachments, { AnnouncementAttachment } from './AnnouncementAttachments';
 import FloatingComposer from './FloatingComposer';
@@ -51,7 +51,7 @@ export default function AnnouncementBoard({ boardType }: Props) {
   const request = async (method = 'GET', payload?: object) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Дахин нэвтэрнэ үү.');
-    const response = await fetch(`${apiUrl}/api/teachers/announcements`, {
+    const response = await fetchWithAuth(`${apiUrl}/api/teachers/announcements`, {
       method,
       headers: {
         Authorization: `Bearer ${session.access_token}`,
@@ -68,7 +68,7 @@ export default function AnnouncementBoard({ boardType }: Props) {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Дахин нэвтэрнэ үү.');
-      const response = await fetch(`${apiUrl}/api/teachers/announcements?kind=${encodeURIComponent(boardType)}`, { headers: { Authorization: `Bearer ${session.access_token}` } });
+      const response = await fetchWithAuth(`${apiUrl}/api/teachers/announcements?kind=${encodeURIComponent(boardType)}`, { headers: { Authorization: `Bearer ${session.access_token}` } });
       const result = await response.json();
       if (!response.ok) throw new Error(result.detail ?? 'Мэдээлэл уншигдсангүй.');
       setAnnouncements(result as Announcement[]);

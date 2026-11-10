@@ -1,10 +1,14 @@
 import { supabase } from './supabaseClient';
 
-export const backendBaseUrl =
-  process.env.NEXT_PUBLIC_BACKEND_URL?.replace(/\/+$/, "") ||
-  (process.env.NODE_ENV === "development"
-    ? "http://127.0.0.1:8000"
-    : "https://porta72.onrender.com");
+const configuredBackendUrl = process.env.NEXT_PUBLIC_BACKEND_URL?.trim().replace(/\/+$/, '');
+const isLoopbackBackend = /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/i.test(configuredBackendUrl ?? '');
+const defaultBackendUrl = process.env.NODE_ENV === 'development'
+  ? 'http://127.0.0.1:8000'
+  : 'https://porta72.onrender.com';
+
+export const backendBaseUrl = configuredBackendUrl && !(process.env.NODE_ENV === 'production' && isLoopbackBackend)
+  ? configuredBackendUrl
+  : defaultBackendUrl;
 
 let refreshInProgress: Promise<string | null> | null = null;
 

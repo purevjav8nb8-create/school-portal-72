@@ -2,7 +2,7 @@
 
 import { FormEvent, useRef, useState } from 'react';
 import { FileUp, Trash2, UserPlus } from 'lucide-react';
-import { backendBaseUrl } from '../../../lib/backendApi';
+import { backendBaseUrl, fetchWithAuth } from '../../../lib/backendApi';
 import { supabase } from '../../../lib/supabaseClient';
 import { Teacher } from '../types';
 import FloatingComposer from './records/FloatingComposer';
@@ -70,7 +70,7 @@ export default function AdminTeacherTools({ teachers, onTeachersAdded, onTeacher
     setMessage('');
     try {
       const token = await accessToken();
-      const response = await fetch(`${apiUrl}/api/teachers`, {
+      const response = await fetchWithAuth(`${apiUrl}/api/teachers`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(teacher),
@@ -98,7 +98,7 @@ export default function AdminTeacherTools({ teachers, onTeachersAdded, onTeacher
       const token = await accessToken();
       const formData = new FormData();
       formData.append('file', file);
-      const response = await fetch(`${apiUrl}/api/teachers/bulk-upload`, {
+      const response = await fetchWithAuth(`${apiUrl}/api/teachers/bulk-upload`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
@@ -138,7 +138,7 @@ export default function AdminTeacherTools({ teachers, onTeachersAdded, onTeacher
     setMessage('');
     try {
       const token = await accessToken();
-      const response = await fetch(`${apiUrl}/api/teachers/${selectedTeacherId}`, {
+      const response = await fetchWithAuth(`${apiUrl}/api/teachers/${selectedTeacherId}`, {
         method: 'DELETE',
         headers: { Authorization: 'Bearer ' + token },
       });

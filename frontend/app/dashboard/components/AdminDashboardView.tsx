@@ -35,6 +35,7 @@ interface Props {
   onTeacherUpdated: (teacher: Teacher) => void;
   notificationCounts?: NotificationCounts;
   notificationError?: string;
+  teacherLoadError?: string;
   onCategoryChange?: (category: DashboardCategory) => void;
 }
 
@@ -58,6 +59,7 @@ export default function AdminDashboardView({
   onTeacherUpdated,
   notificationCounts = {},
   notificationError = '',
+  teacherLoadError = '',
   onCategoryChange,
 }: Props) {
   const activeTeachers = teachers.filter((teacher) => teacher.attendance !== 'Тасалсан').length;
@@ -85,6 +87,7 @@ export default function AdminDashboardView({
           <AdminTeacherTools teachers={teachers} onTeachersAdded={onTeachersAdded} onTeacherRemoved={onTeacherRemoved} />
         </aside>
         <section style={{ minWidth: 0, height: '100%', overflowY: 'auto', overflowX: 'hidden', paddingRight: 4 }}>
+          {teacherLoadError && <p role="alert" style={{ margin: '0 0 6px', color: '#b91c1c' }}>{teacherLoadError}</p>}
           {activeCategory === 'Ирц' && <UnitTabs
               activeUnit={activeUnit}
               setActiveUnit={setActiveUnit}

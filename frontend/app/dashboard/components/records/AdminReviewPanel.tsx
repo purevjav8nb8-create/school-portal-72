@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { backendBaseUrl } from '../../../../lib/backendApi';
+import { backendBaseUrl, fetchWithAuth } from '../../../../lib/backendApi';
 import { supabase } from '../../../../lib/supabaseClient';
 import FileAttachmentActions from './FileAttachmentActions';
 
@@ -58,7 +58,7 @@ export default function AdminReviewPanel({ summaryOnly = false }: Props) {
   const request = async (path: string, method = 'GET', body?: object) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Дахин нэвтэрнэ үү.');
-    const response = await fetch(`${apiUrl}${path}`, {
+    const response = await fetchWithAuth(`${apiUrl}${path}`, {
       method,
       headers: {
         Authorization: `Bearer ${session.access_token}`,

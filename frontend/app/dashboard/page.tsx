@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { backendBaseUrl } from '../../lib/backendApi';
+import { backendBaseUrl, fetchWithAuth } from '../../lib/backendApi';
 import { supabase } from '../../lib/supabaseClient';
 import AdminDashboardView from './components/AdminDashboardView';
 import { DashboardCategory, Teacher, UserProfile } from './types';
@@ -20,7 +20,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
-  const { teachers, setTeachers, displayTeachers } = useTeachers(activeUnit);
+  const { teachers, setTeachers, displayTeachers, errorMessage: teacherLoadError } = useTeachers(activeUnit);
   const { counts: notificationCounts, errorMessage: notificationError, markRead } = useNotifications('admin');
 
   useEffect(() => {
@@ -58,7 +58,7 @@ export default function DashboardPage() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
     try {
-      const response = await fetch(`${apiUrl}/api/teachers/${teacher.auth_id}/attendance`, {
+      const response = await fetchWithAuth(`${apiUrl}/api/teachers/${teacher.auth_id}/attendance`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: new Date().toISOString().slice(0, 10), status }),
@@ -101,6 +101,7 @@ export default function DashboardPage() {
       }}
       notificationCounts={notificationCounts}
       notificationError={notificationError}
+      teacherLoadError={teacherLoadError}
       onCategoryChange={(category) => { markRead(category); setActiveCategory(category); }}
     />
   );
