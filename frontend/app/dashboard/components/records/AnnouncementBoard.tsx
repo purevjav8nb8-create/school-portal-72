@@ -108,8 +108,12 @@ export default function AnnouncementBoard({ boardType }: Props) {
         {(close) => (
           <form onSubmit={(event) => void publish(event, close)} style={{ display: 'grid', gap: 10 }}>
           {boardType === 'Мэдээлэл' && <select value={infoType} onChange={(event) => setInfoType(event.target.value as 'Амжилт' | 'Оролцоо')} style={fieldStyle}><option>Амжилт</option><option>Оролцоо</option></select>}
-          <input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder={`${boardType}-ийн гарчиг`} style={fieldStyle} />
-          <textarea required rows={4} value={body} onChange={(event) => setBody(event.target.value)} placeholder={`${boardType}-ийн агуулга`} style={fieldStyle} />
+          <label style={{ display: 'grid', gap: 4, fontWeight: 600 }}>Гарчиг
+            <input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder={`${boardType}-ийн гарчиг`} style={fieldStyle} />
+          </label>
+          <label style={{ display: 'grid', gap: 4, fontWeight: 600 }}>Агуулга
+            <textarea required rows={4} value={body} onChange={(event) => setBody(event.target.value)} placeholder={`${boardType}-ийн агуулга`} style={fieldStyle} />
+          </label>
           <AnnouncementAttachments attachments={attachments} onChange={setAttachments} />
           <fieldset style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: 8 }}>
             <legend>Хэнд харагдах</legend>

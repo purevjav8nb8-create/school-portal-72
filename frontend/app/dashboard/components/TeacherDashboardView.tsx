@@ -8,6 +8,7 @@ import TrainingForm from './training/TrainingForm';
 import ActivityPanel, { TeacherActivity } from './records/ActivityPanel';
 import { ActivityInput } from './records/ActivityForm';
 import AnnouncementBoard from './records/AnnouncementBoard';
+import ChatBoard from './records/ChatBoard';
 import SurveyBoard from './records/SurveyBoard';
 import ProfessionalProfilePanel from './records/ProfessionalProfilePanel';
 import FloatingComposer from './records/FloatingComposer';
@@ -53,6 +54,7 @@ interface Props {
   onDeleteEvaluation: (evaluationId: string) => Promise<void>;
   onProfessionalSave: (path: string, payload: object) => Promise<void>;
   notificationCounts?: NotificationCounts;
+  notificationError?: string;
   onNotificationCategoryChange?: (category: DashboardCategory) => void;
 }
 
@@ -60,16 +62,16 @@ export default function TeacherDashboardView({
   user, teacher, trainings, evaluations, programPlan, activities, awards, degrees,
   activeCategory, selectedMonth, setSelectedMonth, busy, errorMessage,
   successMessage, onCategoryChange,   onLogout, onTraining, onProgramPlan, onActivity, onEvaluation, onDeleteEvaluation, onProfessionalSave,
-  notificationCounts = {}, onNotificationCategoryChange,
+  notificationCounts = {}, notificationError = '', onNotificationCategoryChange,
 }: Props) {
-  const categories: DashboardCategory[] = ['Ирц', 'Сургалт', 'Үнэлгээ', 'Хөтөлбөр', 'Оролцоо', 'Судалгаа', 'Мэдээлэл', 'Зар', 'Шагнал', 'Зэрэг'];
+  const categories: DashboardCategory[] = ['Ирц', 'Хөтөлбөр', 'Мэдээлэл', 'Оролцоо', 'Сургалт', 'Судалгаа', 'Үнэлгээ', 'Зар', 'Чат', 'Зэрэг', 'Шагнал'];
 
   return (
     <main className="dashboard-compact" style={{ height: '100vh', overflow: 'hidden', backgroundColor: '#f8fafc', padding: 6 }}>
       <Header user={user} onLogout={onLogout} />
-      <div style={{ display: 'grid', gridTemplateColumns: '150px minmax(0, 1fr) 180px', gap: 8, marginTop: 7, height: 'calc(100vh - 100px)', alignItems: 'start' }}>
+      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '150px minmax(0, 1fr) 180px', gap: 8, marginTop: 7, height: 'calc(100vh - 100px)', alignItems: 'start' }}>
         <aside style={{ overflow: 'hidden' }}>
-          <SideMenu activeCategory={activeCategory} setActiveCategory={onNotificationCategoryChange ?? onCategoryChange} categories={categories} notificationCounts={notificationCounts} />
+          <SideMenu activeCategory={activeCategory} setActiveCategory={onNotificationCategoryChange ?? onCategoryChange} categories={categories} notificationCounts={notificationCounts} notificationError={notificationError} />
           <TeachingClassesPanel unit={teacher.unit} initialClasses={teacher.teaching_classes ?? []} />
         </aside>
         <section style={{ minWidth: 0, height: '100%', overflowY: 'auto', overflowX: 'hidden', paddingRight: 4 }}>
@@ -107,6 +109,7 @@ export default function TeacherDashboardView({
             {activeCategory === 'Хөтөлбөр' && <ProgramPlanPanel programPlan={programPlan} unit={user.unit} subjects={user.subjects ?? (user.subject ? [user.subject] : [])} onSubmit={onProgramPlan} />}
             {activeCategory === 'Оролцоо' && <ActivityPanel unit={user.unit} subjects={user.subjects ?? (user.subject ? [user.subject] : [])} activities={activities} onSubmit={onActivity} />}
             {activeCategory === 'Судалгаа' && <SurveyBoard />}
+            {activeCategory === 'Чат' && <ChatBoard />}
             {activeCategory === 'Мэдээлэл' && <AnnouncementBoard boardType="Мэдээлэл" />}
             {activeCategory === 'Зар' && <AnnouncementBoard boardType="Зар" />}
             {activeCategory === 'Шагнал' && <FloatingComposer title="Шагнал бүртгэх" label="Шагнал бүртгэх">{() => <ProfessionalProfilePanel mode="award" awards={awards} degrees={degrees} onSave={onProfessionalSave} />}</FloatingComposer>}

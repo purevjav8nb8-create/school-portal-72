@@ -8,7 +8,7 @@ import FloatingComposer from './FloatingComposer';
 type SurveyQuestionType = 'single_choice' | 'multiple_choice' | 'short_text' | 'rating';
 type SurveyQuestion = { text: string; type: SurveyQuestionType; options: string[] };
 type SurveyAnswer = string | string[];
-type Survey = { id: string; title: string; description: string; author?: string; questions?: (Partial<SurveyQuestion> | string)[]; options?: string[]; target_units: string[]; responses?: Record<string, SurveyAnswer>; respondent_names?: string[]; response_summary?: Record<string, Record<string, number>> };
+type Survey = { id: string; title: string; description: string; author?: string; questions?: (Partial<SurveyQuestion> | string)[]; options?: string[]; target_units: string[]; responses?: Record<string, SurveyAnswer>; response_ids?: string[]; respondent_names?: string[]; response_summary?: Record<string, Record<string, number>> };
 
 function normalizeQuestion(question: Partial<SurveyQuestion> | string, surveyOptions: string[] = []): SurveyQuestion {
   if (typeof question === 'string') return { text: question, type: 'single_choice', options: surveyOptions };
@@ -25,6 +25,7 @@ export default function SurveyBoard({ isAdmin = false }: { isAdmin?: boolean }) 
   const [selectedSurveyId, setSelectedSurveyId] = useState<string>();
   const [answerDrafts, setAnswerDrafts] = useState<Record<string, SurveyAnswer>>({});
   const [savingSurvey, setSavingSurvey] = useState(false);
+  const [downloadingSurveyId, setDownloadingSurveyId] = useState<string>();
   const field = { width: '100%', padding: 9, border: '1px solid #cbd5e1', borderRadius: 7, boxSizing: 'border-box' as const };
   const request = async (path: string, method = 'GET', body?: object) => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -62,32 +63,42 @@ export default function SurveyBoard({ isAdmin = false }: { isAdmin?: boolean }) 
     catch (error) { setMessage(error instanceof Error ? error.message : 'Хариулт хадгалагдсангүй.'); }
     finally { setSavingSurvey(false); }
   };
-  const downloadSummary = (survey: Survey) => {
-    const questions = survey.questions?.length ? survey.questions : [{ text: 'Асуулт 1', options: survey.options ?? [] }];
-    const rows = questions.flatMap((question, index) => {
-      const normalized = normalizeQuestion(question, survey.options);
-      const counts = survey.response_summary?.[index] ?? {};
-      const summaryValues = normalized.type === 'rating' ? Array.from({ length: 11 }, (_, rating) => String(rating))
-        : normalized.type === 'short_text' ? Object.keys(counts) : normalized.options;
-      return summaryValues.map((value) => [normalized.text, value, counts[value] ?? 0]);
-    });
-    const table = `<table><tr><th>Асуулт</th><th>Хариулт</th><th>Хариултын тоо</th></tr>${rows.map((row) => `<tr>${row.map((cell) => `<td>${String(cell).replace(/[&<>"]/g, (value) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[value] ?? value))}</td>`).join('')}</tr>`).join('')}</table>`;
-    const blob = new Blob([`<html><meta charset="UTF-8">${table}</html>`], { type: 'application/vnd.ms-excel' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${survey.title.replace(/[^\w\u0400-\u04FF-]+/g, '_')}-нэгтгэл.xls`;
-    link.click();
-    URL.revokeObjectURL(url);
+  const downloadAnswers = async (survey: Survey) => {
+    setDownloadingSurveyId(survey.id);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Дахин нэвтэрнэ үү.');
+      const response = await fetch(`${backendBaseUrl}/api/teachers/surveys/${survey.id}/export`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.detail ?? 'Excel файл татаж чадсангүй.');
+      }
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${survey.title.replace(/[^\w\u0400-\u04FF-]+/g, '_')}-хариулт.xlsx`;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Excel файл татаж чадсангүй.');
+    } finally {
+      setDownloadingSurveyId(undefined);
+    }
   };
   return <section>
     <h2 style={{ marginTop: 0 }}>Судалгаа</h2>
     <FloatingComposer title="Судалгаа үүсгэх" label="Судалгаа үүсгэх">{(close) => <form onSubmit={(event) => void create(event, close)} style={{ display: 'grid', gap: 8 }}>
-      <input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Судалгааны нэр" style={field} />
+      <label style={{ display: 'grid', gap: 4, fontWeight: 600 }}>Судалгааны нэр
+        <input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Судалгааны нэр" style={field} />
+      </label>
       <textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Тайлбар" style={field} />
       {questions.map((question, questionIndex) => <fieldset key={`question-${questionIndex}`} style={{ display: 'grid', gap: 6, padding: 8, border: '1px solid #cbd5e1', borderRadius: 7 }}>
         <legend>Асуулт {questionIndex + 1}</legend>
-        <input required value={question.text} onChange={(event) => setQuestions((current) => current.map((item, index) => index === questionIndex ? { ...item, text: event.target.value } : item))} placeholder={`Асуулт ${questionIndex + 1}`} style={field} />
+        <label style={{ display: 'grid', gap: 4, fontWeight: 600 }}>Асуулт
+          <input required value={question.text} onChange={(event) => setQuestions((current) => current.map((item, index) => index === questionIndex ? { ...item, text: event.target.value } : item))} placeholder={`Асуулт ${questionIndex + 1}`} style={field} />
+        </label>
         <select value={question.type} onChange={(event) => setQuestions((current) => current.map((item, index) => index === questionIndex ? { ...item, type: event.target.value as SurveyQuestionType, options: ['single_choice', 'multiple_choice'].includes(event.target.value) ? (item.options.length ? item.options : ['', '']) : [] } : item))} style={field}>
           <option value="single_choice">Нэг сонголт</option>
           <option value="multiple_choice">Олон сонголт</option>
@@ -95,7 +106,9 @@ export default function SurveyBoard({ isAdmin = false }: { isAdmin?: boolean }) 
           <option value="rating">0–10 үнэлгээ</option>
         </select>
         {['single_choice', 'multiple_choice'].includes(question.type) && <>
-          {question.options.map((option, optionIndex) => <input required key={optionIndex} value={option} onChange={(event) => setQuestions((current) => current.map((item, index) => index === questionIndex ? { ...item, options: item.options.map((value, choiceIndex) => choiceIndex === optionIndex ? event.target.value : value) } : item))} placeholder={`Сонголт ${optionIndex + 1}`} style={field} />)}
+          {question.options.map((option, optionIndex) => <label key={optionIndex} style={{ display: 'grid', gap: 4, fontWeight: 600 }}>Сонголт {optionIndex + 1}
+            <input required value={option} onChange={(event) => setQuestions((current) => current.map((item, index) => index === questionIndex ? { ...item, options: item.options.map((value, choiceIndex) => choiceIndex === optionIndex ? event.target.value : value) } : item))} placeholder={`Сонголт ${optionIndex + 1}`} style={field} />
+          </label>)}
           <button type="button" onClick={() => setQuestions((current) => current.map((item, index) => index === questionIndex ? { ...item, options: [...item.options, ''] } : item))}>+ Сонголт нэмэх</button>
         </>}
       </fieldset>)}
@@ -104,40 +117,54 @@ export default function SurveyBoard({ isAdmin = false }: { isAdmin?: boolean }) 
       <button type="submit">Судалгаа нийтлэх</button>
     </form>}</FloatingComposer>
     {message && <p role="alert" style={{ color: '#b91c1c' }}>{message}</p>}
-    {surveys.length === 0 ? <p>Одоогоор судалгаа алга.</p> : <div style={{ display: 'grid', gap: 10 }}>{surveys.map((survey) => <article key={survey.id} style={{ padding: 12, border: '1px solid #e2e8f0', borderRadius: 8 }}>
+    {surveys.length === 0 ? <p>Одоогоор судалгаа алга.</p> : isAdmin ? <div style={{ display: 'grid', gap: 8 }}>{surveys.map((survey) => <button key={survey.id} type="button" onClick={() => setSelectedSurveyId(survey.id)} style={{ width: '100%', padding: 12, border: '1px solid #dbe3ee', borderRadius: 8, background: '#fff', textAlign: 'left', cursor: 'pointer' }}>
+      <strong>{survey.title}</strong>
+      {survey.description && <p style={{ margin: '5px 0', color: '#475569' }}>{survey.description}</p>}
+      {survey.author && <span style={{ color: '#64748b', fontSize: 12 }}>Оруулсан: {survey.author}</span>}
+      <span style={{ display: 'block', marginTop: 6, color: '#2563eb', fontSize: 13 }}>{survey.response_ids?.length ?? 0} хариулт · Хариултыг харах →</span>
+    </button>)}</div> : <div style={{ display: 'grid', gap: 10 }}>{surveys.map((survey) => <article key={survey.id} style={{ padding: 12, border: '1px solid #e2e8f0', borderRadius: 8 }}>
       <b>{survey.title}</b>
       <p style={{ margin: '5px 0' }}>{survey.description}</p>
       {survey.author && <p style={{ margin: '5px 0', color: '#475569', fontSize: 12 }}>Оруулсан: {survey.author}</p>}
-      {isAdmin && <div style={{ margin: '8px 0', padding: 8, background: '#f8fafc', borderRadius: 6 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-          <strong>Хариултын нэгтгэл</strong>
-          <button type="button" onClick={() => downloadSummary(survey)}>Excel татах</button>
-        </div>
-        {!!survey.respondent_names?.length && <p style={{ margin: '6px 0', fontSize: 13 }}>
-          <strong>Хариулсан багш:</strong> {survey.respondent_names.join(', ')}
-        </p>}
-        {(survey.questions?.length ? survey.questions : [{ text: 'Асуулт 1', options: survey.options ?? [] }]).map((question, questionIndex) => {
-          const normalized = normalizeQuestion(question, survey.options);
-          const counts = survey.response_summary?.[questionIndex] ?? {};
-          const summaryValues = normalized.type === 'rating' ? Array.from({ length: 11 }, (_, rating) => String(rating))
-            : normalized.type === 'short_text' ? Object.keys(counts) : normalized.options;
-          const max = Math.max(1, ...summaryValues.map((value) => counts[value] ?? 0));
-          return <div key={`${survey.id}-summary-${questionIndex}`} style={{ marginTop: 6 }}>
-            <div style={{ fontWeight: 700, marginBottom: 3 }}>{normalized.text}</div>
-            {summaryValues.map((value) => <div key={value} style={{ display: 'grid', gridTemplateColumns: '120px 1fr 28px', gap: 5, alignItems: 'center', fontSize: 12 }}>
-              <span>{value}</span><div style={{ height: 12, background: '#e2e8f0', borderRadius: 99 }}><div style={{ width: `${((counts[value] ?? 0) / max) * 100}%`, height: '100%', background: '#2563eb', borderRadius: 99 }} /></div><span>{counts[value] ?? 0}</span>
-            </div>)}
-          </div>;
-        })}
-      </div>}
-      {isAdmin && (survey.questions?.length ? survey.questions : [{ text: 'Асуулт 1', options: survey.options ?? [] }]).map((question, questionIndex) => {
-        const normalized = normalizeQuestion(question, survey.options);
-        return <div key={`${survey.id}-${questionIndex}`} style={{ margin: '8px 0' }}><strong>{normalized.text}</strong></div>;
-      })}
       {!isAdmin && <button type="button" onClick={() => setSelectedSurveyId(survey.id)} style={{ marginTop: 8, padding: '8px 12px', border: 0, borderRadius: 6, background: '#2563eb', color: '#fff', cursor: 'pointer' }}>
         {survey.responses && Object.keys(survey.responses).length >= (survey.questions?.length ?? 1) ? 'Бөглөсөн хариуг харах' : Object.keys(survey.responses ?? {}).length > 0 ? 'Үргэлжлүүлэн бөглөх' : 'Судалгаа бөглөх'}
       </button>}
     </article>)}</div>}
+    {isAdmin && selectedSurveyId && (() => {
+      const selectedSurvey = surveys.find((survey) => survey.id === selectedSurveyId);
+      if (!selectedSurvey) return null;
+      const selectedQuestions = selectedSurvey.questions?.length
+        ? selectedSurvey.questions
+        : [{ text: 'Асуулт 1', options: selectedSurvey.options ?? [] }];
+      return <div role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedSurveyId(undefined); }} style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'grid', placeItems: 'center', padding: 16, background: 'rgba(15, 23, 42, 0.5)' }}>
+        <section role="dialog" aria-modal="true" aria-label="Судалгааны хариулт" style={{ width: 'min(900px, 100%)', maxHeight: '85vh', overflow: 'auto', padding: 20, background: '#fff', borderRadius: 10, boxShadow: '0 20px 60px rgba(15, 23, 42, 0.25)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+            <div><h3 style={{ margin: 0 }}>{selectedSurvey.title}</h3><p style={{ margin: '5px 0 12px', color: '#475569' }}>{selectedSurvey.description}</p></div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="button" disabled={downloadingSurveyId === selectedSurvey.id} onClick={() => void downloadAnswers(selectedSurvey)}>{downloadingSurveyId === selectedSurvey.id ? 'Татаж байна...' : 'Excel татах'}</button>
+              <button type="button" onClick={() => setSelectedSurveyId(undefined)}>Буцах</button>
+            </div>
+          </div>
+          <strong>Хариултын нэгтгэл · {selectedSurvey.response_ids?.length ?? 0} багш</strong>
+          {!!selectedSurvey.respondent_names?.length && <p style={{ margin: '6px 0', fontSize: 13 }}><strong>Хариулсан багш:</strong> {selectedSurvey.respondent_names.join(', ')}</p>}
+          {selectedQuestions.map((question, questionIndex) => {
+            const normalized = normalizeQuestion(question, selectedSurvey.options);
+            const counts = selectedSurvey.response_summary?.[questionIndex] ?? {};
+            const values = normalized.type === 'rating' ? Array.from({ length: 11 }, (_, rating) => String(rating))
+              : normalized.type === 'short_text' ? Object.keys(counts) : normalized.options;
+            const max = Math.max(1, ...values.map((value) => counts[value] ?? 0));
+            return <div key={`${selectedSurvey.id}-summary-${questionIndex}`} style={{ marginTop: 14, padding: 12, background: '#f8fafc', borderRadius: 8 }}>
+              <strong>{normalized.text}</strong>
+              {values.length === 0 ? <p style={{ margin: '8px 0', color: '#64748b' }}>Одоогоор хариулт алга.</p> : values.map((value) => <div key={value} style={{ display: 'grid', gridTemplateColumns: 'minmax(90px, 120px) 1fr 28px', gap: 8, alignItems: 'center', marginTop: 5, fontSize: 13 }}>
+                <span style={{ overflowWrap: 'anywhere' }}>{value}</span>
+                <div role="img" aria-label={`${value}: ${counts[value] ?? 0}`} style={{ height: 14, background: '#e2e8f0', borderRadius: 99, overflow: 'hidden' }}><div style={{ width: `${((counts[value] ?? 0) / max) * 100}%`, height: '100%', background: '#2563eb', borderRadius: 99 }} /></div>
+                <span>{counts[value] ?? 0}</span>
+              </div>)}
+            </div>;
+          })}
+        </section>
+      </div>;
+    })()}
     {!isAdmin && selectedSurveyId && (() => {
       const selectedSurvey = surveys.find((survey) => survey.id === selectedSurveyId);
       if (!selectedSurvey) return null;
@@ -157,7 +184,7 @@ export default function SurveyBoard({ isAdmin = false }: { isAdmin?: boolean }) 
             const draftAnswer = answerDrafts[answerKey] ?? savedAnswer ?? (normalized.type === 'rating' ? '5' : undefined);
             const alreadyAnswered = savedAnswer !== undefined;
                 return <fieldset key={`${selectedSurvey.id}-modal-${questionIndex}`} style={{ margin: '12px 0', padding: 12, border: '1px solid #e2e8f0', borderRadius: 8 }}>
-              <legend style={{ fontWeight: 700 }}>{normalized.text}</legend>
+                  <legend style={{ fontWeight: 700 }}>{normalized.text} <span aria-label="Заавал хариулна" style={{ color: '#dc2626' }}>*</span></legend>
               {normalized.type === 'single_choice' && normalized.options.map((option) => <label key={option} style={{ display: 'block', margin: '8px 0' }}>
                 <input type="radio" name={`modal-${selectedSurvey.id}-${questionIndex}`} checked={draftAnswer === option} disabled={alreadyAnswered} onChange={() => setAnswerDrafts((current) => ({ ...current, [answerKey]: option }))} /> {option}
               </label>)}

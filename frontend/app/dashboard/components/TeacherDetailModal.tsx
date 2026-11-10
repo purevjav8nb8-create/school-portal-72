@@ -67,15 +67,23 @@ export default function TeacherDetailModal({ teacher, selectedMonth, onClose, on
               setSaving(false);
             }
           }} style={{ display: 'grid', gap: 8, marginTop: 14, padding: 14, borderRadius: 10, background: '#f8fafc' }}>
-            <input required value={form?.last_name ?? ''} placeholder="Овог" onChange={(event) => setForm((current) => current && { ...current, last_name: event.target.value })} />
-            <input required value={form?.first_name ?? ''} placeholder="Нэр" onChange={(event) => setForm((current) => current && { ...current, first_name: event.target.value })} />
-            <select value={form?.unit ?? teacher.unit} onChange={(event) => setForm((current) => current && { ...current, unit: event.target.value as Teacher['unit'], subject: '' })}>
-              <option value="БАЗАН">БАЗАН</option><option value="БУЗАН">БУЗАН</option><option value="НУЗАН">НУЗАН</option>
-            </select>
-            <select required value={form?.subject ?? ''} onChange={(event) => setForm((current) => current && { ...current, subject: event.target.value })}>
-              <option value="" disabled>Заах хичээл сонгох</option>
-              {subjectsForUnit(form?.unit ?? teacher.unit).map((subject) => <option key={subject}>{subject}</option>)}
-            </select>
+            <label style={{ display: 'grid', gap: 4, fontWeight: 600 }}>Овог
+              <input required value={form?.last_name ?? ''} placeholder="Овог" onChange={(event) => setForm((current) => current && { ...current, last_name: event.target.value })} />
+            </label>
+            <label style={{ display: 'grid', gap: 4, fontWeight: 600 }}>Нэр
+              <input required value={form?.first_name ?? ''} placeholder="Нэр" onChange={(event) => setForm((current) => current && { ...current, first_name: event.target.value })} />
+            </label>
+            <label style={{ display: 'grid', gap: 4, fontWeight: 600 }}>Нэгж
+              <select value={form?.unit ?? teacher.unit} onChange={(event) => setForm((current) => current && { ...current, unit: event.target.value as Teacher['unit'], subject: '' })}>
+                <option value="БАЗАН">БАЗАН</option><option value="БУЗАН">БУЗАН</option><option value="НУЗАН">НУЗАН</option>
+              </select>
+            </label>
+            <label style={{ display: 'grid', gap: 4, fontWeight: 600 }}>Заах хичээл
+              <select required value={form?.subject ?? ''} onChange={(event) => setForm((current) => current && { ...current, subject: event.target.value })}>
+                <option value="" disabled>Заах хичээл сонгох</option>
+                {subjectsForUnit(form?.unit ?? teacher.unit).map((subject) => <option key={subject}>{subject}</option>)}
+              </select>
+            </label>
             <div style={{ display: 'flex', gap: 8 }}>
               <button type="submit" disabled={saving} style={{ padding: '8px 12px', border: 0, borderRadius: 8, background: '#16a34a', color: '#fff', fontWeight: 700 }}>{saving ? 'Хадгалж байна...' : 'Хадгалах'}</button>
               <button type="button" onClick={() => setEditing(false)} style={{ padding: '8px 12px', border: 0, borderRadius: 8, background: '#64748b', color: '#fff' }}>Буцах</button>

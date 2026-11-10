@@ -35,6 +35,14 @@ def validate_teacher_class(user, grade: int, section: str, subject: str) -> None
 
 
 def save_teacher_portal_data(user, portal_data: dict[str, Any]):
+    if mock_data_enabled():
+        try:
+            return update_mock_teacher_portal(user.id, portal_data)
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail="Загвар багш олдсонгүй.") from error
+        except RuntimeError as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
+
     metadata = dict(user.user_metadata or {})
     metadata["teacher_portal"] = portal_data
     try:
@@ -151,6 +159,7 @@ def update_my_teaching_classes(user, submission: TeachingClassesUpdate) -> list[
 
     portal = teacher_portal_data(user)
     portal["teaching_classes"] = classes
+    portal["teaching_classes_updated_at"] = datetime.now(timezone.utc).isoformat()
     save_teacher_portal_data(user, portal)
     return classes
 
@@ -185,6 +194,7 @@ def add_my_training(user, training: TrainingCreate) -> dict[str, Any]:
 def submit_program_plan(user, submission: ProgramPlanSubmit) -> dict[str, Any]:
     validate_teacher_class(user, submission.grade, submission.section, submission.subject)
     program_plan = {
+        "id": str(uuid4()),
         "documentUrl": submission.documentUrl,
         "grade": submission.grade,
         "section": submission.section,

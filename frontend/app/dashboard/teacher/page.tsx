@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { backendBaseUrl } from '../../../lib/backendApi';
+import { backendBaseUrl, fetchWithAuth } from '../../../lib/backendApi';
 import TeacherDashboardView, { TeacherTraining } from '../components/TeacherDashboardView';
 import { ActivityInput } from '../components/records/ActivityForm';
 import { TeacherActivity } from '../components/records/ActivityPanel';
@@ -48,7 +48,7 @@ export default function TeacherDashboardPage() {
 		...awards.map((item) => ({ id: item.id, category: 'Шагнал' as const })),
 		...degrees.map((item) => ({ id: item.id, category: 'Зэрэг' as const })),
 	], [awards, degrees]);
-	const { counts: notificationCounts, markRead } = useNotifications('teacher', personalNotificationItems);
+	const { counts: notificationCounts, errorMessage: notificationError, markRead } = useNotifications('teacher', personalNotificationItems);
 
 	useEffect(() => {
 		const loadProfile = async () => {
@@ -60,7 +60,7 @@ export default function TeacherDashboardPage() {
 			}
 			if (mockToken && !authUser) {
 				try {
-					const response = await fetch(`${apiUrl}/api/teachers/me`, {
+					const response = await fetchWithAuth(`${apiUrl}/api/teachers/me`, {
 						headers: { Authorization: `Bearer ${mockToken}` },
 					});
 					const result = await response.json() as TeacherWorkspace;
@@ -99,7 +99,7 @@ export default function TeacherDashboardPage() {
 				return;
 			}
 			try {
-				const response = await fetch(`${apiUrl}/api/teachers/me`, {
+				const response = await fetchWithAuth(`${apiUrl}/api/teachers/me`, {
 					headers: { Authorization: `Bearer ${session.access_token}` },
 				});
 				const result = await response.json();
@@ -152,7 +152,7 @@ export default function TeacherDashboardPage() {
 		const mockToken = window.localStorage.getItem('school-portal-mock-token');
 		if (!session && mockToken) session = { access_token: mockToken } as typeof session;
 		if (!session && !mockToken) throw new Error('Дахин нэвтэрнэ үү.');
-		const response = await fetch(`${apiUrl}${path}`, {
+		const response = await fetchWithAuth(`${apiUrl}${path}`, {
 			method,
 			headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
 			body: JSON.stringify(payload),
@@ -313,6 +313,7 @@ export default function TeacherDashboardPage() {
 			onDeleteEvaluation={deleteEvaluation}
 			onProfessionalSave={saveProfessional}
 			notificationCounts={notificationCounts}
+			notificationError={notificationError}
 			onNotificationCategoryChange={(category) => { markRead(category); setActiveCategory(category); }}
 		/>
 	);

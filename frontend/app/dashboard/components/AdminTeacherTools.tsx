@@ -201,22 +201,34 @@ export default function AdminTeacherTools({ teachers, onTeachersAdded, onTeacher
       >
         {(close) => (
           <form onSubmit={async (event) => { if (await addTeacher(event)) close(); }} style={{ display: 'grid', gap: 12 }}>
-            <input required placeholder="Овог" value={teacher.last_name} onChange={(event) => setTeacher({ ...teacher, last_name: event.target.value })} style={fieldStyle} />
-            <input required placeholder="Нэр" value={teacher.first_name} onChange={(event) => setTeacher({ ...teacher, first_name: event.target.value })} style={fieldStyle} />
-            <input required type="email" placeholder="И-мэйл" value={teacher.email} onChange={(event) => setTeacher({ ...teacher, email: event.target.value })} style={fieldStyle} />
-            <select value={teacher.unit} onChange={(event) => {
-              const unit = event.target.value as Teacher['unit'];
-              setTeacher({ ...teacher, unit, subject: '' });
-            }} style={fieldStyle}>
-              <option value="БАЗАН">БАЗАН</option>
-              <option value="БУЗАН">БУЗАН</option>
-              <option value="НУЗАН">НУЗАН</option>
-            </select>
-            <select required value={teacher.subject} onChange={(event) => setTeacher({ ...teacher, subject: event.target.value })} style={fieldStyle}>
-              <option value="" disabled>Заах хичээл сонгох</option>
-              {subjectsForUnit(teacher.unit).map((subject) => <option key={subject} value={subject}>{subject}</option>)}
-            </select>
-            <input required type="password" minLength={8} autoComplete="new-password" placeholder="Нууц үг (дор хаяж 8 тэмдэгт)" value={teacher.password} onChange={(event) => setTeacher({ ...teacher, password: event.target.value })} style={fieldStyle} />
+            <label style={{ display: 'grid', gap: 4, fontWeight: 600 }}>Овог
+              <input required placeholder="Овог" value={teacher.last_name} onChange={(event) => setTeacher({ ...teacher, last_name: event.target.value })} style={fieldStyle} />
+            </label>
+            <label style={{ display: 'grid', gap: 4, fontWeight: 600 }}>Нэр
+              <input required placeholder="Нэр" value={teacher.first_name} onChange={(event) => setTeacher({ ...teacher, first_name: event.target.value })} style={fieldStyle} />
+            </label>
+            <label style={{ display: 'grid', gap: 4, fontWeight: 600 }}>И-мэйл
+              <input required type="email" placeholder="И-мэйл" value={teacher.email} onChange={(event) => setTeacher({ ...teacher, email: event.target.value })} style={fieldStyle} />
+            </label>
+            <label style={{ display: 'grid', gap: 4, fontWeight: 600 }}>Нэгж
+              <select value={teacher.unit} onChange={(event) => {
+                const unit = event.target.value as Teacher['unit'];
+                setTeacher({ ...teacher, unit, subject: '' });
+              }} style={fieldStyle}>
+                <option value="БАЗАН">БАЗАН</option>
+                <option value="БУЗАН">БУЗАН</option>
+                <option value="НУЗАН">НУЗАН</option>
+              </select>
+            </label>
+            <label style={{ display: 'grid', gap: 4, fontWeight: 600 }}>Заах хичээл
+              <select required value={teacher.subject} onChange={(event) => setTeacher({ ...teacher, subject: event.target.value })} style={fieldStyle}>
+                <option value="" disabled>Заах хичээл сонгох</option>
+                {subjectsForUnit(teacher.unit).map((subject) => <option key={subject} value={subject}>{subject}</option>)}
+              </select>
+            </label>
+            <label style={{ display: 'grid', gap: 4, fontWeight: 600 }}>Нууц үг
+              <input required type="password" minLength={8} autoComplete="new-password" placeholder="Дор хаяж 8 тэмдэгт" value={teacher.password} onChange={(event) => setTeacher({ ...teacher, password: event.target.value })} style={fieldStyle} />
+            </label>
             <button type="submit" disabled={busy} style={{ ...actionStyle, justifyContent: 'center', borderRadius: 9, padding: '10px 12px' }}>{busy ? 'Нэмж байна...' : 'Үүсгэх'}</button>
           </form>
         )}

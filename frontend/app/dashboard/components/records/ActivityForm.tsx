@@ -98,11 +98,15 @@ export default function ActivityForm({ unit, subjects, onSubmit }: Props) {
           onSectionChange={setSection}
           onSubjectChange={setSubject}
         />
-      ) : <input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Гарчиг" style={fieldStyle} />}
-      <input required type="date" value={date} onChange={(event) => setDate(event.target.value)} style={fieldStyle} />
+      ) : <label style={{ display: 'grid', gap: 4, fontWeight: 600 }}>Гарчиг
+        <input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Гарчиг" style={fieldStyle} />
+      </label>}
+      <label style={{ display: 'grid', gap: 4, fontWeight: 600 }}>Огноо
+        <input required type="date" value={date} onChange={(event) => setDate(event.target.value)} style={fieldStyle} />
+      </label>
       <textarea rows={4} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Тэмдэглэл" style={fieldStyle} />
       <AnnouncementAttachments attachments={attachments} onChange={setAttachments} />
-      <button type="submit" disabled={busy || (lessonAttendance && (!grade || !section || !subject))} style={{ padding: '11px 14px', border: 0, borderRadius: 8, background: busy ? '#cbd5e1' : '#0f766e', color: '#fff', fontWeight: 700, cursor: busy ? 'wait' : 'pointer' }}>{busy ? 'Хадгалж байна...' : 'Илгээх'}</button>
+      <button type="submit" disabled={busy} style={{ padding: '8px 12px', border: 0, borderRadius: 6, background: busy ? '#cbd5e1' : '#0f766e', color: '#fff', fontWeight: 700, cursor: busy ? 'wait' : 'pointer' }}>{busy ? 'Хадгалж байна...' : 'Илгээх'}</button>
     </form>
   );
 }

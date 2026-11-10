@@ -22,13 +22,16 @@ export default function TrainingForm({ onAddTraining }: Props) {
   const [trainingType, setTrainingType] = useState<'' | 'Үндсэн' | 'Төрөлжсөн' | 'Сонголтот' | 'Ажлын байран дээрх сургалт' | 'Бусад'>('');
   const [certificateUrl, setCertificateUrl] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [uploadResetKey, setUploadResetKey] = useState(0);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !trainingType || !startDate || !endDate || !certificateUrl) {
-      alert('Сургалтын нэр, төрөл, огноо болон сертификатын файлыг заавал оруулна уу!');
+      setErrorMessage('Сургалтын нэр, төрөл, огноо болон сертификатын файлыг заавал оруулна уу.');
       return;
     }
+    setErrorMessage('');
 
     onAddTraining({
       name,
@@ -45,6 +48,7 @@ export default function TrainingForm({ onAddTraining }: Props) {
     setTrainingType('');
     setCertificateUrl('');
     setImageUrl('');
+    setUploadResetKey((current) => current + 1);
   };
 
   return (
@@ -53,8 +57,7 @@ export default function TrainingForm({ onAddTraining }: Props) {
       <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#334155' }}>➕ Шинэ сургалт бүртгэх</h4>
       
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-        <div>
-          <label style={{ fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>Сургалтын нэр *</label>
+        <label className="required-field-label" style={{ display: 'grid', gap: 4, fontSize: '12px', fontWeight: 'bold' }}>Сургалтын нэр
           <input 
             type="text" 
             placeholder="Сургалтын нэр оруулах..."
@@ -63,9 +66,9 @@ export default function TrainingForm({ onAddTraining }: Props) {
             required
             style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
           />
-        </div>
+        </label>
         <label style={{ fontSize: '12px', fontWeight: 'bold', display: 'grid', gap: 4 }}>
-          Сургалтын төрөл *
+          Сургалтын төрөл
           <select required value={trainingType} onChange={(event) => setTrainingType(event.target.value as typeof trainingType)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}>
             <option value="" disabled>Сургалтын төрөл сонгох</option>
             {['Үндсэн', 'Төрөлжсөн', 'Сонголтот', 'Ажлын байран дээрх сургалт', 'Бусад'].map((item) => <option key={item}>{item}</option>)}
@@ -73,8 +76,7 @@ export default function TrainingForm({ onAddTraining }: Props) {
         </label>
 
         <div style={{ display: 'flex', gap: '8px' }}>
-          <div style={{ flex: 1 }}>
-            <label style={{ fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>Эхэлсэн огноо *</label>
+          <label className="required-field-label" style={{ display: 'grid', flex: 1, gap: 4, fontSize: '12px', fontWeight: 'bold' }}>Эхэлсэн огноо
             <input 
               type="date" 
               value={startDate}
@@ -82,9 +84,8 @@ export default function TrainingForm({ onAddTraining }: Props) {
               required
               style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
             />
-          </div>
-          <div style={{ flex: 1 }}>
-            <label style={{ fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>Дууссан огноо *</label>
+          </label>
+          <label className="required-field-label" style={{ display: 'grid', flex: 1, gap: 4, fontSize: '12px', fontWeight: 'bold' }}>Дууссан огноо
             <input 
               type="date" 
               value={endDate}
@@ -92,37 +93,26 @@ export default function TrainingForm({ onAddTraining }: Props) {
               required
               style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
             />
-          </div>
+          </label>
         </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-        <div>
-          <label style={{ fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '4px', color: '#dc2626' }}>
-            📄 Сертификат *
-          </label>
-          <CertificateUpload onUploadSuccess={(url) => setCertificateUrl(url)} />
-        </div>
-
-        <div>
-          <label style={{ fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '4px', color: '#475569' }}>
-            🖼️ Зурган файл
-          </label>
-          <CertificateUpload onUploadSuccess={(url) => setImageUrl(url)} />
-        </div>
+        <CertificateUpload required resetKey={uploadResetKey} onUploadSuccess={(url) => setCertificateUrl(url)} onRemove={() => setCertificateUrl('')} />
+        <CertificateUpload label="Зургийн файл" onUploadSuccess={(url) => setImageUrl(url)} onRemove={() => setImageUrl('')} />
       </div>
 
+      {errorMessage && <p role="alert" style={{ margin: 0, color: '#b91c1c' }}>{errorMessage}</p>}
       <button 
         type="submit"
-        disabled={!certificateUrl || !trainingType}
         style={{
-          backgroundColor: certificateUrl && trainingType ? '#ea580c' : '#cbd5e1',
+          backgroundColor: '#ea580c',
           color: 'white',
           border: 'none',
           padding: '10px 20px',
           borderRadius: '6px',
           fontWeight: 'bold',
-          cursor: certificateUrl && trainingType ? 'pointer' : 'not-allowed',
+          cursor: 'pointer',
           width: '100%',
         }}
       >

@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
@@ -65,6 +66,7 @@ def update_mock_teacher_classes(auth_id: str, classes: list[dict[str, Any]]) -> 
     for teacher in data["teachers"]:
         if teacher.get("auth_id") == auth_id:
             teacher["teaching_classes"] = classes
+            teacher["teaching_classes_updated_at"] = datetime.now(timezone.utc).isoformat()
             path = Path(os.getenv("MOCK_DATA_FILE", str(DEFAULT_DATA_PATH)))
             with path.open("w", encoding="utf-8") as file:
                 json.dump(data, file, ensure_ascii=False, indent=2)

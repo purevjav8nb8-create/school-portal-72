@@ -145,7 +145,7 @@ export default function EvaluationPanel({ unit, subjects, evaluations, onSubmit,
           <input required type="date" value={evaluationDate} onChange={(event) => setEvaluationDate(event.target.value)} style={inputStyle} />
         </label>
         {errorMessage && <p role="alert" style={{ color: '#b91c1c', margin: 0 }}>{errorMessage}</p>}
-        <button type="submit" disabled={busy || !grade || !section || !subject} style={{ padding: '11px 14px', border: 0, borderRadius: 8, background: busy ? '#cbd5e1' : '#0f766e', color: '#fff', fontWeight: 700 }}>
+        <button type="submit" disabled={busy} style={{ padding: '8px 12px', border: 0, borderRadius: 6, background: busy ? '#cbd5e1' : '#0f766e', color: '#fff', fontWeight: 700 }}>
           {busy ? 'Хадгалж байна...' : 'Үнэлгээ хадгалах'}
         </button>
         </form>}

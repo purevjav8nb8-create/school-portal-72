@@ -6,6 +6,7 @@ from fastapi import HTTPException
 
 from database import supabase
 from schemas.teacher_records import ActivityReview, ProgramPlanReview
+from services.mock_school_data import load_mock_school_data, mock_data_enabled
 from services.teacher_portal import save_teacher_portal_data, teacher_portal_data
 
 
@@ -23,6 +24,31 @@ def _get_teacher(user_id: str):
 
 
 def list_teacher_records() -> list[dict[str, Any]]:
+    if mock_data_enabled():
+        try:
+            teachers = load_mock_school_data()["teachers"]
+        except RuntimeError as error:
+            raise HTTPException(status_code=503, detail="Багшийн материал уншигдсангүй.") from error
+        return [
+            {
+                "user_id": teacher["auth_id"],
+                "teacher": {
+                    "name": f'{teacher.get("last_name", "")} {teacher.get("first_name", "")}'.strip() or teacher.get("email", ""),
+                    "email": teacher.get("email", ""),
+                    "unit": teacher.get("unit", ""),
+                    "subject": teacher.get("subject", ""),
+                },
+                "program_plan": teacher.get("program_plan"),
+                "trainings": teacher.get("trainings", []),
+                "activities": teacher.get("activities", []),
+                "evaluations": teacher.get("evaluations", []),
+                "awards": teacher.get("awards", []),
+                "professional_degrees": teacher.get("professional_degrees", []),
+                "teaching_classes_updated_at": teacher.get("teaching_classes_updated_at"),
+            }
+            for teacher in teachers
+        ]
+
     try:
         users = supabase.auth.admin.list_users(per_page=1000)
     except Exception as error:
@@ -46,10 +72,12 @@ def list_teacher_records() -> list[dict[str, Any]]:
                 "subject": metadata.get("subject", ""),
             },
             "program_plan": portal.get("program_plan"),
+            "trainings": portal.get("trainings", []),
             "activities": portal.get("activities", []),
             "evaluations": portal.get("evaluations", []),
             "awards": portal.get("awards", []),
             "professional_degrees": portal.get("professional_degrees", []),
+            "teaching_classes_updated_at": portal.get("teaching_classes_updated_at"),
         })
     return records
 

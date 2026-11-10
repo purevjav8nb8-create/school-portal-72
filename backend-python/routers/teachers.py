@@ -1,10 +1,13 @@
 from fastapi import APIRouter, File, Header, HTTPException, UploadFile
+from fastapi.responses import Response
 from pydantic import BaseModel
 
+from schemas.school_chat import ChatMessageCreate, ChatReadRequest
 from schemas.teacher_records import ActivityCreate, ActivityReview, AnnouncementCreate, AwardCreate, EvaluationCreate, ProfessionalDegreeCreate, ProgramPlanReview, ProgramPlanSubmit, SurveyCreate, SurveyResponseCreate, SurveySubmissionCreate
 from schemas.teachers import AttendanceUpdate, TeacherCreate, TeacherUpdate, TeachingClassesUpdate, TrainingCreate
 from services.school_announcements import create_announcement, list_announcements
-from services.school_surveys import create_survey, list_surveys, respond_survey, submit_survey
+from services.school_chat import create_chat_message, list_chat_conversations, list_chat_messages, list_chat_users, mark_chat_read
+from services.school_surveys import create_survey, export_survey_xlsx, list_surveys, respond_survey, submit_survey
 from services.teacher_accounts import create_teacher_account, delete_teacher_account, list_teacher_accounts, update_teacher_account
 from services.teacher_auth import get_authenticated_user, require_admin, require_teacher
 from services.teacher_import import import_teacher_file
@@ -114,6 +117,43 @@ def get_announcements(kind: str | None = None, authorization: str | None = Heade
     return list_announcements(get_authenticated_user(authorization), kind)
 
 
+@router.get("/chat/conversations")
+def get_chat_conversations(authorization: str | None = Header(default=None)):
+    return list_chat_conversations(get_authenticated_user(authorization))
+
+
+@router.get("/chat/users")
+def get_chat_users(
+    q: str = "",
+    authorization: str | None = Header(default=None),
+):
+    return list_chat_users(get_authenticated_user(authorization), q)
+
+
+@router.get("/chat/messages")
+def get_chat_messages(
+    conversation_id: str,
+    authorization: str | None = Header(default=None),
+):
+    return list_chat_messages(get_authenticated_user(authorization), conversation_id)
+
+
+@router.post("/chat/messages")
+def post_chat_message(
+    message: ChatMessageCreate,
+    authorization: str | None = Header(default=None),
+):
+    return {"message": create_chat_message(get_authenticated_user(authorization), message)}
+
+
+@router.post("/chat/read")
+def read_chat_messages(
+    request: ChatReadRequest,
+    authorization: str | None = Header(default=None),
+):
+    return mark_chat_read(get_authenticated_user(authorization), request.conversation_id)
+
+
 @router.post("/announcements")
 def publish_announcement(
     announcement: AnnouncementCreate,
@@ -126,6 +166,16 @@ def publish_announcement(
 @router.get("/surveys")
 def get_surveys(authorization: str | None = Header(default=None)):
     return list_surveys(get_authenticated_user(authorization))
+
+
+@router.get("/surveys/{survey_id}/export")
+def download_survey_xlsx(survey_id: str, authorization: str | None = Header(default=None)):
+    content, filename = export_survey_xlsx(require_admin(authorization), survey_id)
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"},
+    )
 
 
 @router.post("/surveys")

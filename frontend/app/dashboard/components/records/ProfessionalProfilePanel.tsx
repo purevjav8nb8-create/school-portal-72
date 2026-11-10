@@ -16,14 +16,18 @@ export default function ProfessionalProfilePanel({ mode, awards, degrees, onSave
   const [requestedDegree, setRequestedDegree] = useState('');
   const [requestOpen, setRequestOpen] = useState<'award' | 'degree' | null>(null);
   const [message, setMessage] = useState('');
+  const [messageIsError, setMessageIsError] = useState(false);
+  const [uploadResetKey, setUploadResetKey] = useState(0);
   const submit = async (event: FormEvent<HTMLFormElement>, path: string, payload: object, reset: () => void) => {
     event.preventDefault();
     try {
       const normalized = { ...payload, ...('awarded_date' in payload ? { awarded_date: payload.awarded_date || null } : {}), ...('issued_date' in payload ? { issued_date: payload.issued_date || null } : {}) };
       await onSave(path, normalized);
       reset();
+      setMessageIsError(false);
       setMessage('Мэдээлэл хадгалагдлаа.');
     } catch (error) {
+      setMessageIsError(true);
       setMessage(error instanceof Error ? error.message : 'Мэдээлэл хадгалагдсангүй.');
     }
   };
@@ -39,13 +43,20 @@ export default function ProfessionalProfilePanel({ mode, awards, degrees, onSave
       });
       setRequestedDegree('');
       setRequestOpen(null);
+      setMessageIsError(false);
       setMessage('Зэргийн хүсэлт илгээгдлээ.');
     } catch (error) {
+      setMessageIsError(true);
       setMessage(error instanceof Error ? error.message : 'Зэргийн хүсэлт илгээгдсэнгүй.');
     }
   };
   const submitAwardRequest = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!awardRequestFiles.application_url || !awardRequestFiles.meeting_minutes_url || !awardRequestFiles.reference_url) {
+      setMessageIsError(true);
+      setMessage('Анкет, хурлын протокол болон тодорхойлолтын PDF файлыг хавсаргана уу.');
+      return;
+    }
     try {
       await onSave('/api/teachers/me/awards', {
         name: requestedAward === 'Бусад' ? customRequestedAward.trim() : requestedAward,
@@ -61,8 +72,10 @@ export default function ProfessionalProfilePanel({ mode, awards, degrees, onSave
       setAwardRequestFiles({ application_url: '', meeting_minutes_url: '', reference_url: '' });
       setAwardJustification('');
       setRequestOpen(null);
+      setMessageIsError(false);
       setMessage('Шагналын хүсэлт илгээгдлээ.');
     } catch (error) {
+      setMessageIsError(true);
       setMessage(error instanceof Error ? error.message : 'Шагналын хүсэлт илгээгдсэнгүй.');
     }
   };
@@ -70,18 +83,44 @@ export default function ProfessionalProfilePanel({ mode, awards, degrees, onSave
   return (
     <section>
       <h2 style={{ marginTop: 0 }}>{mode === 'award' ? 'Шагнал' : 'Мэргэжлийн зэрэг'}</h2>
-      {message && <p role="status" style={{ color: '#047857' }}>{message}</p>}
+      {message && <p role={messageIsError ? 'alert' : 'status'} style={{ color: messageIsError ? '#b91c1c' : '#047857' }}>{message}</p>}
       {mode === 'award' ? (
         <>
           <h3>Шагнал бүртгэх</h3>
-          <form onSubmit={(event) => void submit(event, '/api/teachers/me/awards', { ...award, name: award.name === 'Бусад' ? award.custom_name : award.name }, () => setAward({ name: '', custom_name: '', certificate_number: '', certificate_url: '', organization: '', awarded_date: '' }))} style={{ display: 'grid', gap: 8 }}>
-            <select required value={award.name} onChange={(event) => setAward({ ...award, name: event.target.value })} style={field}><option value="">Шагналын нэр сонгох</option>{['Арга зүйч багш', 'Ахлах багш', 'Багшийн алдар', 'Жуух бичиг', 'Боловсролын тэргүүний ажилтан', 'Хөдөлмөрийн хүндэт медаль', 'Алтан гадас', 'Хөдөлмөрийн гавьяаны Улаан тугийн одон', 'Бусад'].map((name) => <option key={name}>{name}</option>)}</select>
-            {award.name === 'Бусад' && <input required placeholder="Шагналын нэр" value={award.custom_name} onChange={(event) => setAward({ ...award, custom_name: event.target.value })} style={field} />}
-            <input required placeholder="Шагналын үнэмлэхний дугаар" value={award.certificate_number} onChange={(event) => setAward({ ...award, certificate_number: event.target.value })} style={field} />
-            <LosslessCloudinaryUpload label="Шагналын үнэмлэх PDF заавал оруулна" formats={['pdf']} onUploaded={(file) => setAward({ ...award, certificate_url: file.url })} />
-            <select required value={award.organization} onChange={(event) => setAward({ ...award, organization: event.target.value })} style={field}><option value="">Олгосон байгууллага сонгох</option>{['Нийслэлийн боловсролын газар', 'Боловсролын яам', 'Засгийн газар', 'Төрийн', 'Бусад'].map((name) => <option key={name}>{name}</option>)}</select>
+          <form onSubmit={(event) => {
+            if (!award.certificate_url) {
+              event.preventDefault();
+              setMessageIsError(true);
+              setMessage('Шагналын үнэмлэхний PDF файлыг хавсаргана уу.');
+              return;
+            }
+            void submit(event, '/api/teachers/me/awards', { ...award, name: award.name === 'Бусад' ? award.custom_name : award.name }, () => {
+              setAward({ name: '', custom_name: '', certificate_number: '', certificate_url: '', organization: '', awarded_date: '' });
+              setUploadResetKey((current) => current + 1);
+            });
+          }} style={{ display: 'grid', gap: 8 }}>
+            <label style={{ display: 'grid', gap: 4, fontWeight: 600 }}>Шагналын нэр
+              <select required value={award.name} onChange={(event) => setAward({ ...award, name: event.target.value })} style={field}><option value="">Шагналын нэр сонгох</option>{['Арга зүйч багш', 'Ахлах багш', 'Багшийн алдар', 'Жуух бичиг', 'Боловсролын тэргүүний ажилтан', 'Хөдөлмөрийн хүндэт медаль', 'Алтан гадас', 'Хөдөлмөрийн гавьяаны Улаан тугийн одон', 'Бусад'].map((name) => <option key={name}>{name}</option>)}</select>
+            </label>
+            {award.name === 'Бусад' && <label style={{ display: 'grid', gap: 4, fontWeight: 600 }}>Шагналын нэр
+              <input required placeholder="Шагналын нэр" value={award.custom_name} onChange={(event) => setAward({ ...award, custom_name: event.target.value })} style={field} />
+            </label>}
+            <label style={{ display: 'grid', gap: 4, fontWeight: 600 }}>Шагналын үнэмлэхний дугаар
+              <input required placeholder="Үнэмлэхний дугаар" value={award.certificate_number} onChange={(event) => setAward({ ...award, certificate_number: event.target.value })} style={field} />
+            </label>
+            <LosslessCloudinaryUpload
+              label="Шагналын үнэмлэх (зөвхөн PDF)"
+              formats={['pdf']}
+              required
+              resetKey={uploadResetKey}
+              onUploaded={(file) => setAward({ ...award, certificate_url: file.url })}
+              onRemoved={() => setAward((current) => ({ ...current, certificate_url: '' }))}
+            />
+            <label style={{ display: 'grid', gap: 4, fontWeight: 600 }}>Олгосон байгууллага
+              <select required value={award.organization} onChange={(event) => setAward({ ...award, organization: event.target.value })} style={field}><option value="">Олгосон байгууллага сонгох</option>{['Нийслэлийн боловсролын газар', 'Боловсролын яам', 'Засгийн газар', 'Төрийн', 'Бусад'].map((name) => <option key={name}>{name}</option>)}</select>
+            </label>
             <input type="date" value={award.awarded_date} onChange={(event) => setAward({ ...award, awarded_date: event.target.value })} style={field} />
-            <button type="submit" disabled={!award.certificate_url}>Шагнал хадгалах</button>
+            <button type="submit">Шагнал хадгалах</button>
           </form>
           <button type="button" onClick={() => setRequestOpen('award')} style={{ marginTop: 12, padding: '8px 12px', border: 0, borderRadius: 6, background: '#2563eb', color: '#fff', cursor: 'pointer' }}>Шагналд хүсэлт гаргах</button>
           {awards.map((item) => <p key={item.id}>Шагнал: {item.name}{item.certificate_number && ` · №${item.certificate_number}`}{item.status === 'Хүсэлт' ? ' · Хүсэлт' : ''}</p>)}
@@ -95,15 +134,15 @@ export default function ProfessionalProfilePanel({ mode, awards, degrees, onSave
                   </select>
                 </label>
                 {requestedAward === 'Бусад' && <input required placeholder="Хүсэлт гаргах шагналын нэр" value={customRequestedAward} onChange={(event) => setCustomRequestedAward(event.target.value)} style={field} />}
-                <LosslessCloudinaryUpload label="Анкет PDF оруулах" formats={['pdf']} onUploaded={(file) => setAwardRequestFiles((current) => ({ ...current, application_url: file.url }))} />
-                <LosslessCloudinaryUpload label="Хамт олны хурлын протокол PDF оруулах" formats={['pdf']} onUploaded={(file) => setAwardRequestFiles((current) => ({ ...current, meeting_minutes_url: file.url }))} />
-                <LosslessCloudinaryUpload label="Тодорхойлолт PDF оруулах" formats={['pdf']} onUploaded={(file) => setAwardRequestFiles((current) => ({ ...current, reference_url: file.url }))} />
+                <LosslessCloudinaryUpload label="Анкет (зөвхөн PDF)" formats={['pdf']} required onUploaded={(file) => setAwardRequestFiles((current) => ({ ...current, application_url: file.url }))} onRemoved={() => setAwardRequestFiles((current) => ({ ...current, application_url: '' }))} />
+                <LosslessCloudinaryUpload label="Хамт олны хурлын протокол (зөвхөн PDF)" formats={['pdf']} required onUploaded={(file) => setAwardRequestFiles((current) => ({ ...current, meeting_minutes_url: file.url }))} onRemoved={() => setAwardRequestFiles((current) => ({ ...current, meeting_minutes_url: '' }))} />
+                <LosslessCloudinaryUpload label="Тодорхойлолт (зөвхөн PDF)" formats={['pdf']} required onUploaded={(file) => setAwardRequestFiles((current) => ({ ...current, reference_url: file.url }))} onRemoved={() => setAwardRequestFiles((current) => ({ ...current, reference_url: '' }))} />
                 <label style={{ display: 'grid', gap: 6, fontWeight: 700 }}>Шагнуулах үндэслэл
                   <textarea required value={awardJustification} onChange={(event) => setAwardJustification(event.target.value)} rows={4} style={{ ...field, resize: 'vertical' }} placeholder="Шагналд тодорхойлох үндэслэлээ бичнэ үү" />
                 </label>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                   <button type="button" onClick={() => setRequestOpen(null)}>Буцах</button>
-                  <button type="submit" disabled={!requestedAward || (requestedAward === 'Бусад' && !customRequestedAward.trim()) || !awardRequestFiles.application_url || !awardRequestFiles.meeting_minutes_url || !awardRequestFiles.reference_url || !awardJustification.trim()}>Хүсэлт илгээх</button>
+                  <button type="submit">Хүсэлт илгээх</button>
                 </div>
               </form>
             </section>
@@ -112,14 +151,36 @@ export default function ProfessionalProfilePanel({ mode, awards, degrees, onSave
       ) : (
         <>
           <h3>Одоо байгаа зэргийг бүртгэх</h3>
-          <form onSubmit={(event) => void submit(event, '/api/teachers/me/professional-degrees', degree, () => setDegree({ name: '', certificate_number: '', certificate_url: '', status: 'Одоо байгаа зэрэг', issued_date: '' }))} style={{ display: 'grid', gap: 8 }}>
+          <form onSubmit={(event) => {
+            if (!degree.certificate_url) {
+              event.preventDefault();
+              setMessageIsError(true);
+              setMessage('Зэргийн үнэмлэхний PDF файлыг хавсаргана уу.');
+              return;
+            }
+            void submit(event, '/api/teachers/me/professional-degrees', degree, () => {
+              setDegree({ name: '', certificate_number: '', certificate_url: '', status: 'Одоо байгаа зэрэг', issued_date: '' });
+              setUploadResetKey((current) => current + 1);
+            });
+          }} style={{ display: 'grid', gap: 8 }}>
+            <label style={{ display: 'grid', gap: 4, fontWeight: 600 }}>Мэргэжлийн зэрэг
             <select required value={degree.name} onChange={(event) => setDegree({ ...degree, name: event.target.value })} style={field}>
               <option value="">Зэрэг сонгох</option>{['Заах аргач', 'Тэргүүлэх', 'Зөвлөх'].map((name) => <option key={name} value={name}>{name}</option>)}
             </select>
-            <input required placeholder="Зэргийн үнэмлэхний дугаар" value={degree.certificate_number} onChange={(event) => setDegree({ ...degree, certificate_number: event.target.value })} style={field} />
-            <LosslessCloudinaryUpload label="Зэргийн үнэмлэх PDF заавал оруулна" formats={['pdf']} onUploaded={(file) => setDegree({ ...degree, certificate_url: file.url })} />
+            </label>
+            <label style={{ display: 'grid', gap: 4, fontWeight: 600 }}>Зэргийн үнэмлэхний дугаар
+              <input required placeholder="Үнэмлэхний дугаар" value={degree.certificate_number} onChange={(event) => setDegree({ ...degree, certificate_number: event.target.value })} style={field} />
+            </label>
+            <LosslessCloudinaryUpload
+              label="Зэргийн үнэмлэх (зөвхөн PDF)"
+              formats={['pdf']}
+              required
+              resetKey={uploadResetKey}
+              onUploaded={(file) => setDegree({ ...degree, certificate_url: file.url })}
+              onRemoved={() => setDegree((current) => ({ ...current, certificate_url: '' }))}
+            />
             <input type="date" value={degree.issued_date} onChange={(event) => setDegree({ ...degree, issued_date: event.target.value })} style={field} />
-            <button type="submit" disabled={!degree.name || !degree.certificate_number.trim() || !degree.certificate_url}>Зэрэг бүртгэх</button>
+            <button type="submit">Зэрэг бүртгэх</button>
           </form>
           <button type="button" onClick={() => setRequestOpen('degree')} style={{ marginTop: 12, padding: '8px 12px', border: 0, borderRadius: 6, background: '#2563eb', color: '#fff', cursor: 'pointer' }}>Хүсэлт гаргах</button>
           {degrees.map((item) => <p key={item.id}>Зэрэг: {item.name}{item.certificate_number && ` · №${item.certificate_number}`} · {item.status}</p>)}
@@ -134,7 +195,7 @@ export default function ProfessionalProfilePanel({ mode, awards, degrees, onSave
                 </label>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                   <button type="button" onClick={() => setRequestOpen(null)}>Буцах</button>
-                  <button type="submit" disabled={!requestedDegree}>Хүсэлт илгээх</button>
+                  <button type="submit">Хүсэлт илгээх</button>
                 </div>
               </form>
             </section>

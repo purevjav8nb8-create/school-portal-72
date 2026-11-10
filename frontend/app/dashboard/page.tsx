@@ -21,7 +21,7 @@ export default function DashboardPage() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const { teachers, setTeachers, displayTeachers } = useTeachers(activeUnit);
-  const { counts: notificationCounts, markRead } = useNotifications('admin');
+  const { counts: notificationCounts, errorMessage: notificationError, markRead } = useNotifications('admin');
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -100,6 +100,7 @@ export default function DashboardPage() {
         setSelectedTeacher(updatedTeacher);
       }}
       notificationCounts={notificationCounts}
+      notificationError={notificationError}
       onCategoryChange={(category) => { markRead(category); setActiveCategory(category); }}
     />
   );

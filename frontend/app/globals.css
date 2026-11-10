@@ -10,8 +10,7 @@ html,
 body {
   padding: 0;
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen,
-    Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif;
+  font-family: Arial, "Segoe UI", sans-serif;
   background-color: #f8fafc;
   color: #0f172a;
 }
@@ -21,7 +20,7 @@ body {
 }
 
 .dashboard-compact {
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .dashboard-compact h1,
@@ -48,7 +47,7 @@ body {
 }
 
 .dashboard-compact table {
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .dashboard-compact th,
@@ -66,7 +65,7 @@ body {
 .dashboard-compact input,
 .dashboard-compact select,
 .dashboard-compact textarea {
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .dashboard-content {
@@ -120,5 +119,77 @@ body {
 .dashboard-content input,
 .dashboard-content select,
 .dashboard-content textarea {
-  font-size: 13px;
+  font-size: 12px;
+}
+
+.dashboard-compact > .dashboard-grid {
+  grid-template-columns: 150px minmax(0, 1fr) 180px !important;
+}
+
+.dashboard-compact .dashboard-content {
+  padding: 8px !important;
+}
+
+.dashboard-compact .dashboard-content form {
+  gap: 8px !important;
+}
+
+.dashboard-compact .dashboard-content input,
+.dashboard-compact .dashboard-content select,
+.dashboard-compact .dashboard-content textarea {
+  padding: 7px 8px !important;
+  border-radius: 5px !important;
+}
+
+.dashboard-compact label:has(input[required], select[required], textarea[required])::before,
+.dashboard-compact label.required-field-label::before {
+  content: '*';
+  margin-right: 4px;
+  color: #dc2626;
+}
+
+.dashboard-compact [role='dialog'] {
+  padding: 14px !important;
+  border-radius: 9px !important;
+}
+
+.dashboard-compact [role='dialog'] > header {
+  padding-bottom: 8px !important;
+}
+
+.dashboard-compact [role='dialog'] > div {
+  padding-top: 10px !important;
+}
+
+@media (max-width: 900px) {
+  .dashboard-compact {
+    height: auto !important;
+    min-height: 100vh;
+    overflow: visible !important;
+    padding: 6px !important;
+  }
+
+  .dashboard-compact > .dashboard-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    height: auto !important;
+  }
+
+  .dashboard-compact > .dashboard-grid > section {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .dashboard-compact .chat-layout {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .dashboard-compact .chat-layout > nav {
+    max-height: 220px;
+    border-right: 0 !important;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .dashboard-compact .dashboard-content [style*='repeat(4, minmax'] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
 }

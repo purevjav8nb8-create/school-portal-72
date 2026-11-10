@@ -8,11 +8,12 @@ interface Props {
   setActiveCategory: (category: DashboardCategory) => void;
   categories?: DashboardCategory[];
   notificationCounts?: NotificationCounts;
+  notificationError?: string;
 }
 
 const defaultCategories: DashboardCategory[] = ['Ирц', 'Сургалт', 'Үнэлгээ'];
 
-export default function SideMenu({ activeCategory, setActiveCategory, categories = defaultCategories, notificationCounts = {} }: Props) {
+export default function SideMenu({ activeCategory, setActiveCategory, categories = defaultCategories, notificationCounts = {}, notificationError = '' }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
       {categories.map((category) => {
@@ -41,6 +42,7 @@ export default function SideMenu({ activeCategory, setActiveCategory, categories
           </button>
         );
       })}
+      {notificationError && <p role="alert" style={{ margin: '4px 2px', color: '#b91c1c', fontSize: 11 }}>{notificationError}</p>}
     </div>
   );
 }

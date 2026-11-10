@@ -1,6 +1,7 @@
 'use client';
 
-import { ChangeEvent, useState } from 'react';
+import { ChangeEvent, useEffect, useId, useState } from 'react';
+import { Download, Eye, Paperclip, Trash2 } from 'lucide-react';
 import { backendBaseUrl } from '../lib/backendApi';
 
 export type UploadedFile = {
@@ -14,7 +15,10 @@ interface Props {
   formats: string[];
   multiple?: boolean;
   maxFiles?: number;
+  required?: boolean;
+  resetKey?: string | number;
   onUploaded: (file: UploadedFile) => void;
+  onRemoved?: (file: UploadedFile) => void;
 }
 
 async function optimizeImage(file: File): Promise<File> {
@@ -47,10 +51,9 @@ async function compressFile(file: File): Promise<File> {
     || extension === 'xlsx'
     || extension === 'pptx';
   if (serverCompressed) {
-    const apiUrl = backendBaseUrl;
     const formData = new FormData();
     formData.append('file', file);
-    const response = await fetch(`${apiUrl}/api/files/compress`, { method: 'POST', body: formData });
+    const response = await fetch(`${backendBaseUrl}/api/files/compress`, { method: 'POST', body: formData });
     if (!response.ok) {
       if (response.status === 404) return file;
       const result = await response.json().catch(() => ({}));
@@ -67,22 +70,35 @@ export default function LosslessCloudinaryUpload({
   formats,
   multiple = false,
   maxFiles = 1,
+  required = false,
+  resetKey,
   onUploaded,
+  onRemoved,
 }: Props) {
+  const inputId = useId();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const accept = formats.map((format) => `.${format}`).join(',');
 
+  useEffect(() => {
+    setUploadedFiles([]);
+  }, [resetKey]);
+
   const uploadFile = async (file: File) => {
+    const extension = file.name.split('.').pop()?.toLowerCase() ?? '';
+    if (!formats.map((format) => format.toLowerCase()).includes(extension)) {
+      throw new Error(`${file.name}: зөвшөөрөгдсөн файлын төрөл биш байна.`);
+    }
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
     const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
     if (!cloudName || !uploadPreset) throw new Error('Cloudinary cloud name эсвэл upload preset тохируулаагүй байна.');
 
-    const uploadFile = await compressFile(file);
-    const isPdf = uploadFile.type === 'application/pdf' || uploadFile.name.toLowerCase().endsWith('.pdf');
-    const resourceType = uploadFile.type.startsWith('image/') || isPdf ? 'image' : 'raw';
+    const optimizedFile = await compressFile(file);
+    const isPdf = optimizedFile.type === 'application/pdf' || optimizedFile.name.toLowerCase().endsWith('.pdf');
+    const resourceType = optimizedFile.type.startsWith('image/') || isPdf ? 'image' : 'raw';
     const formData = new FormData();
-    formData.append('file', uploadFile);
+    formData.append('file', optimizedFile);
     formData.append('upload_preset', uploadPreset);
     const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`, {
       method: 'POST',
@@ -92,19 +108,21 @@ export default function LosslessCloudinaryUpload({
     if (!response.ok || !result.secure_url) {
       throw new Error(result.error?.message ?? 'Файл upload хийгдсэнгүй.');
     }
-    onUploaded({
+    const uploadedFile: UploadedFile = {
       name: file.name,
       url: result.secure_url,
       file_type: resourceType === 'image' ? 'image' : 'document',
-    });
-    setMessage(file.name);
+    };
+    setUploadedFiles((current) => multiple ? [...current, uploadedFile].slice(-maxFiles) : [uploadedFile]);
+    onUploaded(uploadedFile);
+    setMessage('');
   };
 
   const handleFiles = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []).slice(0, maxFiles);
     if (!files.length) return;
     setBusy(true);
-    setMessage('Файл бэлтгэж байна...');
+    setMessage('');
     try {
       for (const file of files) await uploadFile(file);
     } catch (error) {
@@ -115,13 +133,55 @@ export default function LosslessCloudinaryUpload({
     }
   };
 
+  const removeFile = (file: UploadedFile) => {
+    setUploadedFiles((current) => current.filter((item) => item.url !== file.url));
+    onRemoved?.(file);
+  };
+
   return (
-    <div style={{ display: 'grid', gap: 6 }}>
-      <label style={{ display: 'inline-flex', width: 'fit-content', alignItems: 'center', padding: '9px 14px', borderRadius: 8, background: busy ? '#94a3b8' : '#0f766e', color: '#fff', fontWeight: 700, cursor: busy ? 'wait' : 'pointer' }}>
-        {busy ? 'Upload хийж байна...' : label}
-        <input type="file" accept={accept} multiple={multiple} disabled={busy} onChange={(event) => void handleFiles(event)} style={{ display: 'none' }} />
-      </label>
-      {message && <small role="status" style={{ color: '#64748b' }}>{message}</small>}
+    <div style={{ display: 'grid', gap: 4, minWidth: 0 }}>
+      <div style={{ color: '#334155', fontSize: 12, fontWeight: 600 }}>
+        {label}{required && <span aria-hidden="true" style={{ color: '#dc2626', marginLeft: 3 }}>*</span>}
+      </div>
+      {(multiple || uploadedFiles.length === 0) && (
+        <label
+          htmlFor={inputId}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            minHeight: 28,
+            padding: '4px 8px',
+            border: '1px solid #cbd5e1',
+            borderRadius: 4,
+            background: busy ? '#f1f5f9' : '#fff',
+            color: '#94a3b8',
+            fontSize: 11,
+            cursor: busy ? 'wait' : 'pointer',
+          }}
+        >
+          <Paperclip size={13} />
+          <span>{busy ? 'Файл байршуулж байна...' : 'Энд дарж файл хавсаргана уу.'}</span>
+          <input
+            id={inputId}
+            type="file"
+            accept={accept}
+            multiple={multiple}
+            disabled={busy}
+            onChange={(event) => void handleFiles(event)}
+            style={{ display: 'none' }}
+          />
+        </label>
+      )}
+      {!multiple && uploadedFiles.map((file) => (
+        <div key={file.url} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, minHeight: 28, padding: '4px 6px', border: '1px solid #cbd5e1', borderRadius: 4, background: '#fff' }}>
+          <a href={file.url} target="_blank" rel="noreferrer" title="Файлыг харах" aria-label={`${file.name} харах`} style={{ display: 'grid', placeItems: 'center', color: '#2563eb' }}><Eye size={13} /></a>
+          <a href={file.url} target="_blank" rel="noreferrer" style={{ flex: 1, minWidth: 0, overflow: 'hidden', color: '#2563eb', fontSize: 11, textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</a>
+          <a href={file.url} download title="Файл татах" aria-label={`${file.name} татах`} style={{ display: 'grid', placeItems: 'center', color: '#2563eb' }}><Download size={13} /></a>
+          <button type="button" onClick={() => removeFile(file)} title="Файлыг хасах" aria-label={`${file.name} хасах`} style={{ display: 'grid', placeItems: 'center', padding: 0, border: 0, background: 'transparent', color: '#dc2626', cursor: 'pointer' }}><Trash2 size={13} /></button>
+        </div>
+      ))}
+      {message && <small role="alert" style={{ color: '#b91c1c' }}>{message}</small>}
     </div>
   );
 }

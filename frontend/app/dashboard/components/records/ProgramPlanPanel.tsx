@@ -31,6 +31,8 @@ export default function ProgramPlanPanel({ programPlan, unit, subjects, onSubmit
   const [section, setSection] = useState('');
   const [subject, setSubject] = useState('');
   const [busy, setBusy] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const [uploadResetKey, setUploadResetKey] = useState(0);
   const fieldStyle = {
     width: '100%',
     padding: '11px 12px',
@@ -43,12 +45,17 @@ export default function ProgramPlanPanel({ programPlan, unit, subjects, onSubmit
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!documentUrl) return;
+    if (!documentUrl) {
+      setUploadError('PDF файл заавал хавсаргана.');
+      return;
+    }
+    setUploadError('');
     setBusy(true);
     try {
       await onSubmit(documentUrl, note, grade, section, subject);
       setDocumentUrl('');
       setNote('');
+      setUploadResetKey((current) => current + 1);
     } finally {
       setBusy(false);
     }
@@ -81,10 +88,17 @@ export default function ProgramPlanPanel({ programPlan, unit, subjects, onSubmit
           onSectionChange={setSection}
           onSubjectChange={setSubject}
         />
-        <LosslessCloudinaryUpload label="PDF сонгох" formats={['pdf']} onUploaded={(file) => setDocumentUrl(file.url)} />
-        {documentUrl && <small>Файл бэлэн боллоо.</small>}
+          <LosslessCloudinaryUpload
+            label="Хөтөлбөр, төлөвлөгөөний файл (зөвхөн PDF)"
+            formats={['pdf']}
+            required
+            resetKey={uploadResetKey}
+            onUploaded={(file) => { setDocumentUrl(file.url); setUploadError(''); }}
+            onRemoved={() => setDocumentUrl('')}
+          />
+          {uploadError && <small role="alert" style={{ color: '#b91c1c' }}>{uploadError}</small>}
         <textarea rows={3} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Тайлбар (заавал биш)" style={fieldStyle} />
-        <button type="submit" disabled={busy || !documentUrl || !grade || !section || !subject} style={{ padding: '11px 14px', border: 0, borderRadius: 8, background: busy || !documentUrl || !grade || !section || !subject ? '#cbd5e1' : '#0f766e', color: '#fff', fontWeight: 700, cursor: busy || !documentUrl || !grade || !section || !subject ? 'not-allowed' : 'pointer' }}>
+        <button type="submit" disabled={busy} style={{ padding: '8px 12px', border: 0, borderRadius: 6, background: busy ? '#cbd5e1' : '#0f766e', color: '#fff', fontWeight: 700, cursor: busy ? 'not-allowed' : 'pointer' }}>
           {busy ? 'Илгээж байна...' : 'Хөтөлбөр илгээх'}
         </button>
       </form>}
