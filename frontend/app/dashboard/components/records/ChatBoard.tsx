@@ -2,7 +2,6 @@
 
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { backendBaseUrl, fetchWithAuth } from '../../../../lib/backendApi';
-import { supabase } from '../../../../lib/supabaseClient';
 
 type ChatConversation = {
   conversation_id: string;
@@ -44,13 +43,9 @@ const fieldStyle = {
 };
 
 async function chatRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token ?? window.localStorage.getItem('school-portal-mock-token');
-  if (!token) throw new Error('Дахин нэвтэрнэ үү.');
   const response = await fetchWithAuth(`${backendBaseUrl}${path}`, {
     ...init,
     headers: {
-      Authorization: `Bearer ${token}`,
       ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
       ...init?.headers,
     },
@@ -168,11 +163,11 @@ export default function ChatBoard({ isAdmin = false }: { isAdmin?: boolean }) {
         );
         if (!active) return;
         setMessages(result);
+        setErrorMessage('');
         await chatRequest<{ read: number }>('/api/teachers/chat/read', {
           method: 'POST',
           body: JSON.stringify({ conversation_id: selectedId }),
         });
-        await loadConversations();
       } catch (error) {
         if (active) setErrorMessage(error instanceof Error ? error.message : 'Чатын мессеж уншигдсангүй.');
       } finally {

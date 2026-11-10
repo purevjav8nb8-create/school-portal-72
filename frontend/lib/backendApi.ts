@@ -41,6 +41,24 @@ export async function fetchWithAuth(input: RequestInfo | URL, init: RequestInit 
   const response = await send(accessToken);
   if (response.status !== 401 || !session) return response;
 
-  const refreshedToken = await refreshAccessToken();
-  return refreshedToken ? send(refreshedToken) : response;
+  const retryWithCurrentSession = async () => {
+    const { data: { session: currentSession }, error: currentSessionError } = await supabase.auth.getSession();
+    if (currentSessionError) throw currentSessionError;
+    if (currentSession?.access_token && currentSession.access_token !== accessToken) {
+      return send(currentSession.access_token);
+    }
+    return null;
+  };
+
+  const currentSessionResponse = await retryWithCurrentSession();
+  if (currentSessionResponse) return currentSessionResponse;
+
+  try {
+    const refreshedToken = await refreshAccessToken();
+    return refreshedToken ? send(refreshedToken) : response;
+  } catch (refreshError) {
+    const changedSessionResponse = await retryWithCurrentSession();
+    if (changedSessionResponse) return changedSessionResponse;
+    throw refreshError;
+  }
 }
