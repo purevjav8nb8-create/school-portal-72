@@ -55,7 +55,7 @@ export default function Header({
             lineHeight: 1.1,
           }}
         >
-          {user?.role === 'admin' || user?.role === 'manager' ? 'Админ хяналт самбар' : 'Багшийн самбар'}
+          {user?.role === 'admin' ? 'Админ хяналт самбар' : user?.role === 'manager' ? 'Менежер хяналт самбар' : 'Багшийн самбар'}
         </h1>
 
         <div
