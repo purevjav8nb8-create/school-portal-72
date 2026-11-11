@@ -27,7 +27,9 @@ interface Props {
 
 export default function AdminTrainingPanel({ teachers }: Props) {
   const [selected, setSelected] = useState<{ teacher: Teacher; training: Training } | null>(null);
-  const rows = teachers.flatMap((teacher) =>
+  const [teacherId, setTeacherId] = useState('');
+  const filteredTeachers = teacherId ? teachers.filter((teacher) => teacher.auth_id === teacherId) : teachers;
+  const rows = filteredTeachers.flatMap((teacher) =>
     (teacher.training_records ?? []).map((training) => ({ teacher, training: training as Training })),
   ).sort((left, right) =>
     right.training.endDate.localeCompare(left.training.endDate)
@@ -42,6 +44,13 @@ export default function AdminTrainingPanel({ teachers }: Props) {
   return (
     <section>
       <h2 style={{ marginTop: 0 }}>Сургалт</h2>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '8px 0', color: '#334155', fontWeight: 600 }}>
+        Багшаар шүүх
+        <select value={teacherId} onChange={(event) => setTeacherId(event.target.value)} style={{ minWidth: 220, padding: '7px 9px', border: '1px solid #cbd5e1', borderRadius: 7, background: '#fff' }}>
+          <option value="">Бүх багш</option>
+          {teachers.map((teacher) => <option key={teacher.auth_id} value={teacher.auth_id}>{teacher.last_name} {teacher.first_name}</option>)}
+        </select>
+      </label>
       <p style={{ color: '#475569' }}>Нийт бүртгэл: <b>{rows.length}</b> · Сургалтад хамрагдсан багш: <b>{new Set(rows.map((row) => row.teacher.auth_id)).size}</b></p>
       <div style={summaryGrid}>{['Үндсэн', 'Төрөлжсөн', 'Сонголтот', 'Ажлын байран дээрх сургалт', 'Бусад'].map((type) => <div key={type} style={summaryCard}><span>{type}</span><b>{groupedTypes[type] ?? 0}</b></div>)}</div>
       {rows.length === 0 ? <p>Сургалтын бүртгэл алга.</p> : (

@@ -6,10 +6,8 @@ import ClassFields from './ClassFields';
 
 export type ActivityCategory =
   | 'Хичээлд суусан'
-  | 'Уралдаан, тэмцээн'
   | 'Сургалт, семинар'
-  | 'Хурал, зөвлөгөөн'
-  | 'Амжилт';
+  | 'Хурал, зөвлөгөөн';
 
 export type ActivityInput = {
   category: ActivityCategory;
@@ -82,10 +80,8 @@ export default function ActivityForm({ unit, subjects, onSubmit }: Props) {
       {errorMessage && <p role="alert" style={{ color: '#b91c1c' }}>{errorMessage}</p>}
       <select value={category} onChange={(event) => setCategory(event.target.value as ActivityCategory)} style={fieldStyle}>
         <option>Хичээлд суусан</option>
-        <option>Уралдаан, тэмцээн</option>
         <option>Сургалт, семинар</option>
         <option>Хурал, зөвлөгөөн</option>
-        <option>Амжилт</option>
       </select>
       {lessonAttendance ? (
         <ClassFields

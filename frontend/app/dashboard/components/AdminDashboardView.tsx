@@ -7,12 +7,13 @@ import QuickActions from './QuickActions';
 import SideMenu from './SideMenu';
 import UnitTabs from './UnitTabs';
 import AdminReviewPanel from './records/AdminReviewPanel';
+import AdminActivityPanel from './records/AdminActivityPanel';
 import AnnouncementBoard from './records/AnnouncementBoard';
 import ChatBoard from './records/ChatBoard';
 import SurveyBoard from './records/SurveyBoard';
 import TeacherDetailModal from './TeacherDetailModal';
 import AdminTrainingPanel from './AdminTrainingPanel';
-import { DashboardCategory, Teacher, UserProfile } from '../types';
+import { DashboardCategory, ReportGradeBand, Teacher, UserProfile } from '../types';
 import { NotificationCounts } from '../hooks/useNotifications';
 
 interface Props {
@@ -37,6 +38,10 @@ interface Props {
   notificationError?: string;
   teacherLoadError?: string;
   onCategoryChange?: (category: DashboardCategory) => void;
+  reportGradeBand: ReportGradeBand;
+  setReportGradeBand: (gradeBand: ReportGradeBand) => void;
+  reportSubject: string;
+  setReportSubject: (subject: string) => void;
 }
 
 export default function AdminDashboardView({
@@ -61,6 +66,10 @@ export default function AdminDashboardView({
   notificationError = '',
   teacherLoadError = '',
   onCategoryChange,
+  reportGradeBand,
+  setReportGradeBand,
+  reportSubject,
+  setReportSubject,
 }: Props) {
   const activeTeachers = teachers.filter((teacher) => teacher.attendance !== 'Тасалсан').length;
   const unitStats = {
@@ -82,7 +91,7 @@ export default function AdminDashboardView({
             setActiveCategory={onCategoryChange ?? setActiveCategory}
             notificationCounts={notificationCounts}
             notificationError={notificationError}
-            categories={['Ирц', 'Хянах', 'Үнэлгээ', 'Мэдээлэл', 'Сургалт', 'Судалгаа', 'Зар', 'Чат']}
+            categories={['Ирц', 'Хянах', 'Үнэлгээ', 'Мэдээлэл', 'Оролцоо', 'Сургалт', 'Судалгаа', 'Зар', 'Чат']}
           />
           <AdminTeacherTools teachers={teachers} onTeachersAdded={onTeachersAdded} onTeacherRemoved={onTeacherRemoved} />
         </aside>
@@ -107,15 +116,33 @@ export default function AdminDashboardView({
               />
             )}
             {activeCategory === 'Сургалт' && <AdminTrainingPanel teachers={teachers} />}
-            {activeCategory === 'Үнэлгээ' && <AdminReviewPanel summaryOnly />}
-            {activeCategory === 'Хянах' && <AdminReviewPanel />}
+            {activeCategory === 'Үнэлгээ' && <AdminReviewPanel
+              summaryOnly
+              selectedBand={reportGradeBand}
+              setSelectedBand={setReportGradeBand}
+              selectedSubject={reportSubject}
+              setSelectedSubject={setReportSubject}
+            />}
+            {activeCategory === 'Хянах' && <AdminReviewPanel
+              selectedBand={reportGradeBand}
+              setSelectedBand={setReportGradeBand}
+              selectedSubject={reportSubject}
+              setSelectedSubject={setReportSubject}
+            />}
             {activeCategory === 'Судалгаа' && <SurveyBoard isAdmin />}
             {activeCategory === 'Чат' && <ChatBoard isAdmin />}
             {activeCategory === 'Мэдээлэл' && <AnnouncementBoard boardType="Мэдээлэл" />}
+            {activeCategory === 'Оролцоо' && <AdminActivityPanel />}
             {activeCategory === 'Зар' && <AnnouncementBoard boardType="Зар" />}
           </div>
         </section>
-        <QuickActions unit={activeUnit} category={activeCategory} month={selectedMonth} />
+        <QuickActions
+          unit={activeUnit}
+          category={activeCategory}
+          month={selectedMonth}
+          gradeBand={reportGradeBand}
+          subject={reportSubject}
+        />
       </div>
       <TeacherDetailModal teacher={selectedTeacher} selectedMonth={selectedMonth} onClose={onCloseTeacher} onTeacherUpdated={onTeacherUpdated} />
     </main>

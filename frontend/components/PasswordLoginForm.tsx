@@ -40,7 +40,7 @@ export default function PasswordLoginForm() {
       }
       const { data: { user } } = await supabase.auth.getUser();
       window.localStorage.removeItem('school-portal-mock-token');
-      const isAdmin = user?.app_metadata?.role === 'admin'
+      const isAdmin = user?.app_metadata?.role === 'admin' || user?.app_metadata?.role === 'manager'
         || user?.email?.toLowerCase() === 'admin@moes.edu.mn';
       window.location.href = isAdmin ? '/dashboard/admin' : '/dashboard/teacher';
     } catch {
@@ -62,7 +62,7 @@ export default function PasswordLoginForm() {
           Нэвтрэх нэр эсвэл И-мэйл:
           <input
             type="text"
-            placeholder="admin эсвэл teacher@moes.edu.mn"
+            placeholder="teacher@moes.edu.mn"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             required
@@ -97,6 +97,9 @@ export default function PasswordLoginForm() {
         >
           {loading ? 'Нэвтэрч байна...' : 'Нэвтрэх'}
         </button>
+        <p style={{ margin: '-6px 0 0', color: '#64748b', fontSize: 13, textAlign: 'center' }}>
+          @moes.edu.mn хаягаар нэвтэрнэ.
+        </p>
       </form>
     </>
   );

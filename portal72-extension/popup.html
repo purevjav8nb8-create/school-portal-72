@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="mn">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Portal72 Login Helper</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main>
+      <h1>Portal72 Login Helper</h1>
+      <p id="status">Төлөв шалгаж байна...</p>
+      <form id="unlock-form" hidden>
+        <label for="passphrase">Vault мастер нууц үг</label>
+        <input id="passphrase" type="password" autocomplete="current-password" required>
+        <button type="submit">Vault нээх</button>
+      </form>
+      <button id="lock-button" type="button" hidden>Түгжих</button>
+      <button id="options-button" class="secondary" type="button">Бүртгэл тохируулах</button>
+      <p id="message" role="status"></p>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

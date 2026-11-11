@@ -13,9 +13,16 @@ from services.report_data import build_report_data
 router = APIRouter(prefix="/api/reports", tags=["Reports"])
 
 
-def _get_report(authorization: str | None, unit: str, category: str, month: str):
+def _get_report(
+    authorization: str | None,
+    unit: str,
+    category: str,
+    month: str,
+    grade_band: str,
+    subject: str,
+):
     report_month = month or date.today().strftime("%Y-%m")
-    return build_report_data(authorization, unit, category, report_month)
+    return build_report_data(authorization, unit, category, report_month, grade_band, subject)
 
 
 def _filename(report: dict, extension: str) -> str:
@@ -28,8 +35,10 @@ def preview_report(
     unit: str = Query("НИЙТ"),
     category: str = Query("Ирц"),
     month: str = Query(""),
+    grade_band: str = Query("all"),
+    subject: str = Query(""),
 ):
-    return _get_report(authorization, unit, category, month)
+    return _get_report(authorization, unit, category, month, grade_band, subject)
 
 
 @router.get("/export/excel")
@@ -38,8 +47,10 @@ def export_teachers_excel(
     unit: str = Query("НИЙТ"),
     category: str = Query("Ирц"),
     month: str = Query(""),
+    grade_band: str = Query("all"),
+    subject: str = Query(""),
 ):
-    report = _get_report(authorization, unit, category, month)
+    report = _get_report(authorization, unit, category, month, grade_band, subject)
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         pd.DataFrame(report["rows"]).to_excel(writer, index=False, sheet_name="Тайлан")
@@ -58,8 +69,10 @@ def export_teachers_pdf(
     category: str = Query("Ирц"),
     month: str = Query(""),
     disposition: str = Query("attachment"),
+    grade_band: str = Query("all"),
+    subject: str = Query(""),
 ):
-    report = _get_report(authorization, unit, category, month)
+    report = _get_report(authorization, unit, category, month, grade_band, subject)
     try:
         from reportlab.lib import colors
         from reportlab.lib.pagesizes import A4, landscape

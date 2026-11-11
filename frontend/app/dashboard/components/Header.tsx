@@ -1,6 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { UserProfile } from '../types';
+import ChangePasswordDialog from './ChangePasswordDialog';
 
 interface Props {
   user: UserProfile | null;
@@ -11,6 +13,7 @@ export default function Header({
   user,
   onLogout,
 }: Props) {
+  const [passwordDialog, setPasswordDialog] = useState(false);
   return (
     <div
       style={{
@@ -52,7 +55,7 @@ export default function Header({
             lineHeight: 1.1,
           }}
         >
-          {user?.role === 'admin' ? 'Админ хяналт самбар' : 'Багшийн самбар'}
+          {user?.role === 'admin' || user?.role === 'manager' ? 'Админ хяналт самбар' : 'Багшийн самбар'}
         </h1>
 
         <div
@@ -75,6 +78,11 @@ export default function Header({
         }}
       >
         {user && (
+          <button type="button" onClick={() => setPasswordDialog(true)} style={{ border: '1px solid #bfdbfe', borderRadius: 8, padding: '6px 8px', background: '#fff', color: '#1d4ed8', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+            Нууц үг солих
+          </button>
+        )}
+        {user && (
           <div style={{ textAlign: 'right' }}>
             <span
               style={{
@@ -93,8 +101,8 @@ export default function Header({
                 fontSize: '11px',
               }}
             >
-              {user.role === 'admin'
-                ? '🔑 Системийн Админ'
+              {user.role === 'admin' || user.role === 'manager'
+                ? (user.role === 'manager' ? '📋 Сургалтын менежер' : '🔑 Системийн Админ')
                 : `👨‍🏫 ${user.unit} - ${user.subject}`}
             </small>
           </div>
@@ -115,6 +123,7 @@ export default function Header({
           Гарах
         </button>
       </div>
+      <ChangePasswordDialog open={passwordDialog} onClose={() => setPasswordDialog(false)} />
     </div>
   );
 }

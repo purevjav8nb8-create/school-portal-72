@@ -1,0 +1,81 @@
+.scroller {
+  overflow-x: auto;
+  padding: 2px 0 8px;
+  border-radius: 10px;
+}
+
+.grid {
+  width: 100%;
+  min-width: 700px;
+  border-collapse: separate;
+  border-spacing: 3px;
+  table-layout: fixed;
+  text-align: center;
+  font-size: 12px;
+}
+
+.rowLabel {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  width: 58px;
+  color: #475569;
+  background: #f1f5f9;
+  text-align: left;
+}
+
+.day,
+.status {
+  min-width: 19px;
+  height: 30px;
+  padding: 4px 2px;
+  border-radius: 6px;
+}
+
+.day {
+  color: #475569;
+  background: #f1f5f9;
+  font-weight: 700;
+}
+
+.status {
+  font-weight: 800;
+}
+
+.present {
+  color: #15803d;
+  background: #dcfce7;
+}
+
+.late {
+  color: #a16207;
+  background: #fef3c7;
+}
+
+.absent {
+  color: #b91c1c;
+  background: #fee2e2;
+}
+
+.leave {
+  color: #1d4ed8;
+  background: #dbeafe;
+}
+
+.sick {
+  color: #7e22ce;
+  background: #f3e8ff;
+}
+
+.unknown,
+.emptyDay {
+  color: #94a3b8;
+  background: #f8fafc;
+}
+
+.empty {
+  margin: 0;
+  padding: 14px;
+  color: #64748b;
+  text-align: center;
+}

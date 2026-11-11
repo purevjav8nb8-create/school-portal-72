@@ -8,21 +8,26 @@ interface Props {
   label: string;
   trigger?: ReactElement<{ onClick?: () => void }>;
   headerAction?: ReactNode;
+  onOpen?: () => void;
   children: (close: () => void) => ReactNode;
 }
 
-export default function FloatingComposer({ title, label, trigger, headerAction, children }: Props) {
+export default function FloatingComposer({ title, label, trigger, headerAction, onOpen, children }: Props) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
+  const openComposer = () => {
+    onOpen?.();
+    setOpen(true);
+  };
 
   return (
     <>
-      {trigger ? cloneElement(trigger, { onClick: () => setOpen(true) }) : (
+      {trigger ? cloneElement(trigger, { onClick: openComposer }) : (
         <button
           type="button"
           aria-label={label}
           title={label}
-          onClick={() => setOpen(true)}
+          onClick={openComposer}
           style={{
             position: 'fixed',
             right: 24,

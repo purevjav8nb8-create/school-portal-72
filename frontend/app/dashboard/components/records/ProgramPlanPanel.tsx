@@ -13,6 +13,8 @@ export type ProgramPlan = {
   section: string;
   subject: string;
   approved: boolean;
+  returned?: boolean;
+  review_status?: 'pending' | 'returned' | 'approved';
   submittedAt: string;
   reviewedAt?: string;
 };
@@ -21,10 +23,12 @@ interface Props {
   programPlan?: ProgramPlan;
   unit: string;
   subjects: string[];
+  busy: boolean;
   onSubmit: (documentUrl: string, note: string, grade: number, section: string, subject: string) => Promise<void>;
+  onDelete: () => Promise<void>;
 }
 
-export default function ProgramPlanPanel({ programPlan, unit, subjects, onSubmit }: Props) {
+export default function ProgramPlanPanel({ programPlan, unit, subjects, busy: operationBusy, onSubmit, onDelete }: Props) {
   const [documentUrl, setDocumentUrl] = useState('');
   const [note, setNote] = useState('');
   const [grade, setGrade] = useState(0);
@@ -68,12 +72,24 @@ export default function ProgramPlanPanel({ programPlan, unit, subjects, onSubmit
         <p style={{ margin: '6px 0 0', color: '#64748b' }}>Материалаа илгээгээд баталгаажуулалтын төлөвөө эндээс харна.</p>
       </header>
       <div style={{ padding: 16, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8 }}>
-        <span style={{ display: 'inline-flex', padding: '5px 10px', borderRadius: 999, background: programPlan?.approved ? '#dcfce7' : programPlan ? '#fef3c7' : '#e2e8f0', color: programPlan?.approved ? '#166534' : programPlan ? '#92400e' : '#475569', fontWeight: 700, fontSize: 13 }}>
-          {programPlan?.approved ? 'Батлагдсан' : programPlan ? 'Админаар хянагдаж байна' : 'Илгээгээгүй'}
+        <span style={{ display: 'inline-flex', padding: '5px 10px', borderRadius: 999, background: programPlan?.approved ? '#dcfce7' : (programPlan?.returned || programPlan?.review_status === 'returned') ? '#fee2e2' : programPlan ? '#fef3c7' : '#e2e8f0', color: programPlan?.approved ? '#166534' : (programPlan?.returned || programPlan?.review_status === 'returned') ? '#b91c1c' : programPlan ? '#92400e' : '#475569', fontWeight: 700, fontSize: 13 }}>
+          {programPlan?.approved ? 'Батлагдсан' : (programPlan?.returned || programPlan?.review_status === 'returned') ? 'Засуулахаар буцаасан' : programPlan ? 'Менежерээр хянагдаж байна' : 'Илгээгээгүй'}
         </span>
+        {(programPlan?.returned || programPlan?.review_status === 'returned') && <p style={{ margin: '8px 0 0', color: '#b91c1c' }}>Материалаа засварлаад дахин илгээнэ үү.</p>}
         {programPlan?.documentUrl && <p style={{ margin: '12px 0 0' }}><FileAttachmentActions attachment={{ name: 'Хөтөлбөр, төлөвлөгөө.pdf', url: programPlan.documentUrl, file_type: 'document' }} /></p>}
         {programPlan && <p style={{ margin: '8px 0 0' }}>{programPlan.grade}-р анги {programPlan.section} бүлэг · {programPlan.subject}</p>}
         {programPlan?.note && <p style={{ margin: '10px 0 0', color: '#475569' }}>{programPlan.note}</p>}
+        {programPlan && <button
+          type="button"
+          disabled={busy || operationBusy}
+          onClick={async () => {
+            if (!window.confirm('Хөтөлбөр, төлөвлөгөөг устгах уу? Устгасны дараа дахин илгээж болно.')) return;
+            await onDelete();
+          }}
+          style={{ marginTop: 10, padding: '7px 12px', border: 0, borderRadius: 6, background: busy || operationBusy ? '#cbd5e1' : '#dc2626', color: '#fff', fontWeight: 700, cursor: busy || operationBusy ? 'not-allowed' : 'pointer' }}
+        >
+          {busy || operationBusy ? 'Устгаж байна...' : 'Төлөвлөгөө устгах'}
+        </button>}
       </div>
       <FloatingComposer title="Хөтөлбөр, төлөвлөгөө оруулах" label="Хөтөлбөр, төлөвлөгөө оруулах">
       {(close) => <form onSubmit={async (event) => { await submit(event); if (documentUrl && grade && section && subject) close(); }} style={{ display: 'grid', gap: 12, padding: 16, border: '1px solid #e2e8f0', borderRadius: 8 }}>

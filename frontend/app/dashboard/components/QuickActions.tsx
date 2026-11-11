@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import { backendBaseUrl, fetchWithAuth } from '../../../lib/backendApi';
 import { supabase } from '../../../lib/supabaseClient';
-import { DashboardCategory } from '../types';
+import { DashboardCategory, ReportGradeBand } from '../types';
 import ReportPreviewDialog from './records/ReportPreviewDialog';
-import { LINKS } from '../constants/links';
+import ExternalLoginLinks from './ExternalLoginLinks';
 
 function buttonStyle(color: string) {
   return {
@@ -26,6 +26,8 @@ interface Props {
   category: DashboardCategory;
   month: string;
   showReports?: boolean;
+  gradeBand?: ReportGradeBand;
+  subject?: string;
 }
 
 type PreviewData = {
@@ -36,13 +38,26 @@ type PreviewData = {
 
 const apiUrl = backendBaseUrl;
 
-export default function QuickActions({ unit, category, month, showReports = true }: Props) {
+export default function QuickActions({
+  unit,
+  category,
+  month,
+  showReports = true,
+  gradeBand = 'all',
+  subject = '',
+}: Props) {
   const [preview, setPreview] = useState<PreviewData>();
   const [pdfUrl, setPdfUrl] = useState<string>();
   const [previewFormat, setPreviewFormat] = useState<'excel' | 'pdf'>();
   const [errorMessage, setErrorMessage] = useState('');
   const reportCategory = category === 'Сургалт' || category === 'Үнэлгээ' ? category : 'Ирц';
-  const reportQuery = new URLSearchParams({ unit: unit.trim().toUpperCase(), category: reportCategory, month }).toString();
+  const reportQuery = new URLSearchParams({
+    unit: unit.trim().toUpperCase(),
+    category: reportCategory,
+    month,
+    grade_band: gradeBand,
+    subject,
+  }).toString();
 
   const requestReport = async (path: string) => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -110,18 +125,7 @@ export default function QuickActions({ unit, category, month, showReports = true
 
       {showReports && <button style={buttonStyle('#dc2626')} onClick={() => void previewPdf()}>📄 PDF Тайлан татах</button>}
       {showReports && errorMessage && <small role="alert" style={{ color: '#b91c1c' }}>{errorMessage}</small>}
-
-      <button
-        style={buttonStyle('#2563eb')}
-        onClick={() =>
-          window.open(
-            LINKS.gmail,
-            '_blank'
-          )
-        }
-      >
-        📧 Gmail
-      </button>
+      <ExternalLoginLinks />
       <ReportPreviewDialog
         report={preview}
         pdfUrl={pdfUrl}
@@ -135,41 +139,6 @@ export default function QuickActions({ unit, category, month, showReports = true
         }}
       />
 
-      <button
-        style={buttonStyle('#0f766e')}
-        onClick={() =>
-          window.open(
-            LINKS.medle,
-            '_blank'
-          )
-        }
-      >
-        🏢 Medle Office
-      </button>
-
-      <button
-        style={buttonStyle('#ea580c')}
-        onClick={() =>
-          window.open(
-            LINKS.mozaik,
-            '_blank'
-          )
-        }
-      >
-        📖 Mozaik
-      </button>
-
-      <button
-        style={buttonStyle('#7c3aed')}
-        onClick={() =>
-          window.open(
-            LINKS.lms,
-            '_blank'
-          )
-        }
-      >
-        📚 Их Нүүдэл LMS
-      </button>
     </div>
   );
 }

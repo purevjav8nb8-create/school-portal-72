@@ -39,6 +39,7 @@ interface Props {
   activities: TeacherActivity[];
   awards: { id: string; name: string; certificate_number: string; certificate_url: string; organization: string; awarded_date?: string; note: string }[];
   degrees: { id: string; name: string; certificate_number: string; certificate_url: string; status: string; issued_date?: string; note: string }[];
+  homeroomEvaluations: (EvaluationRecord & { evaluator?: string })[];
   activeCategory: DashboardCategory;
   selectedMonth: string;
   setSelectedMonth: (month: string) => void;
@@ -49,6 +50,7 @@ interface Props {
   onLogout: () => void;
   onTraining: (training: Omit<TeacherTraining, 'id' | 'createdAt'>) => Promise<void>;
   onProgramPlan: (documentUrl: string, note: string, grade: number, section: string, subject: string) => Promise<void>;
+  onDeleteProgramPlan: () => Promise<void>;
   onActivity: (activity: ActivityInput) => Promise<void>;
   onEvaluation: (evaluation: Omit<EvaluationRecord, 'id' | 'createdAt'>) => Promise<void>;
   onDeleteEvaluation: (evaluationId: string) => Promise<void>;
@@ -59,9 +61,9 @@ interface Props {
 }
 
 export default function TeacherDashboardView({
-  user, teacher, trainings, evaluations, programPlan, activities, awards, degrees,
+  user, teacher, trainings, evaluations, programPlan, activities, awards, degrees, homeroomEvaluations,
   activeCategory, selectedMonth, setSelectedMonth, busy, errorMessage,
-  successMessage, onCategoryChange,   onLogout, onTraining, onProgramPlan, onActivity, onEvaluation, onDeleteEvaluation, onProfessionalSave,
+  successMessage, onCategoryChange,   onLogout, onTraining, onProgramPlan, onDeleteProgramPlan, onActivity, onEvaluation, onDeleteEvaluation, onProfessionalSave,
   notificationCounts = {}, notificationError = '', onNotificationCategoryChange,
 }: Props) {
   const categories: DashboardCategory[] = ['Ирц', 'Хөтөлбөр', 'Мэдээлэл', 'Оролцоо', 'Сургалт', 'Судалгаа', 'Үнэлгээ', 'Зар', 'Чат', 'Зэрэг', 'Шагнал'];
@@ -104,9 +106,9 @@ export default function TeacherDashboardView({
               </section>
             )}
             {activeCategory === 'Үнэлгээ' && (
-              <EvaluationPanel unit={user.unit} subjects={user.subjects ?? (user.subject ? [user.subject] : [])} evaluations={evaluations} onSubmit={onEvaluation} onDelete={onDeleteEvaluation} />
+              <EvaluationPanel unit={user.unit} subjects={user.subjects ?? (user.subject ? [user.subject] : [])} evaluations={evaluations} sharedEvaluations={homeroomEvaluations} onSubmit={onEvaluation} onDelete={onDeleteEvaluation} />
             )}
-            {activeCategory === 'Хөтөлбөр' && <ProgramPlanPanel programPlan={programPlan} unit={user.unit} subjects={user.subjects ?? (user.subject ? [user.subject] : [])} onSubmit={onProgramPlan} />}
+            {activeCategory === 'Хөтөлбөр' && <ProgramPlanPanel programPlan={programPlan} unit={user.unit} subjects={user.subjects ?? (user.subject ? [user.subject] : [])} onSubmit={onProgramPlan} onDelete={onDeleteProgramPlan} busy={busy} />}
             {activeCategory === 'Оролцоо' && <ActivityPanel unit={user.unit} subjects={user.subjects ?? (user.subject ? [user.subject] : [])} activities={activities} onSubmit={onActivity} />}
             {activeCategory === 'Судалгаа' && <SurveyBoard />}
             {activeCategory === 'Чат' && <ChatBoard />}

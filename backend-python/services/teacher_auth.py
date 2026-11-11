@@ -43,7 +43,7 @@ def get_authenticated_user(authorization: str | None):
 def require_admin(authorization: str | None):
     user = get_authenticated_user(authorization)
     admin_email = os.getenv("ADMIN_EMAIL", "admin@moes.edu.mn").lower()
-    if (user.app_metadata or {}).get("role") != "admin" and (user.email or "").lower() != admin_email:
+    if (user.app_metadata or {}).get("role") not in {"admin", "manager"} and (user.email or "").lower() != admin_email:
         raise HTTPException(status_code=403, detail="Админы эрх шаардлагатай.")
     return user
 
@@ -52,7 +52,7 @@ def require_teacher(authorization: str | None):
     user = get_authenticated_user(authorization)
     admin_email = os.getenv("ADMIN_EMAIL", "admin@moes.edu.mn").lower()
     email = (user.email or "").lower()
-    if (user.app_metadata or {}).get("role") == "admin" or email == admin_email:
+    if (user.app_metadata or {}).get("role") in {"admin", "manager"} or email == admin_email:
         raise HTTPException(status_code=403, detail="Энэ үйлдлийг хийх эрхгүй байна.")
     if (user.app_metadata or {}).get("role") != "teacher" and not email.endswith("@moes.edu.mn"):
         raise HTTPException(status_code=403, detail="Энэ үйлдлийг хийх эрхгүй байна.")

@@ -4,6 +4,8 @@ from zipfile import ZIP_DEFLATED, ZipFile
 import pymupdf
 from fastapi import APIRouter, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
+from urllib.parse import quote
+
 
 router = APIRouter(prefix="/api/files", tags=["Files"])
 OFFICE_EXTENSIONS = {".docx", ".xlsx", ".pptx"}
@@ -21,7 +23,7 @@ async def compress_file(file: UploadFile):
         if file.content_type == "application/pdf" or extension == ".pdf":
             source = pymupdf.open(stream=content, filetype="pdf")
             output = BytesIO()
-            source.save(output, garbage=4, deflate=True, clean=True)
+            source.save(output, garbage=0, deflate=True, clean=False)
             source.close()
         elif extension in OFFICE_EXTENSIONS:
             output = BytesIO()
@@ -42,5 +44,5 @@ async def compress_file(file: UploadFile):
     return StreamingResponse(
         output,
         media_type=media_type,
-        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+        headers={"Content-Disposition": f"inline; filename*=UTF-8''{quote(filename, safe='')}"},
     )

@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "Portal72 Login Helper",
+  "version": "1.0.0",
+  "description": "Autofills teacher credentials on approved school service sign-in pages.",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://accounts.google.com/*",
+    "https://www.mozaweb.mn/*",
+    "https://mozaweb.mn/*",
+    "https://login.microsoftonline.com/*",
+    "https://login.live.com/*",
+    "https://ub72.nuudelms.mn/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Portal72 Login Helper",
+    "default_popup": "popup.html"
+  },
+  "options_page": "options.html",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://accounts.google.com/*",
+        "https://www.mozaweb.mn/*",
+        "https://mozaweb.mn/*",
+        "https://login.microsoftonline.com/*",
+        "https://login.live.com/*",
+        "https://ub72.nuudelms.mn/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

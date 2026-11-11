@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { Teacher } from '../types';
+import AttendanceSummaryBar from './AttendanceSummaryBar';
+import TeacherAttendanceDialog from './TeacherAttendanceDialog';
 
 interface Props {
   teachers: Teacher[];
@@ -23,14 +25,6 @@ export default function AttendanceTable({
   readOnly = false,
 }: Props) {
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
-  const monthOptions = Array.from({ length: 12 }, (_, offset) => {
-    const monthDate = new Date();
-    monthDate.setDate(1);
-    monthDate.setMonth(monthDate.getMonth() - offset);
-    const year = monthDate.getFullYear();
-    const month = String(monthDate.getMonth() + 1).padStart(2, '0');
-    return { value: `${year}-${month}`, label: `${year} оны ${month}-р сар` };
-  });
   const monthRecords = teachers.flatMap((teacher) => (teacher.daily_records ?? []).filter((record) => record.date.startsWith(selectedMonth)));
   const statuses = readOnly ? monthRecords.map((record) => record.status) : teachers.map((teacher) => teacher.attendance);
   const presentCount = statuses.filter(status => status === 'Ирсэн').length;
@@ -44,42 +38,14 @@ export default function AttendanceTable({
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-        <h3 style={{ margin: 0, color: '#0f172a' }}>{readOnly ? '📌 Миний ирц' : `📌 ${activeUnit} - Багш нарын ирц ба засах хэсэг`}</h3>
-        
-        {/* Өмнөх болон Одоогийн саруудыг сонгох dropdown */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>Сар сонгох:</label>
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 'bold' }}
-          >
-            {monthOptions.map((month) => (
-              <option key={month.value} value={month.value}>{month.label}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Статистик бар */}
-      <div style={{ backgroundColor: '#f8fafc', padding: '9px 12px', borderRadius: '8px', marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid #cbd5e1' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-          <div>
-          <div style={{ fontSize: '13px', color: '#475569' }}>Ирцийн хувь: <b>{attendanceRate}%</b></div>
-          <div style={{ width: '200px', height: '10px', backgroundColor: '#e2e8f0', borderRadius: '5px', overflow: 'hidden', marginTop: '4px' }}>
-            <div style={{ width: `${attendanceRate}%`, height: '100%', backgroundColor: '#16a34a' }}></div>
-          </div>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: '10px', fontSize: '12px' }}>
-          <span style={{ color: '#16a34a' }}>🟢 Ирсэн: <b>{presentCount}</b></span>
-          <span style={{ color: '#eab308' }}>🟡 Хоцорсон: <b>{lateCount}</b></span>
-          <span style={{ color: '#2563eb' }}>🔵 Чөлөөтэй: <b>{leaveCount}</b></span>
-          <span style={{ color: '#8b5cf6' }}>🟣 Өвчтэй: <b>{sickCount}</b></span>
-          <span style={{ color: '#dc2626' }}>🔴 Тасалсан: <b>{absentCount}</b></span>
-        </div>
-      </div>
+      <AttendanceSummaryBar
+        activeUnit={activeUnit}
+        selectedMonth={selectedMonth}
+        setSelectedMonth={setSelectedMonth}
+        readOnly={readOnly}
+        attendanceRate={attendanceRate}
+        counts={{ present: presentCount, late: lateCount, leave: leaveCount, sick: sickCount, absent: absentCount }}
+      />
 
       {/* Хүснэгт */}
       <div style={{ maxHeight: '280px', overflowY: 'auto' }}>
@@ -156,36 +122,11 @@ export default function AttendanceTable({
           </tbody>
         </table>
       </div>
-      {readOnly && selectedTeacher && (
-        <div role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setSelectedTeacher(null)} style={detailOverlay}>
-          <section role="dialog" aria-modal="true" aria-label="Сарын ирцийн дэлгэрэнгүй" style={detailDialog}>
-            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-              <div>
-                <h2 style={{ margin: 0 }}>{selectedTeacher.last_name} {selectedTeacher.first_name}</h2>
-                <p style={{ margin: '4px 0', color: '#64748b' }}>{selectedTeacher.unit} · {selectedTeacher.subject} · {selectedMonth}</p>
-              </div>
-              <button type="button" onClick={() => setSelectedTeacher(null)} style={closeButton}>Хаах</button>
-            </header>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, margin: '14px 0' }}>
-              <div style={statCard}>Ирцийн хувь <b>{Math.round(((selectedTeacher.daily_records ?? []).filter((record) => record.date.startsWith(selectedMonth) && record.status === 'Ирсэн').length / Math.max(1, (selectedTeacher.daily_records ?? []).filter((record) => record.date.startsWith(selectedMonth)).length)) * 100)}%</b></div>
-              <div style={statCard}>Бүртгэлтэй өдөр <b>{(selectedTeacher.daily_records ?? []).filter((record) => record.date.startsWith(selectedMonth)).length}</b></div>
-              <div style={statCard}>Илүү цаг <b>{selectedTeacher.overtime_hours ?? 0} цаг</b></div>
-            </div>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-              <thead><tr><th style={detailCell}>Огноо</th><th style={detailCell}>Төлөв</th></tr></thead>
-              <tbody>{(selectedTeacher.daily_records ?? []).filter((record) => record.date.startsWith(selectedMonth)).sort((a, b) => a.date.localeCompare(b.date)).map((record) => (
-                <tr key={record.date}><td style={detailCell}>{record.date}</td><td style={detailCell}>{record.status}</td></tr>
-              ))}</tbody>
-            </table>
-          </section>
-        </div>
-      )}
+      {readOnly && selectedTeacher && <TeacherAttendanceDialog
+        teacher={selectedTeacher}
+        month={selectedMonth}
+        onClose={() => setSelectedTeacher(null)}
+      />}
     </div>
   );
 }
-
-const detailOverlay = { position: 'fixed' as const, inset: 0, zIndex: 70, display: 'grid', placeItems: 'center', padding: 16, background: 'rgba(15, 23, 42, .5)' };
-const detailDialog = { width: 'min(680px, 100%)', maxHeight: '85vh', overflowY: 'auto' as const, padding: 20, borderRadius: 14, background: '#fff', boxShadow: '0 20px 60px rgba(0,0,0,.25)' };
-const closeButton = { border: 0, borderRadius: 6, padding: '7px 10px', cursor: 'pointer' };
-const statCard = { display: 'grid', gap: 4, padding: 10, borderRadius: 8, background: '#f1f5f9', color: '#64748b', fontSize: 12 };
-const detailCell = { padding: 8, textAlign: 'left' as const, borderBottom: '1px solid #e2e8f0' };

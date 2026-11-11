@@ -18,14 +18,7 @@ interface Props {
 
 export default function ReportPreviewDialog({ report, pdfUrl, downloadLabel = 'Татах', onDownload, onClose }: Props) {
   if (!report && !pdfUrl) return null;
-  const reportColumns = report
-    ? ['Овог', 'Нэр', 'Мэргэжил', ...report.columns.filter((column) => !['Овог', 'Нэр', 'Мэргэжил'].includes(column))]
-    : [];
-  const stickyColumnStyles = [
-    { left: 0, width: 110 },
-    { left: 110, width: 110 },
-    { left: 220, width: 150 },
-  ];
+  const reportColumns = report?.columns ?? [];
 
   return (
     <div
@@ -46,11 +39,11 @@ export default function ReportPreviewDialog({ report, pdfUrl, downloadLabel = '�
             <div style={{ overflow: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead style={{ position: 'sticky', top: 0, background: '#eaf1f5' }}>
-                  <tr>{reportColumns.map((column, columnIndex) => <th key={column} style={{ padding: 10, borderBottom: '1px solid #cbd5e1', ...(columnIndex < 3 ? { position: 'sticky', left: stickyColumnStyles[columnIndex].left, minWidth: stickyColumnStyles[columnIndex].width, zIndex: 3, background: '#eaf1f5' } : {}) }}>{column}</th>)}</tr>
+                  <tr>{reportColumns.map((column) => <th key={column} style={{ padding: '7px 9px', borderBottom: '1px solid #cbd5e1', whiteSpace: 'nowrap' }}>{column}</th>)}</tr>
                 </thead>
                 <tbody>{report?.rows.map((row, index) => (
                   <tr key={index} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    {reportColumns.map((column, columnIndex) => <td key={column} style={{ padding: 10, ...(columnIndex < 3 ? { position: 'sticky', left: stickyColumnStyles[columnIndex].left, minWidth: stickyColumnStyles[columnIndex].width, zIndex: 2, background: '#fff' } : {}) }}>{row[column]}</td>)}
+                    {reportColumns.map((column) => <td key={column} style={{ padding: '5px 9px', whiteSpace: 'nowrap' }}>{row[column]}</td>)}
                   </tr>
                 ))}</tbody>
               </table>

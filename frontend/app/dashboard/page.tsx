@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { backendBaseUrl, fetchWithAuth } from '../../lib/backendApi';
 import { supabase } from '../../lib/supabaseClient';
 import AdminDashboardView from './components/AdminDashboardView';
-import { DashboardCategory, Teacher, UserProfile } from './types';
+import { DashboardCategory, ReportGradeBand, Teacher, UserProfile } from './types';
 import { useTeachers } from './hooks/useTeachers';
 import { useNotifications } from './hooks/useNotifications';
 
@@ -20,8 +20,10 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
-  const { teachers, setTeachers, displayTeachers, errorMessage: teacherLoadError } = useTeachers(activeUnit);
-  const { counts: notificationCounts, errorMessage: notificationError, markRead } = useNotifications('admin');
+  const [reportGradeBand, setReportGradeBand] = useState<ReportGradeBand>('all');
+  const [reportSubject, setReportSubject] = useState('');
+  const { teachers, setTeachers, displayTeachers, errorMessage: teacherLoadError } = useTeachers(activeUnit, !loading && !!user);
+  const { counts: notificationCounts, errorMessage: notificationError, markRead } = useNotifications('admin', undefined, !loading && !!user);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -30,7 +32,8 @@ export default function DashboardPage() {
         window.location.href = '/';
         return;
       }
-      if (authUser.app_metadata?.role !== 'admin' && authUser.email?.toLowerCase() !== 'admin@moes.edu.mn') {
+      const role = authUser.app_metadata?.role;
+      if (role !== 'admin' && role !== 'manager' && authUser.email?.toLowerCase() !== 'admin@moes.edu.mn') {
         window.location.href = '/dashboard/teacher';
         return;
       }
@@ -40,7 +43,7 @@ export default function DashboardPage() {
         email: authUser.email ?? '',
         unit: authUser.user_metadata?.unit ?? 'Захиргаа',
         subject: authUser.user_metadata?.subject ?? 'Администратор',
-        role: 'admin',
+        role: role === 'manager' ? 'manager' : 'admin',
       });
       setLoading(false);
     };
@@ -102,6 +105,10 @@ export default function DashboardPage() {
       notificationCounts={notificationCounts}
       notificationError={notificationError}
       teacherLoadError={teacherLoadError}
+      reportGradeBand={reportGradeBand}
+      setReportGradeBand={setReportGradeBand}
+      reportSubject={reportSubject}
+      setReportSubject={setReportSubject}
       onCategoryChange={(category) => { markRead(category); setActiveCategory(category); }}
     />
   );

@@ -1,0 +1,27 @@
+.header { display: grid; gap: 12px; margin-bottom: 12px; }
+.titleRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.titleRow h3 { margin: 0; color: #0f172a; font-size: 17px; }
+.monthPicker { display: flex; align-items: center; gap: 9px; color: #64748b; font-size: 12px; font-weight: 700; }
+.monthPicker select {
+  min-height: 36px; padding: 6px 10px; border: 1px solid #dbe3ee; border-radius: 9px;
+  background: #fff; color: #0f172a; font: inherit; font-weight: 600;
+}
+.summary {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 12px 14px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc;
+}
+.rate { display: grid; flex: 0 0 180px; gap: 7px; color: #475569; font-size: 12px; }
+.rate b { margin-left: 4px; color: #0f172a; }
+.progress { height: 7px; overflow: hidden; border-radius: 99px; background: #e2e8f0; }
+.progress span { display: block; height: 100%; border-radius: inherit; background: #16a34a; transition: width 180ms ease; }
+.counts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; font-size: 11px; }
+.counts span { padding: 6px 8px; border-radius: 99px; background: #fff; }
+.counts b { margin-left: 3px; }
+.present { color: #15803d; }.late { color: #a16207; }.leave { color: #1d4ed8; }
+.sick { color: #7e22ce; }.absent { color: #b91c1c; }
+@media (max-width: 700px) {
+  .titleRow, .summary { align-items: stretch; flex-direction: column; }
+  .monthPicker { justify-content: space-between; }
+  .rate { flex-basis: auto; }
+  .counts { justify-content: flex-start; }
+}

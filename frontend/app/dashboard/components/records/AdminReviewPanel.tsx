@@ -1,17 +1,21 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { PenLine } from 'lucide-react';
 import { backendBaseUrl, fetchWithAuth } from '../../../../lib/backendApi';
 import { supabase } from '../../../../lib/supabaseClient';
+import LosslessCloudinaryUpload, { uploadCloudinaryFile } from '../../../../components/LosslessCloudinaryUpload';
 import FileAttachmentActions from './FileAttachmentActions';
 
 const apiUrl = backendBaseUrl;
 const evaluationLevels = ['VIII', 'VII', 'VI', 'V', 'IV', 'III', 'II', 'I'] as const;
 const gradeBands = [
-  { id: 'Бага', label: 'Бага (1–5)', min: 1, max: 5 },
-  { id: 'Дунд', label: 'Дунд (6–9)', min: 6, max: 9 },
-  { id: 'Ахлах', label: 'Ахлах (10–12)', min: 10, max: 12 },
+  { id: 'all', label: 'Бүгд', min: 1, max: 12 },
+  { id: 'primary', label: 'Бага (1–5)', min: 1, max: 5 },
+  { id: 'middle', label: 'Дунд (6–9)', min: 6, max: 9 },
+  { id: 'high', label: 'Ахлах (10–12)', min: 10, max: 12 },
 ] as const;
+type GradeBand = (typeof gradeBands)[number]['id'];
 
 type Activity = {
   id: string;
@@ -31,7 +35,7 @@ type Activity = {
 type TeacherRecords = {
   user_id: string;
   teacher: { name: string; email: string; unit: string; subject: string };
-  program_plan?: { documentUrl: string; note: string; grade?: number; section?: string; subject?: string; approved: boolean; submittedAt: string };
+  program_plan?: { documentUrl: string; note: string; grade?: number; section?: string; subject?: string; approved: boolean; returned?: boolean; review_status?: 'pending' | 'returned' | 'approved'; submittedAt: string };
   activities: Activity[];
   awards: { id: string; name: string; certificate_number: string; certificate_url: string; organization?: string; status?: string; application_url?: string; meeting_minutes_url?: string; reference_url?: string; justification?: string; awarded_date?: string }[];
   professional_degrees: { id: string; name: string; certificate_number: string; certificate_url: string; status: string; issued_date?: string }[];
@@ -46,14 +50,27 @@ function formatTeacherName(name: string) {
 
 interface Props {
   summaryOnly?: boolean;
+  selectedBand: GradeBand;
+  setSelectedBand: (band: GradeBand) => void;
+  selectedSubject: string;
+  setSelectedSubject: (subject: string) => void;
 }
 
-export default function AdminReviewPanel({ summaryOnly = false }: Props) {
+export default function AdminReviewPanel({
+  summaryOnly = false,
+  selectedBand,
+  setSelectedBand,
+  selectedSubject,
+  setSelectedSubject,
+}: Props) {
   const [records, setRecords] = useState<TeacherRecords[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
-  const [selectedBand, setSelectedBand] = useState<(typeof gradeBands)[number]['id']>('Бага');
-  const [selectedSubject, setSelectedSubject] = useState('');
+  const [approvalAssets, setApprovalAssets] = useState({ signature_url: '', stamp_url: '' });
+  const [approvalAssetsDraft, setApprovalAssetsDraft] = useState({ signature_url: '', stamp_url: '' });
+  const [approvalAssetsOpen, setApprovalAssetsOpen] = useState(false);
+  const [savingApprovalAssets, setSavingApprovalAssets] = useState(false);
+  const [reviewingPlan, setReviewingPlan] = useState('');
 
   const request = async (path: string, method = 'GET', body?: object) => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -87,7 +104,7 @@ export default function AdminReviewPanel({ summaryOnly = false }: Props) {
             && String(evaluation.subject ?? '').trim().length > 0
             && evaluationLevels.includes(evaluation.level as typeof evaluationLevels[number])
             && Number.isFinite(studentsCount)
-            && studentsCount >= 0
+            && studentsCount > 0
             && Number.isFinite(averageScore);
         }) : [],
         awards: Array.isArray(record.awards) ? record.awards : [],
@@ -101,14 +118,109 @@ export default function AdminReviewPanel({ summaryOnly = false }: Props) {
     }
   };
 
-  useEffect(() => { void loadRecords(); }, []);
+  const loadApprovalAssets = async () => {
+    try {
+      const assets = await request('/api/teachers/review/program-plan/approval-assets');
+      setApprovalAssets(assets);
+      setApprovalAssetsDraft(assets);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Гарын үсэг, тамганы тохиргоо уншигдсангүй.');
+    }
+  };
+
+  useEffect(() => {
+    void loadRecords();
+    if (!summaryOnly) void loadApprovalAssets();
+  }, []);
+
+  const saveApprovalAssets = async () => {
+    if (!approvalAssetsDraft.signature_url || !approvalAssetsDraft.stamp_url) {
+      setErrorMessage('Гарын үсэг, тамганы зургийг хоёуланг нь оруулна уу.');
+      return;
+    }
+    setSavingApprovalAssets(true);
+    try {
+      const saved = await request('/api/teachers/review/program-plan/approval-assets', 'PUT', approvalAssetsDraft);
+      setApprovalAssets(saved);
+      setApprovalAssetsDraft(saved);
+      setApprovalAssetsOpen(false);
+      setErrorMessage('');
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Гарын үсэг, тамга хадгалагдсангүй.');
+    } finally {
+      setSavingApprovalAssets(false);
+    }
+  };
 
   const reviewPlan = async (userId: string, approved: boolean) => {
+    if (approved && (!approvalAssets.signature_url || !approvalAssets.stamp_url)) {
+      setErrorMessage('Батлахын өмнө хянах хуудасны гарын үсэг, тамганы тохиргоог хадгална уу.');
+      return;
+    }
+    setReviewingPlan(userId);
     try {
-      await request(`/api/teachers/review/${userId}/program-plan`, 'PATCH', { approved });
+      let signedDocumentUrl: string | undefined;
+      if (approved) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Дахин нэвтэрнэ үү.');
+        const response = await fetchWithAuth(`${apiUrl}/api/teachers/review/${userId}/program-plan/approved-pdf`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            signature_url: approvalAssets.signature_url,
+            stamp_url: approvalAssets.stamp_url,
+          }),
+        });
+        if (!response.ok) {
+          const result = await response.json();
+          throw new Error(result.detail ?? 'PDF-д гарын үсэг, тамга нэгтгэсэнгүй.');
+        }
+        const pdf = new File([await response.blob()], `approved-program-plan-${userId}.pdf`, { type: 'application/pdf' });
+        const uploaded = await uploadCloudinaryFile(pdf, ['pdf']);
+        signedDocumentUrl = uploaded.url;
+      }
+      await request(`/api/teachers/review/${userId}/program-plan`, 'PATCH', {
+        approved,
+        ...(signedDocumentUrl ? { signed_document_url: signedDocumentUrl } : {}),
+      });
       await loadRecords();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Төлөвлөгөөний төлөв хадгалагдсангүй.');
+    } finally {
+      setReviewingPlan('');
+    }
+  };
+
+  const deletePlan = async (userId: string) => {
+    if (!window.confirm('Энэ багшийн хөтөлбөр, төлөвлөгөөг устгах уу?')) return;
+    setReviewingPlan(userId);
+    try {
+      await request(`/api/teachers/review/${userId}/program-plan`, 'DELETE');
+      setErrorMessage('');
+      await loadRecords();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Хөтөлбөр, төлөвлөгөө устгагдсангүй.');
+    } finally {
+      setReviewingPlan('');
+    }
+  };
+
+  const returnPlan = async (userId: string) => {
+    if (!window.confirm('Энэ хөтөлбөр, төлөвлөгөөг засуулахаар багшид буцаах уу?')) return;
+    setReviewingPlan(userId);
+    try {
+      const result = await request(`/api/teachers/review/${userId}/program-plan/return`, 'POST');
+      setErrorMessage('');
+      setRecords((current) => current.map((record) => record.user_id === userId
+        ? { ...record, program_plan: result.program_plan }
+        : record));
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Хөтөлбөр, төлөвлөгөөг буцааж чадсангүй.');
+    } finally {
+      setReviewingPlan('');
     }
   };
 
@@ -167,9 +279,15 @@ export default function AdminReviewPanel({ summaryOnly = false }: Props) {
     [bandSummary]
   );
 
-  const activeSubject = subjectsInBand.includes(selectedSubject) ? selectedSubject : (subjectsInBand[0] ?? '');
-  const activeSubjectSummary = bandSummary.filter((item) => item.subject === activeSubject);
-  const submittedRecords = records.filter((record) => record.program_plan);
+  const activeSubject = subjectsInBand.includes(selectedSubject) ? selectedSubject : '';
+  const activeSubjectSummary = activeSubject
+    ? bandSummary.filter((item) => item.subject === activeSubject)
+    : bandSummary;
+  const submittedRecords = records.filter((record) => (
+    record.program_plan
+    && !record.program_plan.returned
+    && record.program_plan.review_status !== 'returned'
+  ));
   const activeSubjectTotals = useMemo(() => ({
     levels: Object.fromEntries(evaluationLevels.map((level) => [
       level,
@@ -187,10 +305,28 @@ export default function AdminReviewPanel({ summaryOnly = false }: Props) {
 
   return (
     <section>
-      <h2 style={{ marginTop: 0 }}>{summaryOnly ? 'Үнэлгээний нэгтгэл' : 'Багшийн материал хянах'}</h2>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+        <h2 style={{ marginTop: 0 }}>{summaryOnly ? 'Үнэлгээний нэгтгэл' : 'Багшийн материал хянах'}</h2>
+        {!summaryOnly && <button type="button" aria-label="Гарын үсэг, тамганы тохиргоо" title="Гарын үсэг, тамганы тохиргоо" onClick={() => { setApprovalAssetsDraft(approvalAssets); setApprovalAssetsOpen(true); }} style={{ display: 'grid', placeItems: 'center', width: 36, height: 36, border: '1px solid #cbd5e1', borderRadius: 9, background: '#fff', color: '#1d4ed8', cursor: 'pointer' }}>
+          <PenLine size={18} />
+        </button>}
+      </header>
       {errorMessage && <p role="alert" style={{ color: '#b91c1c' }}>{errorMessage}</p>}
+      {approvalAssetsOpen && <div role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setApprovalAssetsOpen(false); }} style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'grid', placeItems: 'center', padding: 16, background: 'rgba(15,23,42,.5)' }}>
+        <section role="dialog" aria-modal="true" aria-label="Гарын үсэг, тамганы тохиргоо" style={{ width: 'min(460px,100%)', display: 'grid', gap: 14, padding: 20, borderRadius: 14, background: '#fff', boxShadow: '0 24px 70px rgba(15,23,42,.3)' }}>
+          <h3 style={{ margin: 0, color: '#172554' }}>Гарын үсэг, тамганы тохиргоо</h3>
+          <LosslessCloudinaryUpload label="Гарын үсэг (PNG/JPG)" formats={['png', 'jpg', 'jpeg']} onUploaded={(file) => setApprovalAssetsDraft((current) => ({ ...current, signature_url: file.url }))} />
+          {approvalAssetsDraft.signature_url && <a href={approvalAssetsDraft.signature_url} target="_blank" rel="noreferrer">Оруулсан гарын үсгийг харах</a>}
+          <LosslessCloudinaryUpload label="Тамга (PNG/JPG)" formats={['png', 'jpg', 'jpeg']} onUploaded={(file) => setApprovalAssetsDraft((current) => ({ ...current, stamp_url: file.url }))} />
+          {approvalAssetsDraft.stamp_url && <a href={approvalAssetsDraft.stamp_url} target="_blank" rel="noreferrer">Оруулсан тамгыг харах</a>}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <button type="button" onClick={() => setApprovalAssetsOpen(false)} style={{ padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: 8, background: '#fff', cursor: 'pointer' }}>Болих</button>
+            <button type="button" disabled={savingApprovalAssets || !approvalAssetsDraft.signature_url || !approvalAssetsDraft.stamp_url} onClick={() => void saveApprovalAssets()} style={{ padding: '8px 12px', border: 0, borderRadius: 8, background: savingApprovalAssets ? '#94a3b8' : '#2563eb', color: '#fff', fontWeight: 700, cursor: savingApprovalAssets ? 'wait' : 'pointer' }}>{savingApprovalAssets ? 'Хадгалж байна...' : 'Хадгалах'}</button>
+          </div>
+        </section>
+      </div>}
       {summaryOnly && <section style={{ padding: 10, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8 }}>
-        <h3 style={{ margin: '0 0 8px', fontSize: 16 }}>Хичээл бүрийн нэгтгэл (бүх анги)</h3>
+        <h3 style={{ margin: '0 0 8px', fontSize: 16 }}>Хичээлийн нэгтгэл</h3>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
           {gradeBands.map((band) => (
             <button key={band.id} type="button" onClick={() => { setSelectedBand(band.id); setSelectedSubject(''); }} style={tabButton(selectedBand === band.id)}>
@@ -201,6 +337,9 @@ export default function AdminReviewPanel({ summaryOnly = false }: Props) {
         {subjectsInBand.length === 0 ? <p style={{ margin: 0 }}>Энэ түвшинд үнэлгээ оруулаагүй байна.</p> : (
           <>
             <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 8 }}>
+              <button type="button" onClick={() => setSelectedSubject('')} style={subjectTabButton(!activeSubject)}>
+                Бүх хичээл
+              </button>
               {subjectsInBand.map((subject) => (
                 <button key={subject} type="button" onClick={() => setSelectedSubject(subject)} style={subjectTabButton(activeSubject === subject)}>
                   {subject}
@@ -209,10 +348,11 @@ export default function AdminReviewPanel({ summaryOnly = false }: Props) {
             </div>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 12 }}>
-                <thead><tr>{['Анги', 'VIII', 'VII', 'VI', 'V', 'IV', 'III', 'II', 'I', 'Нийт', 'Дундаж', 'Багш'].map((label) => <th key={label} style={{ padding: '4px 6px', background: '#fff' }}>{label}</th>)}</tr></thead>
+                <thead><tr>{['Анги', ...(!activeSubject ? ['Хичээл'] : []), 'VIII', 'VII', 'VI', 'V', 'IV', 'III', 'II', 'I', 'Нийт', 'Дундаж', 'Багш'].map((label) => <th key={label} style={{ padding: '4px 6px', background: '#fff' }}>{label}</th>)}</tr></thead>
                 <tbody>{activeSubjectSummary.map((item) => (
                   <tr key={`${item.grade}-${item.section}-${item.subject}`} style={{ borderTop: '1px solid #e2e8f0' }}>
                     <td style={{ padding: '4px 6px', fontWeight: 600 }}>{item.grade}-{item.section}</td>
+                    {!activeSubject && <td style={{ padding: '4px 6px' }}>{item.subject}</td>}
                     {evaluationLevels.map((level) => <td key={level} style={{ padding: '4px 6px' }}>{item.levels[level] ?? 0}</td>)}
                     <td style={{ padding: '4px 6px' }}>{item.students}</td>
                     <td style={{ padding: '4px 6px' }}>{item.average.toFixed(1)}</td>
@@ -221,6 +361,7 @@ export default function AdminReviewPanel({ summaryOnly = false }: Props) {
                 ))}
                 <tr style={{ borderTop: '2px solid #94a3b8', background: '#e2e8f0', fontWeight: 700 }}>
                   <td style={{ padding: '4px 6px' }}>Нэгтгэл</td>
+                  {!activeSubject && <td style={{ padding: '4px 6px' }} />}
                   {evaluationLevels.map((level) => <td key={level} style={{ padding: '4px 6px' }}>{activeSubjectTotals.levels[level]}</td>)}
                   <td style={{ padding: '4px 6px' }}>{activeSubjectTotals.students}</td>
                   <td style={{ padding: '4px 6px' }}>{activeSubjectTotals.average.toFixed(1)}</td>
@@ -243,10 +384,34 @@ export default function AdminReviewPanel({ summaryOnly = false }: Props) {
               <p style={{ margin: '2px 0' }}><FileAttachmentActions attachment={{ name: 'Хөтөлбөр, төлөвлөгөө.pdf', url: record.program_plan.documentUrl, file_type: 'document' }} /></p>
               {(record.program_plan.grade || record.program_plan.section || record.program_plan.subject) && <p style={{ margin: '2px 0' }}>{record.program_plan.grade}-р анги {record.program_plan.section} бүлэг · {record.program_plan.subject}</p>}
               {record.program_plan.note && <p style={{ margin: '2px 0' }}>{record.program_plan.note}</p>}
-              <label style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <input type="checkbox" checked={record.program_plan.approved} onChange={(event) => void reviewPlan(record.user_id, event.target.checked)} />
-                Баталсан
-              </label>
+              {record.program_plan.returned && <strong style={{ color: '#b91c1c' }}>Засуулахаар буцаасан</strong>}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                {record.program_plan.approved && <strong style={{ color: '#15803d' }}>Батлагдсан</strong>}
+                <button
+                  type="button"
+                  disabled={reviewingPlan === record.user_id || (!record.program_plan.approved && (!approvalAssets.signature_url || !approvalAssets.stamp_url))}
+                  onClick={() => void reviewPlan(record.user_id, !record.program_plan.approved)}
+                  style={{ padding: '7px 12px', border: 0, borderRadius: 7, background: record.program_plan.approved ? '#64748b' : '#15803d', color: '#fff', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  {reviewingPlan === record.user_id ? 'Хадгалж байна...' : record.program_plan.approved ? 'Баталгааг цуцлах' : 'Батлах'}
+                </button>
+                {!record.program_plan.approved && !record.program_plan.returned && <button
+                  type="button"
+                  disabled={reviewingPlan === record.user_id}
+                  onClick={() => void returnPlan(record.user_id)}
+                  style={{ padding: '7px 12px', border: 0, borderRadius: 7, background: reviewingPlan === record.user_id ? '#cbd5e1' : '#d97706', color: '#fff', fontWeight: 700, cursor: reviewingPlan === record.user_id ? 'not-allowed' : 'pointer' }}
+                >
+                  {reviewingPlan === record.user_id ? 'Буцааж байна...' : 'Багшид буцаах'}
+                </button>}
+                <button
+                  type="button"
+                  disabled={reviewingPlan === record.user_id}
+                  onClick={() => void deletePlan(record.user_id)}
+                  style={{ padding: '7px 12px', border: 0, borderRadius: 7, background: reviewingPlan === record.user_id ? '#cbd5e1' : '#dc2626', color: '#fff', fontWeight: 700, cursor: reviewingPlan === record.user_id ? 'not-allowed' : 'pointer' }}
+                >
+                  {reviewingPlan === record.user_id ? 'Хадгалж байна...' : 'Устгах'}
+                </button>
+              </div>
             </div>
             {(record.awards.length > 0 || record.professional_degrees.length > 0) && <div style={{ marginTop: 8, padding: 8, background: '#f8fafc', borderRadius: 8 }}>
               <strong>Шагнал, мэргэжлийн зэрэг</strong>

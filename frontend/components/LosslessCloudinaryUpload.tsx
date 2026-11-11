@@ -65,6 +65,36 @@ async function compressFile(file: File): Promise<File> {
   return optimizeImage(file);
 }
 
+export async function uploadCloudinaryFile(file: File, formats: string[]): Promise<UploadedFile> {
+  const extension = file.name.split('.').pop()?.toLowerCase() ?? '';
+  if (!formats.map((format) => format.toLowerCase()).includes(extension)) {
+    throw new Error(`${file.name}: зөвшөөрөгдсөн файлын төрөл биш байна.`);
+  }
+  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+  const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+  if (!cloudName || !uploadPreset) throw new Error('Cloudinary cloud name эсвэл upload preset тохируулаагүй байна.');
+
+  const optimizedFile = await compressFile(file);
+  const isPdf = optimizedFile.type === 'application/pdf' || optimizedFile.name.toLowerCase().endsWith('.pdf');
+  const resourceType = optimizedFile.type.startsWith('image/') || isPdf ? 'image' : 'raw';
+  const formData = new FormData();
+  formData.append('file', optimizedFile);
+  formData.append('upload_preset', uploadPreset);
+  const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`, {
+    method: 'POST',
+    body: formData,
+  });
+  const result = await response.json();
+  if (!response.ok || !result.secure_url) {
+    throw new Error(result.error?.message ?? 'Файл upload хийгдсэнгүй.');
+  }
+  return {
+    name: file.name,
+    url: result.secure_url,
+    file_type: resourceType === 'image' ? 'image' : 'document',
+  };
+}
+
 export default function LosslessCloudinaryUpload({
   label,
   formats,
@@ -86,33 +116,7 @@ export default function LosslessCloudinaryUpload({
   }, [resetKey]);
 
   const uploadFile = async (file: File) => {
-    const extension = file.name.split('.').pop()?.toLowerCase() ?? '';
-    if (!formats.map((format) => format.toLowerCase()).includes(extension)) {
-      throw new Error(`${file.name}: зөвшөөрөгдсөн файлын төрөл биш байна.`);
-    }
-    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
-    if (!cloudName || !uploadPreset) throw new Error('Cloudinary cloud name эсвэл upload preset тохируулаагүй байна.');
-
-    const optimizedFile = await compressFile(file);
-    const isPdf = optimizedFile.type === 'application/pdf' || optimizedFile.name.toLowerCase().endsWith('.pdf');
-    const resourceType = optimizedFile.type.startsWith('image/') || isPdf ? 'image' : 'raw';
-    const formData = new FormData();
-    formData.append('file', optimizedFile);
-    formData.append('upload_preset', uploadPreset);
-    const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`, {
-      method: 'POST',
-      body: formData,
-    });
-    const result = await response.json();
-    if (!response.ok || !result.secure_url) {
-      throw new Error(result.error?.message ?? 'Файл upload хийгдсэнгүй.');
-    }
-    const uploadedFile: UploadedFile = {
-      name: file.name,
-      url: result.secure_url,
-      file_type: resourceType === 'image' ? 'image' : 'document',
-    };
+    const uploadedFile = await uploadCloudinaryFile(file, formats);
     setUploadedFiles((current) => multiple ? [...current, uploadedFile].slice(-maxFiles) : [uploadedFile]);
     onUploaded(uploadedFile);
     setMessage('');

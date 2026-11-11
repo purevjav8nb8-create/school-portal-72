@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { backendBaseUrl, fetchWithAuth } from '../../../../lib/backendApi';
+import UnitTargetSelector from './UnitTargetSelector';
 
 type ChatConversation = {
   conversation_id: string;
@@ -33,7 +34,6 @@ type ChatUser = {
   unit: string;
 };
 
-const units = ['БАЗАН', 'БУЗАН', 'НУЗАН'] as const;
 const fieldStyle = {
   width: '100%',
   padding: 10,
@@ -189,6 +189,10 @@ export default function ChatBoard({ isAdmin = false }: { isAdmin?: boolean }) {
       setErrorMessage('Мессеж бичнэ үү.');
       return;
     }
+    if (selectedId === 'broadcast' && targetUnits.length === 0) {
+      setErrorMessage('“Бүгд” эсвэл дор хаяж нэг нэгж сонгоно уу.');
+      return;
+    }
     setSending(true);
     setErrorMessage('');
     try {
@@ -202,6 +206,7 @@ export default function ChatBoard({ isAdmin = false }: { isAdmin?: boolean }) {
       });
       setDraft('');
       setSelectedUser(null);
+      if (selectedId === 'broadcast') setTargetUnits([]);
       await loadConversations();
       const updated = await chatRequest<ChatMessage[]>(
         `/api/teachers/chat/messages?conversation_id=${encodeURIComponent(selectedId)}`,
@@ -313,12 +318,12 @@ export default function ChatBoard({ isAdmin = false }: { isAdmin?: boolean }) {
             </div>
             {selectedConversation && (selectedConversation.kind !== 'broadcast' || isAdmin) ? (
               <form onSubmit={(event) => void send(event)} style={{ display: 'grid', gap: 8, padding: 10, borderTop: '1px solid #e2e8f0' }}>
-                {selectedConversation.kind === 'broadcast' && isAdmin && <fieldset style={{ margin: 0, padding: '5px 8px', border: '1px solid #cbd5e1', borderRadius: 7 }}>
-                  <legend style={{ fontSize: 12 }}>Хүлээн авах нэгж</legend>
-                  {units.map((unit) => <label key={unit} style={{ marginRight: 10, fontSize: 12 }}>
-                    <input type="checkbox" checked={targetUnits.includes(unit)} onChange={(event) => setTargetUnits((current) => event.target.checked ? [...current, unit] : current.filter((value) => value !== unit))} /> {unit}
-                  </label>)}
-                </fieldset>}
+                {selectedConversation.kind === 'broadcast' && isAdmin && <UnitTargetSelector
+                  selectedUnits={targetUnits}
+                  setSelectedUnits={setTargetUnits}
+                  label="Хүлээн авах нэгж"
+                  compact
+                />}
                 <label style={{ display: 'grid', gap: 4, fontWeight: 600 }}>Мессеж
                   <textarea required maxLength={5000} rows={2} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Мессеж бичих..." style={fieldStyle} />
                 </label>

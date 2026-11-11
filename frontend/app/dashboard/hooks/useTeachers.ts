@@ -4,11 +4,12 @@ import { Teacher } from '../types';
 
 const apiUrl = backendBaseUrl;
 
-export function useTeachers(activeUnit: string) {
+export function useTeachers(activeUnit: string, enabled = true) {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
+    if (!enabled) return;
     let active = true;
     const loadTeachers = async () => {
       try {
@@ -30,7 +31,7 @@ export function useTeachers(activeUnit: string) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [enabled]);
 
   const displayTeachers =
     activeUnit === 'НИЙТ'

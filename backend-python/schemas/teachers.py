@@ -45,6 +45,34 @@ class TeacherUpdate(BaseModel):
             raise ValueError("Энэ талбар хоосон байж болохгүй.")
         return value
 
+
+class ManagerCreate(BaseModel):
+    first_name: str = Field(min_length=1)
+    last_name: str = Field(min_length=1)
+    email: str = Field(min_length=3)
+    password: str = Field(min_length=6)
+
+    @field_validator("first_name", "last_name", "email")
+    @classmethod
+    def reject_blank_manager_values(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Энэ талбар хоосон байж болохгүй.")
+        return value
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        value = value.strip()
+        if len(value) < 6:
+            raise ValueError("Менежерийн нууц үг дор хаяж 6 тэмдэгт байна.")
+        return value
+
+
+class PasswordUpdate(BaseModel):
+    password: str = Field(min_length=8)
+
+
 class TrainingCreate(BaseModel):
     name: str = Field(min_length=1)
     startDate: date
@@ -73,6 +101,7 @@ class TeachingClass(BaseModel):
     grade: int = Field(ge=1, le=12)
     section: str = Field(min_length=1, max_length=1)
     weekly_hours: int = Field(ge=1)
+    homeroom: bool = False
 
 
 class TeachingClassesUpdate(BaseModel):

@@ -13,7 +13,7 @@ interface CertificateUploadProps {
 
 export default function CertificateUpload({ label = 'Сертификат (PDF эсвэл зураг)', onUploadSuccess, onRemove, required = false, resetKey }: CertificateUploadProps) {
   return (
-    <div className="flex flex-col gap-1">
+    <div className="certificate-upload-container">
       <LosslessCloudinaryUpload
         label={label}
         formats={['pdf', 'png', 'jpeg', 'jpg']}

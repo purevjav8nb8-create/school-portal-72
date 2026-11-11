@@ -21,8 +21,8 @@ interface Props {
 export default function ActivityPanel({ unit, subjects, activities, onSubmit }: Props) {
   return (
     <section style={{ display: 'grid', gap: 18 }}>
-      <h2 style={{ margin: 0 }}>Амжилт, хичээл ба оролцоо</h2>
-      <FloatingComposer title="Амжилт, оролцоо нэмэх" label="Амжилт, оролцоо нэмэх">
+      <h2 style={{ margin: 0 }}>Оролцоо</h2>
+      <FloatingComposer title="Оролцоо нэмэх" label="Оролцоо нэмэх">
         {(close) => <ActivityForm unit={unit} subjects={subjects} onSubmit={async (activity) => { await onSubmit(activity); close(); }} />}
       </FloatingComposer>
       <div style={{ display: 'grid', gap: 10 }}>

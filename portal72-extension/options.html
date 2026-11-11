@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="mn">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Portal72 vault тохиргоо</title>
+    <link rel="stylesheet" href="options.css">
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Portal72 Login Helper</h1>
+        <p>Нэвтрэх мэдээлэл зөвхөн энэ browser profile-д AES-GCM-ээр шифрлэгдэн хадгалагдана. Supabase руу илгээгдэхгүй.</p>
+      </header>
+      <section class="card">
+        <h2>Vault нээх эсвэл шинээр үүсгэх</h2>
+        <form id="vault-form">
+          <label for="master-password">Мастер нууц үг (12+ тэмдэгт)</label>
+          <input id="master-password" type="password" minlength="12" autocomplete="new-password" required>
+          <button id="load-button" type="submit">Одоо байгаа vault нээх</button>
+          <button id="create-button" class="secondary" type="button">Шинэ vault үүсгэх</button>
+        </form>
+        <p id="status" role="status"></p>
+      </section>
+      <form id="credentials-form" class="card" hidden>
+        <h2>Сайтын нэвтрэх мэдээлэл</h2>
+        <p class="hint">Эдгээр мэдээллийг зөвхөн доорх сайтын sign-in хуудсанд бөглөнө. Нэвтрэх товчийг extension дарахгүй.</p>
+        <fieldset>
+          <legend>Gmail</legend>
+          <label for="gmail-username">И-мэйл / хэрэглэгчийн нэр</label>
+          <input id="gmail-username" autocomplete="off">
+          <label for="gmail-password">Нууц үг</label>
+          <input id="gmail-password" type="password" autocomplete="new-password">
+        </fieldset>
+        <fieldset>
+          <legend>Mozaik</legend>
+          <label for="mozaik-username">Хэрэглэгчийн нэр</label>
+          <input id="mozaik-username" autocomplete="off">
+          <label for="mozaik-password">Нууц үг</label>
+          <input id="mozaik-password" type="password" autocomplete="new-password">
+        </fieldset>
+        <fieldset>
+          <legend>Medle Office / Outlook</legend>
+          <label for="medle-username">Medle ID / и-мэйл</label>
+          <input id="medle-username" autocomplete="off">
+          <label for="medle-password">Medle нууц үг</label>
+          <input id="medle-password" type="password" autocomplete="new-password">
+        </fieldset>
+        <fieldset>
+          <legend>Их Нүүдэл LMS</legend>
+          <label for="lms-username">ESIS ID / LMS хэрэглэгчийн нэр</label>
+          <input id="lms-username" autocomplete="off">
+          <label for="lms-password">LMS нууц үг</label>
+          <input id="lms-password" type="password" autocomplete="new-password">
+        </fieldset>
+        <button type="submit">Шифрлэж хадгалах</button>
+        <button id="lock-options-button" class="secondary" type="button">Vault түгжих</button>
+      </form>
+    </main>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

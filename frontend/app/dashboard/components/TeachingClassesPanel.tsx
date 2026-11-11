@@ -6,9 +6,12 @@ import { Teacher } from '../types';
 import FloatingComposer from './records/FloatingComposer';
 import { gradesForUnit, romanGrade } from './records/ClassFields';
 import { supabase } from '../../../lib/supabaseClient';
+import TeachingClassDialog from './TeachingClassDialog';
+import TeachingClassSummary from './TeachingClassSummary';
 
 type TeachingClass = NonNullable<Teacher['teaching_classes']>[number];
 const apiUrl = backendBaseUrl;
+const fieldStyle = { display: 'block', width: '100%', marginTop: 4, padding: 9, border: '1px solid #cbd5e1', borderRadius: 6, boxSizing: 'border-box' as const };
 
 interface Props {
   unit: string;
@@ -18,7 +21,7 @@ interface Props {
 export default function TeachingClassesPanel({ unit, initialClasses }: Props) {
   const [classes, setClasses] = useState<TeachingClass[]>(initialClasses);
   const grades = gradesForUnit(unit);
-  const [draft, setDraft] = useState<TeachingClass>({ grade: grades[0], section: 'А', weekly_hours: 1 });
+  const [draft, setDraft] = useState<TeachingClass>({ grade: grades[0], section: 'А', weekly_hours: 1, homeroom: false });
   const [selectedClass, setSelectedClass] = useState<TeachingClass | null>(null);
   const [dialog, setDialog] = useState<'actions' | 'edit' | 'delete' | null>(null);
   const [message, setMessage] = useState('');
@@ -91,6 +94,19 @@ export default function TeachingClassesPanel({ unit, initialClasses }: Props) {
     }
   };
 
+  const setHomeroom = async (item: TeachingClass, homeroom: boolean) => {
+    const nextClasses = classes.map((current) =>
+      current.grade === item.grade && current.section === item.section ? { ...current, homeroom } : current,
+    );
+    try {
+      await persistClasses(nextClasses);
+      setClasses(nextClasses);
+      setMessage('');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Анги удирдсан төлөв хадгалагдсангүй.');
+    }
+  };
+
   return (
     <section style={{ marginTop: 10, marginBottom: 10, padding: 8, border: '1px solid #cbd5e1', borderRadius: 8, fontSize: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
@@ -102,6 +118,10 @@ export default function TeachingClassesPanel({ unit, initialClasses }: Props) {
                 {classes.length === 0 ? <p style={{ margin: 0, color: '#64748b' }}>Анги бүртгэгдээгүй байна.</p> : classes.map((item) => (
                   <div key={`${item.grade}-${item.section}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '7px 9px', border: '1px solid #e2e8f0', borderRadius: 7, background: '#f8fafc' }}>
                     <span>{item.grade}-р анги {item.section} · {item.weekly_hours} цаг</span>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
+                      <input type="checkbox" checked={Boolean(item.homeroom)} onChange={(event) => void setHomeroom(item, event.target.checked)} />
+                      АУБ
+                    </label>
                     <button type="button" onClick={() => void removeClass(item)} aria-label={`${item.grade}-р анги ${item.section} устгах`} title="Анги устгах" style={{ padding: '3px 7px', border: 0, borderRadius: 5, background: '#fee2e2', color: '#b91c1c', cursor: 'pointer' }}>×</button>
                   </div>
                 ))}
@@ -116,56 +136,9 @@ export default function TeachingClassesPanel({ unit, initialClasses }: Props) {
           )}
         </FloatingComposer>
       </div>
-      <div style={{ display: 'grid', gap: 2, marginTop: 6, fontSize: 12, lineHeight: 1.2 }}>
-        <b>Нийт: {classes.reduce((sum, item) => sum + item.weekly_hours, 0)} цаг</b>
-        <b>Илүү цаг: {Math.max(0, classes.reduce((sum, item) => sum + item.weekly_hours, 0) - 19)} цаг</b>
-      </div>
+      <TeachingClassSummary classes={classes} />
       {message && <small role="alert" style={{ display: 'block', marginTop: 6, color: '#b91c1c' }}>{message}</small>}
-      {dialog && selectedClass && (
-        <div
-          role="presentation"
-          onMouseDown={(event) => event.target === event.currentTarget && setDialog(null)}
-          style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'grid', placeItems: 'center', padding: 16, background: 'rgba(15, 23, 42, .45)' }}
-        >
-          <section role="dialog" aria-modal="true" style={{ width: 'min(360px, 100%)', padding: 18, borderRadius: 10, background: '#fff', boxShadow: '0 20px 60px rgba(0,0,0,.25)' }}>
-            {dialog === 'actions' && (
-              <>
-                <h3 style={{ margin: '0 0 14px', fontSize: 16 }}>{selectedClass.grade}-р анги {selectedClass.section}</h3>
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                  <button type="button" onClick={() => { setDraft(selectedClass); setDialog('edit'); }} style={dialogButton('#2563eb')}>Засах</button>
-                  <button type="button" onClick={() => setDialog('delete')} style={dialogButton('#dc2626')}>Устгах</button>
-                  <button type="button" onClick={() => setDialog(null)} style={dialogButton('#64748b')}>Буцах</button>
-                </div>
-              </>
-            )}
-            {dialog === 'edit' && (
-              <>
-                <h3 style={{ margin: '0 0 12px', fontSize: 16 }}>Анги засах</h3>
-                <label>Анги<select value={draft.grade} onChange={(event) => setDraft({ ...draft, grade: Number(event.target.value) })} style={fieldStyle}>{grades.map((grade) => <option key={grade} value={grade}>{romanGrade(grade)} анги</option>)}</select></label>
-                <label>Бүлэг<select value={draft.section} onChange={(event) => setDraft({ ...draft, section: event.target.value })} style={fieldStyle}>{['А', 'Б', 'В', 'Г', 'Д', 'Е'].map((section) => <option key={section}>{section}</option>)}</select></label>
-                <label>7 хоногийн цаг<input type="number" min={1} value={draft.weekly_hours} onChange={(event) => setDraft({ ...draft, weekly_hours: Math.max(1, Number(event.target.value)) })} style={fieldStyle} /></label>
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
-                  <button type="button" onClick={saveEdit} style={dialogButton('#16a34a')}>Хадгалах</button>
-                  <button type="button" onClick={() => setDialog('actions')} style={dialogButton('#64748b')}>Буцах</button>
-                </div>
-              </>
-            )}
-            {dialog === 'delete' && (
-              <>
-                <h3 style={{ margin: '0 0 8px', fontSize: 16 }}>Анги устгах уу?</h3>
-                <p style={{ margin: '0 0 16px', color: '#475569' }}>{selectedClass.grade}-р анги {selectedClass.section} ангийг устгах гэж байна.</p>
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                  <button type="button" onClick={confirmDelete} style={dialogButton('#dc2626')}>Устгах</button>
-                  <button type="button" onClick={() => setDialog('actions')} style={dialogButton('#64748b')}>Буцах</button>
-                </div>
-              </>
-            )}
-          </section>
-        </div>
-      )}
+      {dialog && selectedClass && <TeachingClassDialog unit={unit} selectedClass={selectedClass} dialog={dialog} draft={draft} onDraftChange={setDraft} onDialogChange={setDialog} onSave={saveEdit} onDelete={confirmDelete} />}
     </section>
   );
 }
-
-const fieldStyle = { display: 'block', width: '100%', marginTop: 4, padding: 9, border: '1px solid #cbd5e1', borderRadius: 6, boxSizing: 'border-box' as const };
-const dialogButton = (background: string) => ({ padding: '7px 10px', border: 0, borderRadius: 6, background, color: '#fff', cursor: 'pointer', fontSize: 12 });

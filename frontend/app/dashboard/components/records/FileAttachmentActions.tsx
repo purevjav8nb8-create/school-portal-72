@@ -71,7 +71,9 @@ export default function FileAttachmentActions({ attachment, inlinePreview = fals
               <button type="button" title="Хаах" aria-label="Хаах" onClick={() => setOpen(false)} style={{ display: 'grid', placeItems: 'center', width: 34, height: 34, border: '1px solid #cbd5e1', borderRadius: 6, background: '#fff' }}><X size={18} /></button>
             </header>
             <div style={{ flex: '1 1 auto', minHeight: 0, overflow: 'auto', display: 'grid', placeItems: 'center', padding: 12 }}>
-              {isImage ? <img src={previewUrl} alt={attachment.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} /> : <iframe title={attachment.name} src={previewUrl} style={{ width: '100%', height: '100%', minHeight: 360, border: 0 }} />}
+              {isImage || extension === 'pdf'
+                ? <img src={previewUrl} alt={attachment.name} style={{ width: extension === 'pdf' ? '75%' : 'auto', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                : <iframe title={attachment.name} src={previewUrl} style={{ width: '100%', height: '100%', minHeight: 360, border: 0 }} />}
             </div>
           </section>
         </div>
