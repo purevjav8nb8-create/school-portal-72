@@ -45,6 +45,7 @@ export default function ProgramPlanPanel({ programPlan, unit, subjects, busy: op
     background: '#fff',
     color: '#172033',
     boxSizing: 'border-box' as const,
+    fontFamily: 'Arial, sans-serif',
   };
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -66,7 +67,7 @@ export default function ProgramPlanPanel({ programPlan, unit, subjects, busy: op
   };
 
   return (
-    <section style={{ display: 'grid', gap: 18, maxWidth: 720 }}>
+    <section style={{ display: 'grid', gap: 18, maxWidth: 720, fontFamily: 'Arial, sans-serif' }}>
       <header>
         <h2 style={{ margin: 0, fontSize: 22, color: '#172033' }}>Хөтөлбөр, төлөвлөгөө</h2>
         <p style={{ margin: '6px 0 0', color: '#64748b' }}>Материалаа илгээгээд баталгаажуулалтын төлөвөө эндээс харна.</p>
@@ -93,7 +94,7 @@ export default function ProgramPlanPanel({ programPlan, unit, subjects, busy: op
       </div>
       <FloatingComposer title="Хөтөлбөр, төлөвлөгөө оруулах" label="Хөтөлбөр, төлөвлөгөө оруулах">
       {(close) => <form onSubmit={async (event) => { await submit(event); if (documentUrl && grade && section && subject) close(); }} style={{ display: 'grid', gap: 12, padding: 16, border: '1px solid #e2e8f0', borderRadius: 8 }}>
-        <h3 style={{ margin: 0, fontSize: 16 }}>Хөтөлбөр илгээх</h3>
+        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, fontFamily: 'Arial, sans-serif' }}>Хөтөлбөр илгээх</h3>
         <ClassFields
           unit={unit}
           subjects={subjects}

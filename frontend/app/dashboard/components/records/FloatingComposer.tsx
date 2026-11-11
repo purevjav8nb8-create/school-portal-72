@@ -54,9 +54,9 @@ export default function FloatingComposer({ title, label, trigger, headerAction, 
           onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}
           style={{ position: 'fixed', inset: 0, zIndex: 40, display: 'grid', placeItems: 'center', padding: 16, background: 'rgba(15, 23, 42, 0.45)' }}
         >
-          <section role="dialog" aria-modal="true" aria-label={title} style={{ width: 'min(640px, 100%)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 24, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, boxShadow: '0 24px 70px rgba(15, 23, 42, 0.3)' }}>
+          <section role="dialog" aria-modal="true" aria-label={title} style={{ width: 'min(640px, 100%)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 24, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, boxShadow: '0 24px 70px rgba(15, 23, 42, 0.3)', fontFamily: 'Arial, sans-serif' }}>
             <header style={{ flex: '0 0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingBottom: 16, borderBottom: '1px solid #e2e8f0' }}>
-              <h2 style={{ margin: 0, color: '#172554', fontSize: 20, fontWeight: 800 }}>{title}</h2>
+              <h2 style={{ margin: 0, color: '#172554', fontSize: 20, fontWeight: 600, fontFamily: 'Arial, sans-serif' }}>{title}</h2>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 {headerAction}
                 <button type="button" aria-label="Цонх хаах" title="Цонх хаах" onClick={close} style={{ display: 'grid', placeItems: 'center', width: 32, height: 32, border: 0, borderRadius: 8, background: '#f1f5f9', color: '#334155', cursor: 'pointer' }}>

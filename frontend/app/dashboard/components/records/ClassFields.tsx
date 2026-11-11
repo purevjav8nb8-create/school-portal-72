@@ -42,6 +42,7 @@ const fieldStyle = {
   background: '#fff',
   color: '#172033',
   boxSizing: 'border-box' as const,
+  fontFamily: 'Arial, sans-serif',
 };
 
 export function gradesForUnit(unit: string) {
