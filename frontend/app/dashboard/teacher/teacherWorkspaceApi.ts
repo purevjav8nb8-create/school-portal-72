@@ -17,7 +17,7 @@ export type TeacherWorkspace = {
   activities: TeacherActivity[];
   awards: { id: string; name: string; certificate_number: string; certificate_url: string; organization: string; awarded_date?: string; note: string }[];
   professional_degrees: { id: string; name: string; certificate_number: string; certificate_url: string; status: string; issued_date?: string; note: string }[];
-  homeroom_evaluations?: (EvaluationRecord & { evaluator?: string })[];
+  homeroom_evaluations?: (EvaluationRecord & { evaluator?: string; evaluator_id?: string; evaluator_email?: string })[];
 };
 
 type LoadResult = {

@@ -29,11 +29,24 @@ export default function TeacherDashboardPage() {
     setErrorMessage,
     setSuccessMessage,
   });
-  const personalNotificationItems = useMemo(() => [
-    ...workspace.awards.map((item) => ({ id: item.id, category: 'Шагнал' as const })),
-    ...workspace.degrees.map((item) => ({ id: item.id, category: 'Зэрэг' as const })),
-    ...workspace.homeroomEvaluations.map((item) => ({ id: item.id, category: 'Үнэлгээ' as const })),
-  ], [workspace.awards, workspace.degrees, workspace.homeroomEvaluations]);
+  const personalNotificationItems = useMemo(() => {
+    const latestEvaluationByTeacher = new Map<string, (typeof workspace.homeroomEvaluations)[number]>();
+    workspace.homeroomEvaluations.forEach((item) => {
+      const teacherId = item.evaluator_id || item.evaluator || item.id;
+      const current = latestEvaluationByTeacher.get(teacherId);
+      const timestamp = item.createdAt || item.evaluation_date || item.id;
+      const currentTimestamp = current?.createdAt || current?.evaluation_date || current?.id || '';
+      if (!current || timestamp.localeCompare(currentTimestamp) > 0) latestEvaluationByTeacher.set(teacherId, item);
+    });
+    return [
+      ...workspace.awards.map((item) => ({ id: item.id, category: 'Шагнал' as const })),
+      ...workspace.degrees.map((item) => ({ id: item.id, category: 'Зэрэг' as const })),
+      ...[...latestEvaluationByTeacher.values()].map((item) => ({
+        id: item.id,
+        category: 'Үнэлгээ' as const,
+      })),
+    ];
+  }, [workspace.awards, workspace.degrees, workspace.homeroomEvaluations]);
   const { counts: notificationCounts, errorMessage: notificationError, markRead } = useNotifications(
     'teacher',
     personalNotificationItems,

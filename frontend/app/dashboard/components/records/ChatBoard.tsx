@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { backendBaseUrl, fetchWithAuth } from '../../../../lib/backendApi';
 import UnitTargetSelector from './UnitTargetSelector';
+import { formatTeacherName } from '../../utils/teacherName';
 
 type ChatConversation = {
   conversation_id: string;
@@ -266,7 +267,7 @@ export default function ChatBoard({ isAdmin = false }: { isAdmin?: boolean }) {
                   }}
                   style={{ display: 'grid', gap: 2, padding: '6px 8px', border: '1px solid #dbeafe', borderRadius: 6, background: '#fff', textAlign: 'left', cursor: 'pointer' }}
                 >
-                  <strong style={{ color: '#1e3a8a', fontSize: 12 }}>{item.name}</strong>
+                  <strong style={{ color: '#1e3a8a', fontSize: 12 }}>{formatTeacherName(item.name)}</strong>
                   <small style={{ color: '#64748b' }}>{[item.role, item.unit, item.email].filter(Boolean).join(' · ')}</small>
                 </button>
               ))}
@@ -292,7 +293,7 @@ export default function ChatBoard({ isAdmin = false }: { isAdmin?: boolean }) {
                 }}
               >
                 <span style={{ display: 'flex', justifyContent: 'space-between', gap: 6, fontWeight: 700, color: '#172554' }}>
-                  <span>{conversation.title}</span>
+                  <span>{conversation.kind === 'private' ? formatTeacherName(conversation.title) : conversation.title}</span>
                   {!!conversation.unread_count && <span style={{ color: '#dc2626' }}>{conversation.unread_count}</span>}
                 </span>
                 {conversation.unit && <small style={{ color: '#64748b' }}>{conversation.unit}</small>}
@@ -303,14 +304,14 @@ export default function ChatBoard({ isAdmin = false }: { isAdmin?: boolean }) {
           </nav>
           <div style={{ display: 'grid', gridTemplateRows: 'auto minmax(180px, 1fr) auto', minWidth: 0 }}>
             <header style={{ padding: '10px 12px', borderBottom: '1px solid #e2e8f0' }}>
-              <strong>{selectedConversation?.title ?? 'Чат сонгоно уу'}</strong>
+              <strong>{selectedConversation ? selectedConversation.kind === 'private' ? formatTeacherName(selectedConversation.title) : selectedConversation.title : 'Чат сонгоно уу'}</strong>
               {selectedConversation?.kind === 'private' && selectedConversation.unit && <small style={{ display: 'block', marginTop: 2, color: '#64748b' }}>{selectedConversation.unit}</small>}
               {selectedConversation?.kind === 'broadcast' && <small style={{ display: 'block', marginTop: 3, color: '#64748b' }}>Хоосон шүүлтүүрээр бүх багшид хүргэнэ.</small>}
             </header>
             <div aria-live="polite" style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 12, overflowY: 'auto', background: '#fff' }}>
               {messages.map((message) => (
                 <article key={message.id} style={{ maxWidth: '90%', alignSelf: message.is_mine ? 'flex-end' : 'flex-start', padding: '8px 10px', borderRadius: 10, background: message.is_mine ? '#dbeafe' : '#f1f5f9', overflowWrap: 'anywhere' }}>
-                  <small style={{ display: 'block', marginBottom: 3, color: '#64748b' }}>{message.sender_name} · {new Date(message.created_at).toLocaleString()}</small>
+                  <small style={{ display: 'block', marginBottom: 3, color: '#64748b' }}>{formatTeacherName(message.sender_name)} · {new Date(message.created_at).toLocaleString()}</small>
                   <span style={{ whiteSpace: 'pre-wrap' }}>{message.body}</span>
                 </article>
               ))}

@@ -18,23 +18,23 @@ def homeroom_evaluations(user) -> list[dict[str, Any]]:
     if not homeroom_classes:
         return []
 
-    sources: list[tuple[str, dict[str, Any], dict[str, Any]]] = []
+    sources: list[tuple[str, dict[str, Any], dict[str, Any], str]] = []
     if mock_data_enabled():
         sources = [
-            (teacher.get("auth_id", ""), teacher, teacher)
+            (teacher.get("auth_id", ""), teacher, teacher, teacher.get("email", ""))
             for teacher in load_mock_school_data()["teachers"]
         ]
     else:
         try:
             sources = [
-                (account.id, account.user_metadata or {}, account.user_metadata or {})
+                (account.id, account.user_metadata or {}, account.user_metadata or {}, account.email or "")
                 for account in supabase.auth.admin.list_users(per_page=1000)
             ]
         except Exception as error:
             raise HTTPException(status_code=503, detail="Анги удирдсан багшийн үнэлгээ уншигдсангүй.") from error
 
     received = []
-    for source_id, source_metadata, source_data in sources:
+    for source_id, source_metadata, source_data, source_email in sources:
         if source_id == str(user.id):
             continue
         portal = source_data if mock_data_enabled() else source_metadata.get("teacher_portal", {})
@@ -44,7 +44,9 @@ def homeroom_evaluations(user) -> list[dict[str, Any]]:
                 received.append({
                     **evaluation,
                     "id": f"{source_id}:{evaluation.get('id', '')}",
+                    "evaluator_id": source_id,
                     "evaluator": f'{source_metadata.get("last_name", "")} {source_metadata.get("first_name", "")}'.strip(),
+                    "evaluator_email": source_email,
                 })
     return sorted(received, key=lambda item: (item.get("evaluation_date", ""), item.get("createdAt", "")), reverse=True)
 

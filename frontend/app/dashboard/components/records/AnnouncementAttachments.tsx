@@ -8,6 +8,10 @@ export type AnnouncementAttachment = {
   file_type: 'image' | 'document';
 };
 
+export function isPdfAttachment(attachment: Pick<AnnouncementAttachment, 'name' | 'url'>) {
+  return /\.pdf(?:$|[?#])/i.test(attachment.name) || /\.pdf(?:$|[?#])/i.test(attachment.url);
+}
+
 interface Props {
   attachments: AnnouncementAttachment[];
   onChange: React.Dispatch<React.SetStateAction<AnnouncementAttachment[]>>;

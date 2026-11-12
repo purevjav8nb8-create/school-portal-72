@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import FileAttachmentActions from './records/FileAttachmentActions';
 import { Teacher } from '../types';
+import { formatTeacherName } from '../utils/teacherName';
 
 type Training = {
   id: string;
@@ -28,6 +29,13 @@ interface Props {
 export default function AdminTrainingPanel({ teachers }: Props) {
   const [selected, setSelected] = useState<{ teacher: Teacher; training: Training } | null>(null);
   const [teacherId, setTeacherId] = useState('');
+  const [teacherSearch, setTeacherSearch] = useState('');
+  const [teacherPickerOpen, setTeacherPickerOpen] = useState(false);
+  const selectedTeacher = teachers.find((teacher) => teacher.auth_id === teacherId);
+  const matchingTeachers = useMemo(() => teachers.filter((teacher) =>
+    `${teacher.last_name} ${teacher.first_name} ${formatTeacherName(`${teacher.last_name} ${teacher.first_name}`)}`
+      .toLocaleLowerCase().includes(teacherSearch.trim().toLocaleLowerCase()),
+  ), [teacherSearch, teachers]);
   const filteredTeachers = teacherId ? teachers.filter((teacher) => teacher.auth_id === teacherId) : teachers;
   const rows = filteredTeachers.flatMap((teacher) =>
     (teacher.training_records ?? []).map((training) => ({ teacher, training: training as Training })),
@@ -45,11 +53,27 @@ export default function AdminTrainingPanel({ teachers }: Props) {
     <section>
       <h2 style={{ marginTop: 0 }}>Сургалт</h2>
       <label style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '8px 0', color: '#334155', fontWeight: 600 }}>
-        Багшаар шүүх
-        <select value={teacherId} onChange={(event) => setTeacherId(event.target.value)} style={{ minWidth: 220, padding: '7px 9px', border: '1px solid #cbd5e1', borderRadius: 7, background: '#fff' }}>
-          <option value="">Бүх багш</option>
-          {teachers.map((teacher) => <option key={teacher.auth_id} value={teacher.auth_id}>{teacher.last_name} {teacher.first_name}</option>)}
-        </select>
+        <span style={{ position: 'relative', display: 'inline-block', minWidth: 220 }}>
+          <input
+            role="combobox"
+            aria-label="Багшаар шүүх"
+            aria-expanded={teacherPickerOpen}
+            aria-controls="training-teacher-options"
+            aria-autocomplete="list"
+            value={teacherPickerOpen ? teacherSearch : selectedTeacher ? formatTeacherName(`${selectedTeacher.last_name} ${selectedTeacher.first_name}`) : 'Бүх багш'}
+            onFocus={() => { setTeacherSearch(''); setTeacherPickerOpen(true); }}
+            onChange={(event) => { setTeacherSearch(event.target.value); setTeacherPickerOpen(true); }}
+            onBlur={() => window.setTimeout(() => setTeacherPickerOpen(false), 120)}
+            style={{ width: '100%', padding: '7px 9px', border: '1px solid #cbd5e1', borderRadius: 7, background: '#fff' }}
+          />
+          {teacherPickerOpen && <div id="training-teacher-options" role="listbox" style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20, maxHeight: 220, overflowY: 'auto', border: '1px solid #cbd5e1', borderRadius: 7, background: '#fff', boxShadow: '0 8px 20px rgba(15,23,42,.12)' }}>
+            <button type="button" role="option" aria-selected={!teacherId} onMouseDown={(event) => event.preventDefault()} onClick={() => { setTeacherId(''); setTeacherPickerOpen(false); }} style={pickerOption}>Бүх багш</button>
+            {matchingTeachers.map((teacher) => <button key={teacher.auth_id} type="button" role="option" aria-selected={teacher.auth_id === teacherId} onMouseDown={(event) => event.preventDefault()} onClick={() => { setTeacherId(teacher.auth_id); setTeacherPickerOpen(false); }} style={pickerOption}>
+              {formatTeacherName(`${teacher.last_name} ${teacher.first_name}`)}
+            </button>)}
+            {matchingTeachers.length === 0 && <span style={{ display: 'block', padding: '7px 9px', color: '#64748b', fontWeight: 400 }}>Багш олдсонгүй.</span>}
+          </div>}
+        </span>
       </label>
       <p style={{ color: '#475569' }}>Нийт бүртгэл: <b>{rows.length}</b> · Сургалтад хамрагдсан багш: <b>{new Set(rows.map((row) => row.teacher.auth_id)).size}</b></p>
       <div style={summaryGrid}>{['Үндсэн', 'Төрөлжсөн', 'Сонголтот', 'Ажлын байран дээрх сургалт', 'Бусад'].map((type) => <div key={type} style={summaryCard}><span>{type}</span><b>{groupedTypes[type] ?? 0}</b></div>)}</div>
@@ -59,7 +83,7 @@ export default function AdminTrainingPanel({ teachers }: Props) {
             <thead><tr>{['Багш', 'Сургалтын нэр', 'Төрөл', 'Хугацаа', 'Файл'].map((item) => <th key={item} style={cell}>{item}</th>)}</tr></thead>
             <tbody>{rows.map(({ teacher, training }) => (
               <tr key={`${teacher.auth_id}-${training.id}`} style={{ borderTop: '1px solid #e2e8f0' }}>
-                <td style={cell}>{teacher.last_name} {teacher.first_name}</td>
+                <td style={cell}>{formatTeacherName(`${teacher.last_name} ${teacher.first_name}`)}</td>
                 <td style={cell}>
                   <button type="button" onClick={() => setSelected({ teacher, training })} style={linkButton}>{training.name}</button>
                 </td>
@@ -78,7 +102,7 @@ export default function AdminTrainingPanel({ teachers }: Props) {
               <h3 style={{ margin: 0 }}>{selected.training.name}</h3>
               <button type="button" onClick={() => setSelected(null)} style={closeButton}>Хаах</button>
             </header>
-            <p style={{ margin: '10px 0', color: '#475569' }}>{selected.teacher.last_name} {selected.teacher.first_name} · {selected.training.trainingType || 'Бусад'} · {selected.training.startDate} – {selected.training.endDate}</p>
+            <p style={{ margin: '10px 0', color: '#475569' }}>{formatTeacherName(`${selected.teacher.last_name} ${selected.teacher.first_name}`)} · {selected.training.trainingType || 'Бусад'} · {selected.training.startDate} – {selected.training.endDate}</p>
             <div style={attachmentGrid}>
               <div style={attachmentCard}>
                 <strong>Сертификат</strong>
@@ -115,3 +139,4 @@ const attachmentCard = { display: 'grid', alignContent: 'start', gap: 8, minWidt
 const previewFrame = { display: 'grid', placeItems: 'center', minHeight: 260, padding: 8, borderRadius: 8, background: '#f8fafc' };
 const previewImage = { display: 'block', maxWidth: '100%', maxHeight: 420, objectFit: 'contain' as const };
 const closeButton = { border: 0, borderRadius: 6, padding: '7px 10px', cursor: 'pointer' };
+const pickerOption = { display: 'block', width: '100%', padding: '7px 9px', border: 0, background: '#fff', color: '#172033', textAlign: 'left' as const, cursor: 'pointer' };

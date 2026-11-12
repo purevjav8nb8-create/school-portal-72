@@ -12,9 +12,9 @@ import ChatBoard from './records/ChatBoard';
 import SurveyBoard from './records/SurveyBoard';
 import ProfessionalProfilePanel from './records/ProfessionalProfilePanel';
 import FloatingComposer from './records/FloatingComposer';
+import RecordFeedCard from './records/RecordFeedCard';
 import ProgramPlanPanel, { ProgramPlan } from './records/ProgramPlanPanel';
 import EvaluationPanel, { EvaluationRecord } from './records/EvaluationPanel';
-import FileAttachmentActions from './records/FileAttachmentActions';
 import TeachingClassesPanel from './TeachingClassesPanel';
 import { DashboardCategory, Teacher, UserProfile } from '../types';
 import { NotificationCounts } from '../hooks/useNotifications';
@@ -39,7 +39,7 @@ interface Props {
   activities: TeacherActivity[];
   awards: { id: string; name: string; certificate_number: string; certificate_url: string; organization: string; awarded_date?: string; note: string }[];
   degrees: { id: string; name: string; certificate_number: string; certificate_url: string; status: string; issued_date?: string; note: string }[];
-  homeroomEvaluations: (EvaluationRecord & { evaluator?: string })[];
+  homeroomEvaluations: (EvaluationRecord & { evaluator?: string; evaluator_id?: string; evaluator_email?: string })[];
   activeCategory: DashboardCategory;
   selectedMonth: string;
   setSelectedMonth: (month: string) => void;
@@ -97,19 +97,31 @@ export default function TeacherDashboardView({
               <section>
                 <h2 style={{ marginTop: 0 }}>Миний сургалт</h2>
                 <TrainingForm onAddTraining={async (training) => { await onTraining(training); }} />
-                {trainings.length === 0 ? <p>Сургалт бүртгэгдээгүй байна.</p> : [...trainings].sort((left, right) => right.endDate.localeCompare(left.endDate) || right.startDate.localeCompare(left.startDate) || right.createdAt.localeCompare(left.createdAt)).map((item) => (
-                  <div key={item.id} style={{ display: 'grid', gap: 3, padding: '4px 0', borderBottom: '1px solid #e2e8f0' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>{item.name} · {item.trainingType} · {item.startDate} – {item.endDate} · <FileAttachmentActions attachment={{ name: 'Сертификат', url: item.certificateUrl, file_type: item.certificateUrl.toLowerCase().includes('.pdf') ? 'document' : 'image' }} /></div>
-                    {item.imageUrl && <div style={{ marginTop: 1 }}><FileAttachmentActions attachment={{ name: 'Сургалтын зураг', url: item.imageUrl, file_type: 'image' }} /></div>}
-                  </div>
-                ))}
+                {trainings.length === 0
+                  ? <p>Сургалт бүртгэгдээгүй байна.</p>
+                  : <div style={{ display: 'grid', gap: 8 }}>{[...trainings]
+                    .sort((left, right) => right.endDate.localeCompare(left.endDate) || right.startDate.localeCompare(left.startDate) || right.createdAt.localeCompare(left.createdAt))
+                    .map((item) => <RecordFeedCard
+                      key={item.id}
+                      label="Сургалт"
+                      title={item.name}
+                      description={`${item.trainingType} · ${item.startDate} – ${item.endDate}`}
+                      date={item.createdAt}
+                      author={`${user.last_name} ${user.first_name}`}
+                      imageUrl={item.imageUrl}
+                      attachments={[
+                        { name: 'Сертификат', url: item.certificateUrl, file_type: item.certificateUrl.toLowerCase().includes('.pdf') ? 'document' : 'image' },
+                        ...(item.imageUrl ? [{ name: 'Сургалтын зураг', url: item.imageUrl, file_type: 'image' as const }] : []),
+                      ]}
+                    />)}
+                  </div>}
               </section>
             )}
             {activeCategory === 'Үнэлгээ' && (
               <EvaluationPanel unit={user.unit} subjects={user.subjects ?? (user.subject ? [user.subject] : [])} evaluations={evaluations} sharedEvaluations={homeroomEvaluations} onSubmit={onEvaluation} onDelete={onDeleteEvaluation} />
             )}
             {activeCategory === 'Хөтөлбөр' && <ProgramPlanPanel programPlan={programPlan} unit={user.unit} subjects={user.subjects ?? (user.subject ? [user.subject] : [])} onSubmit={onProgramPlan} onDelete={onDeleteProgramPlan} busy={busy} />}
-            {activeCategory === 'Оролцоо' && <ActivityPanel unit={user.unit} subjects={user.subjects ?? (user.subject ? [user.subject] : [])} activities={activities} onSubmit={onActivity} />}
+            {activeCategory === 'Оролцоо' && <ActivityPanel unit={user.unit} subjects={user.subjects ?? (user.subject ? [user.subject] : [])} activities={activities} author={`${user.last_name} ${user.first_name}`.trim() || user.email} onSubmit={onActivity} />}
             {activeCategory === 'Судалгаа' && <SurveyBoard />}
             {activeCategory === 'Чат' && <ChatBoard />}
             {activeCategory === 'Мэдээлэл' && <AnnouncementBoard boardType="Мэдээлэл" />}

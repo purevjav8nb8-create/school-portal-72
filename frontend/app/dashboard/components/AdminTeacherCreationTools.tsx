@@ -6,6 +6,7 @@ import { Teacher } from '../types';
 import FloatingComposer from './records/FloatingComposer';
 import { subjectsForUnit } from './records/ClassFields';
 import { ManagedUser } from './adminTeacherToolsApi';
+import { formatTeacherName } from '../utils/teacherName';
 
 type TeacherDraft = { first_name: string; last_name: string; email: string; unit: Teacher['unit']; subject: string; password: string };
 const actionStyle = { display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '7px 10px', border: 'none', borderRadius: 24, background: '#fb923c', color: '#fff', fontWeight: 600, fontSize: 12, cursor: 'pointer', textAlign: 'left' as const, boxShadow: '0 2px 6px rgba(251, 146, 60, 0.25)' };
@@ -39,7 +40,7 @@ export default function AdminTeacherCreationTools({
     `${item.last_name} ${item.first_name} ${item.email} ${item.role}`.toLocaleLowerCase().includes(userSearch.trim().toLocaleLowerCase())
   );
   const selectedUser = managedUsers.find((item) => item.id === selectedUserId);
-  const userLabel = (item: ManagedUser) => `${item.last_name} ${item.first_name} — ${item.email} (${item.role})`;
+  const userLabel = (item: ManagedUser) => `${formatTeacherName(`${item.last_name} ${item.first_name}`)} — ${item.email} (${item.role})`;
   return <>
     <FloatingComposer title={resetMode ? 'Нууц үг шинэчлэх' : 'Шинэ хэрэглэгч нэмэх'} label="Багш нэмэх" onOpen={() => setResetMode(false)} headerAction={resetMode ? <button type="button" onClick={() => setResetMode(false)} style={{ ...actionStyle, width: 'auto', padding: '6px 9px' }}>Багш нэмэх</button> : <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
       <button type="button" onClick={onDownloadTemplate} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 9px', border: 0, borderRadius: 8, background: '#fb923c', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}><FileUp size={13} /> Загвар файл</button>

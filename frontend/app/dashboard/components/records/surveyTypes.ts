@@ -6,6 +6,8 @@ export type Survey = {
   title: string;
   description: string;
   author?: string;
+  can_view_results?: boolean;
+  can_delete?: boolean;
   questions?: (Partial<SurveyQuestion> | string)[];
   options?: string[];
   target_units: string[];

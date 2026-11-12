@@ -44,6 +44,6 @@ export interface Teacher {
   evaluation_records?: Array<{ grade: number; subject?: string }>;
 }
 
-export type DashboardCategory = 'Ирц' | 'Сургалт' | 'Үнэлгээ' | 'Хөтөлбөр' | 'Оролцоо' | 'Судалгаа' | 'Мэдээлэл' | 'Шагнал' | 'Зэрэг' | 'Хянах' | 'Зар' | 'Чат';
+export type DashboardCategory = 'Ирц' | 'Сургалт' | 'Үнэлгээ' | 'Хөтөлбөр' | 'Оролцоо' | 'Судалгаа' | 'Мэдээлэл' | 'Шагнал' | 'Зэрэг' | 'Хянах' | 'Зар' | 'Чат' | 'Data ашиглалт';
 
 export type ReportGradeBand = 'all' | 'primary' | 'middle' | 'high';

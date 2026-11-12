@@ -25,6 +25,8 @@ export default function TeachingClassesPanel({ unit, initialClasses }: Props) {
   const [selectedClass, setSelectedClass] = useState<TeachingClass | null>(null);
   const [dialog, setDialog] = useState<'actions' | 'edit' | 'delete' | null>(null);
   const [message, setMessage] = useState('');
+  const [homeroomPickerOpen, setHomeroomPickerOpen] = useState(false);
+  const [homeroomDraft, setHomeroomDraft] = useState({ grade: grades[0], section: 'А' });
 
   const persistClasses = async (nextClasses: TeachingClass[]) => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -41,7 +43,11 @@ export default function TeachingClassesPanel({ unit, initialClasses }: Props) {
   };
 
   const addClass = async (close: () => void) => {
-    const nextClasses = [...classes.filter((item) => !(item.grade === draft.grade && item.section === draft.section)), draft];
+    const existing = classes.find((item) => item.grade === draft.grade && item.section === draft.section);
+    const nextClasses = [
+      ...classes.filter((item) => !(item.grade === draft.grade && item.section === draft.section)),
+      { ...draft, homeroom: existing?.homeroom ?? draft.homeroom },
+    ];
     try {
       await persistClasses(nextClasses);
       setClasses(nextClasses);
@@ -94,16 +100,18 @@ export default function TeachingClassesPanel({ unit, initialClasses }: Props) {
     }
   };
 
-  const setHomeroom = async (item: TeachingClass, homeroom: boolean) => {
-    const nextClasses = classes.map((current) =>
-      current.grade === item.grade && current.section === item.section ? { ...current, homeroom } : current,
-    );
+  const saveHomeroomClass = async () => {
+    const existing = classes.find((item) => item.grade === homeroomDraft.grade && item.section === homeroomDraft.section);
+    const nextClasses = existing
+      ? classes.map((item) => item === existing ? { ...item, homeroom: true } : item)
+      : [...classes, { ...homeroomDraft, weekly_hours: 0, homeroom: true }];
     try {
       await persistClasses(nextClasses);
       setClasses(nextClasses);
       setMessage('');
+      setHomeroomPickerOpen(false);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Анги удирдсан төлөв хадгалагдсангүй.');
+      setMessage(error instanceof Error ? error.message : 'АУБ анги хадгалагдсангүй.');
     }
   };
 
@@ -117,11 +125,7 @@ export default function TeachingClassesPanel({ unit, initialClasses }: Props) {
                 <strong style={{ color: '#172554' }}>Одоогийн жагсаалт</strong>
                 {classes.length === 0 ? <p style={{ margin: 0, color: '#64748b' }}>Анги бүртгэгдээгүй байна.</p> : classes.map((item) => (
                   <div key={`${item.grade}-${item.section}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '7px 9px', border: '1px solid #e2e8f0', borderRadius: 7, background: '#f8fafc' }}>
-                    <span>{item.grade}-р анги {item.section} · {item.weekly_hours} цаг</span>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
-                      <input type="checkbox" checked={Boolean(item.homeroom)} onChange={(event) => void setHomeroom(item, event.target.checked)} />
-                      АУБ
-                    </label>
+                    <span>{item.grade}-р анги {item.section} · {item.weekly_hours} цаг{item.homeroom ? ' · АУБ' : ''}</span>
                     <button type="button" onClick={() => void removeClass(item)} aria-label={`${item.grade}-р анги ${item.section} устгах`} title="Анги устгах" style={{ padding: '3px 7px', border: 0, borderRadius: 5, background: '#fee2e2', color: '#b91c1c', cursor: 'pointer' }}>×</button>
                   </div>
                 ))}
@@ -132,6 +136,7 @@ export default function TeachingClassesPanel({ unit, initialClasses }: Props) {
               <label>Бүлэг<select value={draft.section} onChange={(event) => setDraft({ ...draft, section: event.target.value })} style={fieldStyle}>{['А', 'Б', 'В', 'Г', 'Д', 'Е'].map((section) => <option key={section}>{section}</option>)}</select></label>
               <label>7 хоногийн цаг<input type="number" min={1} value={draft.weekly_hours} onChange={(event) => setDraft({ ...draft, weekly_hours: Math.max(1, Number(event.target.value)) })} style={fieldStyle} /></label>
               <button type="button" onClick={() => addClass(close)} style={{ padding: 10, border: 0, borderRadius: 6, background: '#16a34a', color: '#fff' }}>Хадгалах</button>
+              <button type="button" onClick={() => setHomeroomPickerOpen(true)} style={{ padding: 10, border: '1px solid #2563eb', borderRadius: 6, background: '#eff6ff', color: '#1d4ed8', fontWeight: 700, cursor: 'pointer' }}>АУБ анги нэмэх</button>
             </div>
           )}
         </FloatingComposer>
@@ -139,6 +144,17 @@ export default function TeachingClassesPanel({ unit, initialClasses }: Props) {
       <TeachingClassSummary classes={classes} />
       {message && <small role="alert" style={{ display: 'block', marginTop: 6, color: '#b91c1c' }}>{message}</small>}
       {dialog && selectedClass && <TeachingClassDialog unit={unit} selectedClass={selectedClass} dialog={dialog} draft={draft} onDraftChange={setDraft} onDialogChange={setDialog} onSave={saveEdit} onDelete={confirmDelete} />}
+      {homeroomPickerOpen && <div role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setHomeroomPickerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 55, display: 'grid', placeItems: 'center', padding: 16, background: 'rgba(15, 23, 42, .5)' }}>
+        <section role="dialog" aria-modal="true" aria-label="АУБ анги сонгох" style={{ width: 'min(360px, 100%)', display: 'grid', gap: 12, padding: 18, borderRadius: 10, background: '#fff', boxShadow: '0 20px 60px rgba(0,0,0,.25)' }}>
+          <h3 style={{ margin: 0, fontSize: 16 }}>АУБ анги сонгох</h3>
+          <label>Анги<select value={homeroomDraft.grade} onChange={(event) => setHomeroomDraft({ ...homeroomDraft, grade: Number(event.target.value) })} style={fieldStyle}>{grades.map((grade) => <option key={grade} value={grade}>{romanGrade(grade)} анги</option>)}</select></label>
+          <label>Бүлэг<select value={homeroomDraft.section} onChange={(event) => setHomeroomDraft({ ...homeroomDraft, section: event.target.value })} style={fieldStyle}>{['А', 'Б', 'В', 'Г', 'Д', 'Е'].map((section) => <option key={section}>{section}</option>)}</select></label>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <button type="button" onClick={() => setHomeroomPickerOpen(false)} style={{ padding: '7px 10px', border: '1px solid #cbd5e1', borderRadius: 6, background: '#fff', cursor: 'pointer' }}>Болих</button>
+            <button type="button" onClick={() => void saveHomeroomClass()} style={{ padding: '7px 10px', border: 0, borderRadius: 6, background: '#2563eb', color: '#fff', cursor: 'pointer' }}>Сонгох</button>
+          </div>
+        </section>
+      </div>}
     </section>
   );
 }

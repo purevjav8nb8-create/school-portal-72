@@ -7,6 +7,8 @@ The extension autofills four teacher accounts on a fixed list of HTTPS sign-in s
 - Medle Office: Outlook / Microsoft sign-in pages
 - Ih Nüdel LMS: `ub72.nuudelms.mn`
 
+The Portal72 LMS shortcut opens the class list directly; an existing LMS browser session works without this extension. Install the extension only if you want encrypted credential autofill. It does not sign in automatically.
+
 It does not submit login forms. Teachers review the filled values and click **Sign in** themselves. CAPTCHA, MFA, and account-recovery steps remain manual.
 
 ## Credential storage and security

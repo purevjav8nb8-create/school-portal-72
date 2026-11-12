@@ -6,6 +6,7 @@ import { backendBaseUrl, fetchWithAuth } from '../../../../lib/backendApi';
 import { supabase } from '../../../../lib/supabaseClient';
 import LosslessCloudinaryUpload, { uploadCloudinaryFile } from '../../../../components/LosslessCloudinaryUpload';
 import FileAttachmentActions from './FileAttachmentActions';
+import { formatTeacherName } from '../../utils/teacherName';
 
 const apiUrl = backendBaseUrl;
 const evaluationLevels = ['VIII', 'VII', 'VI', 'V', 'IV', 'III', 'II', 'I'] as const;
@@ -41,12 +42,6 @@ type TeacherRecords = {
   professional_degrees: { id: string; name: string; certificate_number: string; certificate_url: string; status: string; issued_date?: string }[];
   evaluations: { id: string; grade: number; section: string; subject: string; level: string; students_count: number; average_score: number; evaluation_date: string }[];
 };
-
-function formatTeacherName(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length < 2) return name.trim();
-  return `${parts[0].charAt(0)}. ${parts.slice(1).join(' ')}`;
-}
 
 interface Props {
   summaryOnly?: boolean;
@@ -225,7 +220,7 @@ export default function AdminReviewPanel({
   };
 
   const evaluationSummary = useMemo(() => {
-    const summary = new Map<string, { levels: Record<string, number>; students: number; weightedScore: number; entries: number; teachers: Set<string> }>();
+    const summary = new Map<string, { levels: Record<string, number>; students: number; weightedScore: number; entries: number; teachers: Map<string, { name: string; email: string }> }>();
     for (const record of records) {
       for (const evaluation of record.evaluations) {
         const grade = Number(evaluation.grade);
@@ -243,8 +238,9 @@ export default function AdminReviewPanel({
           !Number.isFinite(averageScore)
         ) continue;
         const key = `${grade}-${section}-${subject}`;
-        const current = summary.get(key) ?? { levels: {}, students: 0, weightedScore: 0, entries: 0, teachers: new Set<string>() };
-        current.teachers.add(formatTeacherName(record.teacher.name));
+        const current = summary.get(key) ?? { levels: {}, students: 0, weightedScore: 0, entries: 0, teachers: new Map<string, { name: string; email: string }>() };
+        const teacherId = record.user_id || record.teacher.email || record.teacher.name;
+        current.teachers.set(teacherId, { name: formatTeacherName(record.teacher.name), email: record.teacher.email });
         summary.set(key, {
           levels: { ...current.levels, [evaluation.level]: (current.levels[evaluation.level] ?? 0) + studentsCount },
           students: current.students + studentsCount,
@@ -257,12 +253,16 @@ export default function AdminReviewPanel({
     return [...summary.entries()]
       .map(([key, value]) => {
         const [grade, section, ...subjectParts] = key.split('-');
+        const teachers = [...value.teachers.values()];
+        const teacherNameCounts = new Map<string, number>();
+        teachers.forEach((teacher) => teacherNameCounts.set(teacher.name, (teacherNameCounts.get(teacher.name) ?? 0) + 1));
         return {
           grade: Number(grade),
           section,
           subject: subjectParts.join('-'),
           ...value,
-          teacherNames: [...value.teachers].join(', '),
+          teacherNames: teachers.map((teacher) => teacherNameCounts.get(teacher.name) > 1 ? `${teacher.name} (${teacher.email})` : teacher.name).join(', '),
+          teacherCount: value.teachers.size,
           average: value.students ? value.weightedScore / value.students : 0,
         };
       })
@@ -348,7 +348,7 @@ export default function AdminReviewPanel({
             </div>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 12 }}>
-                <thead><tr>{['Анги', ...(!activeSubject ? ['Хичээл'] : []), 'VIII', 'VII', 'VI', 'V', 'IV', 'III', 'II', 'I', 'Нийт', 'Дундаж', 'Багш'].map((label) => <th key={label} style={{ padding: '4px 6px', background: '#fff' }}>{label}</th>)}</tr></thead>
+                <thead><tr>{['Анги', ...(!activeSubject ? ['Хичээл'] : []), 'VIII', 'VII', 'VI', 'V', 'IV', 'III', 'II', 'I', 'Нийт', 'Дундаж', 'Багш (тоо)'].map((label) => <th key={label} style={{ padding: '4px 6px', background: '#fff' }}>{label}</th>)}</tr></thead>
                 <tbody>{activeSubjectSummary.map((item) => (
                   <tr key={`${item.grade}-${item.section}-${item.subject}`} style={{ borderTop: '1px solid #e2e8f0' }}>
                     <td style={{ padding: '4px 6px', fontWeight: 600 }}>{item.grade}-{item.section}</td>
@@ -356,7 +356,7 @@ export default function AdminReviewPanel({
                     {evaluationLevels.map((level) => <td key={level} style={{ padding: '4px 6px' }}>{item.levels[level] ?? 0}</td>)}
                     <td style={{ padding: '4px 6px' }}>{item.students}</td>
                     <td style={{ padding: '4px 6px' }}>{item.average.toFixed(1)}</td>
-                    <td style={{ padding: '4px 6px' }}>{item.teacherNames}</td>
+                    <td style={{ padding: '4px 6px' }}>{item.teacherNames}{item.teacherCount > 0 ? ` (${item.teacherCount})` : ''}</td>
                   </tr>
                 ))}
                 <tr style={{ borderTop: '2px solid #94a3b8', background: '#e2e8f0', fontWeight: 700 }}>
@@ -374,18 +374,21 @@ export default function AdminReviewPanel({
         )}
       </section>}
       {!summaryOnly && submittedRecords.length === 0 && <p>Илгээсэн материал алга.</p>}
-      {!summaryOnly && <div style={{ display: 'grid', gap: 4 }}>
+      {!summaryOnly && <div style={{ display: 'grid', gap: 8 }}>
         {submittedRecords.map((record) => (
-          <article key={record.user_id} style={{ padding: 6, border: '1px solid #bfdbfe', borderRadius: 6, background: '#fff' }}>
-            <h3 style={{ margin: '-6px -6px 3px', padding: '5px 6px', color: '#0f3b78', background: 'linear-gradient(90deg, #dbeafe, #eff6ff)', borderBottom: '1px solid #bfdbfe', borderRadius: '6px 6px 0 0', fontSize: 15 }}>{record.teacher.name}</h3>
-            <p style={{ margin: '0 0 3px', color: '#64748b' }}>{record.teacher.email} · {record.teacher.unit} · {record.teacher.subject}</p>
-            <div style={{ padding: 5, background: '#f8fafc', borderRadius: 5, border: '1px solid #e2e8f0' }}>
-              <strong style={{ display: 'block', margin: '-5px -5px 3px', padding: '4px 5px', color: '#155e75', background: '#cffafe', borderBottom: '1px solid #a5f3fc', borderRadius: '5px 5px 0 0' }}>Хөтөлбөр, төлөвлөгөө</strong>
-              <p style={{ margin: '2px 0' }}><FileAttachmentActions attachment={{ name: 'Хөтөлбөр, төлөвлөгөө.pdf', url: record.program_plan.documentUrl, file_type: 'document' }} /></p>
-              {(record.program_plan.grade || record.program_plan.section || record.program_plan.subject) && <p style={{ margin: '2px 0' }}>{record.program_plan.grade}-р анги {record.program_plan.section} бүлэг · {record.program_plan.subject}</p>}
-              {record.program_plan.note && <p style={{ margin: '2px 0' }}>{record.program_plan.note}</p>}
+          <article key={record.user_id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: 9, border: '1px solid #e2e8f0', borderRadius: 8, background: '#fff' }}>
+            <div style={{ flex: '0 0 112px', minWidth: 0 }}>
+              <FileAttachmentActions attachment={{ name: 'Хөтөлбөр, төлөвлөгөө.pdf', url: record.program_plan.documentUrl, file_type: 'document' }} inlinePreview previewWidth={112} previewHeight={104} />
+            </div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <small style={{ color: '#047857' }}>Хянах · Хөтөлбөр, төлөвлөгөө</small>
+              <h3 style={{ margin: '2px 0 3px', color: '#0f172a', fontSize: 16 }}>{formatTeacherName(record.teacher.name)}</h3>
+              <small style={{ color: '#64748b' }}>{record.teacher.email} · {record.teacher.unit} · {record.teacher.subject}</small>
+              {(record.program_plan.grade || record.program_plan.section || record.program_plan.subject) && <p style={{ margin: '7px 0 3px', color: '#475569' }}>{record.program_plan.grade}-р анги {record.program_plan.section} бүлэг · {record.program_plan.subject}</p>}
+              {record.program_plan.note && <p style={{ margin: '5px 0', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{record.program_plan.note}</p>}
               {record.program_plan.returned && <strong style={{ color: '#b91c1c' }}>Засуулахаар буцаасан</strong>}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+              {record.program_plan.submittedAt && <small style={{ display: 'block', marginTop: 6, color: '#64748b' }}>{new Date(record.program_plan.submittedAt).toLocaleString('mn-MN')} · {formatTeacherName(record.teacher.name)}</small>}
+              <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
                 {record.program_plan.approved && <strong style={{ color: '#15803d' }}>Батлагдсан</strong>}
                 <button
                   type="button"
@@ -412,8 +415,7 @@ export default function AdminReviewPanel({
                   {reviewingPlan === record.user_id ? 'Хадгалж байна...' : 'Устгах'}
                 </button>
               </div>
-            </div>
-            {(record.awards.length > 0 || record.professional_degrees.length > 0) && <div style={{ marginTop: 8, padding: 8, background: '#f8fafc', borderRadius: 8 }}>
+            {(record.awards.length > 0 || record.professional_degrees.length > 0) && <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #e2e8f0' }}>
               <strong>Шагнал, мэргэжлийн зэрэг</strong>
               {record.awards.map((award) => <div key={award.id} style={{ margin: '6px 0' }}>
                 <p style={{ margin: '2px 0' }}>Шагнал: {award.name}{award.certificate_number && ` · №${award.certificate_number}`} {award.organization && `· ${award.organization}`} {award.status === 'Хүсэлт' ? '· Хүсэлт' : null}</p>
@@ -425,6 +427,7 @@ export default function AdminReviewPanel({
               </div>)}
               {record.professional_degrees.map((degree) => <p key={degree.id} style={{ margin: '6px 0' }}>Зэрэг: {degree.name}{degree.certificate_number && ` · №${degree.certificate_number}`} · {degree.status} {degree.certificate_url && <FileAttachmentActions attachment={{ name: 'Үнэмлэх PDF', url: degree.certificate_url, file_type: 'document' }} />}</p>)}
             </div>}
+            </div>
           </article>
         ))}
       </div>}

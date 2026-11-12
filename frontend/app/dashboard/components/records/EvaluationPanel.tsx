@@ -16,7 +16,7 @@ interface Props {
   evaluations: EvaluationRecord[];
   onSubmit: (evaluation: Omit<EvaluationRecord, 'id' | 'createdAt'>) => Promise<void>;
   onDelete: (evaluationId: string) => Promise<void>;
-  sharedEvaluations?: (EvaluationRecord & { evaluator?: string })[];
+  sharedEvaluations?: (EvaluationRecord & { evaluator?: string; evaluator_id?: string; evaluator_email?: string })[];
 }
 
 const inputStyle = { width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: 8, boxSizing: 'border-box' as const };

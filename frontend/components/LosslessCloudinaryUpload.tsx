@@ -91,7 +91,7 @@ export async function uploadCloudinaryFile(file: File, formats: string[]): Promi
   return {
     name: file.name,
     url: result.secure_url,
-    file_type: resourceType === 'image' ? 'image' : 'document',
+    file_type: isPdf || resourceType === 'raw' ? 'document' : 'image',
   };
 }
 

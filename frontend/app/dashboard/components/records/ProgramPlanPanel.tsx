@@ -3,8 +3,8 @@
 import { FormEvent, useState } from 'react';
 import LosslessCloudinaryUpload from '../../../../components/LosslessCloudinaryUpload';
 import ClassFields from './ClassFields';
-import FileAttachmentActions from './FileAttachmentActions';
 import FloatingComposer from './FloatingComposer';
+import RecordFeedCard from './RecordFeedCard';
 
 export type ProgramPlan = {
   documentUrl: string;
@@ -72,15 +72,14 @@ export default function ProgramPlanPanel({ programPlan, unit, subjects, busy: op
         <h2 style={{ margin: 0, fontSize: 22, color: '#172033' }}>Хөтөлбөр, төлөвлөгөө</h2>
         <p style={{ margin: '6px 0 0', color: '#64748b' }}>Материалаа илгээгээд баталгаажуулалтын төлөвөө эндээс харна.</p>
       </header>
-      <div style={{ padding: 16, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8 }}>
-        <span style={{ display: 'inline-flex', padding: '5px 10px', borderRadius: 999, background: programPlan?.approved ? '#dcfce7' : (programPlan?.returned || programPlan?.review_status === 'returned') ? '#fee2e2' : programPlan ? '#fef3c7' : '#e2e8f0', color: programPlan?.approved ? '#166534' : (programPlan?.returned || programPlan?.review_status === 'returned') ? '#b91c1c' : programPlan ? '#92400e' : '#475569', fontWeight: 700, fontSize: 13 }}>
-          {programPlan?.approved ? 'Батлагдсан' : (programPlan?.returned || programPlan?.review_status === 'returned') ? 'Засуулахаар буцаасан' : programPlan ? 'Менежерээр хянагдаж байна' : 'Илгээгээгүй'}
-        </span>
-        {(programPlan?.returned || programPlan?.review_status === 'returned') && <p style={{ margin: '8px 0 0', color: '#b91c1c' }}>Материалаа засварлаад дахин илгээнэ үү.</p>}
-        {programPlan?.documentUrl && <p style={{ margin: '12px 0 0' }}><FileAttachmentActions attachment={{ name: 'Хөтөлбөр, төлөвлөгөө.pdf', url: programPlan.documentUrl, file_type: 'document' }} /></p>}
-        {programPlan && <p style={{ margin: '8px 0 0' }}>{programPlan.grade}-р анги {programPlan.section} бүлэг · {programPlan.subject}</p>}
-        {programPlan?.note && <p style={{ margin: '10px 0 0', color: '#475569' }}>{programPlan.note}</p>}
-        {programPlan && <button
+      <RecordFeedCard
+        label="Хөтөлбөр, төлөвлөгөө"
+        title={programPlan ? `${programPlan.grade}-р анги ${programPlan.section} бүлэг · ${programPlan.subject}` : 'Материал илгээгээгүй'}
+        description={[programPlan?.note, programPlan?.returned || programPlan?.review_status === 'returned' ? 'Материалаа засварлаад дахин илгээнэ үү.' : ''].filter(Boolean).join('\n')}
+        date={programPlan?.submittedAt}
+        status={programPlan?.approved ? 'Батлагдсан' : (programPlan?.returned || programPlan?.review_status === 'returned') ? 'Засуулахаар буцаасан' : programPlan ? 'Менежерээр хянагдаж байна' : 'Илгээгээгүй'}
+        attachments={programPlan?.documentUrl ? [{ name: 'Хөтөлбөр, төлөвлөгөө.pdf', url: programPlan.documentUrl, file_type: 'document' }] : []}
+        action={programPlan && <button
           type="button"
           disabled={busy || operationBusy}
           onClick={async () => {
@@ -91,7 +90,7 @@ export default function ProgramPlanPanel({ programPlan, unit, subjects, busy: op
         >
           {busy || operationBusy ? 'Устгаж байна...' : 'Төлөвлөгөө устгах'}
         </button>}
-      </div>
+      />
       <FloatingComposer title="Хөтөлбөр, төлөвлөгөө оруулах" label="Хөтөлбөр, төлөвлөгөө оруулах">
       {(close) => <form onSubmit={async (event) => { await submit(event); if (documentUrl && grade && section && subject) close(); }} style={{ display: 'grid', gap: 12, padding: 16, border: '1px solid #e2e8f0', borderRadius: 8 }}>
         <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, fontFamily: 'Arial, sans-serif' }}>Хөтөлбөр илгээх</h3>

@@ -9,9 +9,6 @@ from services.teacher_portal import teacher_portal_data
 from services.school_surveys_common import _survey_owner
 
 def export_survey_xlsx(current_user, survey_id: str) -> tuple[bytes, str]:
-    if not _is_admin(current_user):
-        raise HTTPException(status_code=403, detail="Энэ үйлдлийг зөвхөн админ хийх боломжтой.")
-
     users = supabase.auth.admin.list_users(per_page=1000)
     admin = _survey_owner(users)
     if admin is None:
@@ -23,6 +20,10 @@ def export_survey_xlsx(current_user, survey_id: str) -> tuple[bytes, str]:
     )
     if survey is None:
         raise HTTPException(status_code=404, detail="Судалгаа олдсонгүй.")
+    if str(survey.get("created_by", "")) != str(current_user.id) and "created_by" in survey:
+        raise HTTPException(status_code=403, detail="Энэ судалгааны нэгтгэлийг зөвхөн оруулсан хэрэглэгч харах боломжтой.")
+    if "created_by" not in survey and not _is_admin(current_user):
+        raise HTTPException(status_code=403, detail="Энэ судалгааны нэгтгэлийг зөвхөн оруулсан хэрэглэгч харах боломжтой.")
 
     questions = survey.get("questions", [])
     if not questions:
@@ -47,8 +48,6 @@ def export_survey_xlsx(current_user, survey_id: str) -> tuple[bytes, str]:
     counts: dict[int, dict[str, int]] = {}
 
     for user in users:
-        if _is_admin(user):
-            continue
         responses = [
             response
             for response in teacher_portal_data(user).get("survey_responses", [])

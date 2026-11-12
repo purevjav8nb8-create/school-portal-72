@@ -1,6 +1,6 @@
 from datetime import date
 
-from pydantic import BaseModel, Field, ValidationInfo, field_validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 
 TRAINING_TYPES = {"Үндсэн", "Төрөлжсөн", "Сонголтот", "Ажлын байран дээрх сургалт", "Бусад"}
 
@@ -100,8 +100,14 @@ class AttendanceUpdate(BaseModel):
 class TeachingClass(BaseModel):
     grade: int = Field(ge=1, le=12)
     section: str = Field(min_length=1, max_length=1)
-    weekly_hours: int = Field(ge=1)
+    weekly_hours: int = Field(ge=0)
     homeroom: bool = False
+
+    @model_validator(mode="after")
+    def validate_zero_hours(self):
+        if self.weekly_hours == 0 and not self.homeroom:
+            raise ValueError("0 цагтай анги зөвхөн АУБ анги байж болно.")
+        return self
 
 
 class TeachingClassesUpdate(BaseModel):

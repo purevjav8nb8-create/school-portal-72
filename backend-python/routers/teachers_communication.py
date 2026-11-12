@@ -4,8 +4,8 @@ from schemas.school_chat import ChatMessageCreate, ChatReadRequest
 from schemas.teacher_records import AnnouncementCreate, SurveyCreate, SurveyResponseCreate, SurveySubmissionCreate
 from services.school_announcements import create_announcement, list_announcements
 from services.school_chat import create_chat_message, list_chat_conversations, list_chat_messages, list_chat_users, mark_chat_read
-from services.school_surveys import create_survey, export_survey_xlsx, list_surveys, respond_survey, submit_survey
-from services.teacher_auth import get_authenticated_user, require_admin, require_teacher
+from services.school_surveys import create_survey, delete_survey, export_survey_xlsx, list_surveys, respond_survey, submit_survey
+from services.teacher_auth import get_authenticated_user
 
 router = APIRouter()
 
@@ -59,7 +59,7 @@ def get_surveys(authorization: str | None = Header(default=None)):
 
 @router.get("/surveys/{survey_id}/export")
 def download_survey_xlsx(survey_id: str, authorization: str | None = Header(default=None)):
-    content, filename = export_survey_xlsx(require_admin(authorization), survey_id)
+    content, filename = export_survey_xlsx(get_authenticated_user(authorization), survey_id)
     return Response(
         content=content,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -70,10 +70,15 @@ def download_survey_xlsx(survey_id: str, authorization: str | None = Header(defa
 def publish_survey(survey: SurveyCreate, authorization: str | None = Header(default=None)):
     return {"survey": create_survey(get_authenticated_user(authorization), survey)}
 
+@router.delete("/surveys/{survey_id}")
+def remove_survey(survey_id: str, authorization: str | None = Header(default=None)):
+    delete_survey(get_authenticated_user(authorization), survey_id)
+    return {"deleted": True}
+
 @router.post("/surveys/{survey_id}/responses")
 def submit_survey_response(survey_id: str, response: SurveyResponseCreate, authorization: str | None = Header(default=None)):
-    return {"response": respond_survey(require_teacher(authorization), survey_id, response)}
+    return {"response": respond_survey(get_authenticated_user(authorization), survey_id, response)}
 
 @router.post("/surveys/{survey_id}/submit")
 def submit_survey_answers(survey_id: str, submission: SurveySubmissionCreate, authorization: str | None = Header(default=None)):
-    return {"responses": submit_survey(require_teacher(authorization), survey_id, submission)}
+    return {"responses": submit_survey(get_authenticated_user(authorization), survey_id, submission)}

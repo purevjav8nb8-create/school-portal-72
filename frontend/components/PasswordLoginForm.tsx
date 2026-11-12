@@ -29,7 +29,9 @@ export default function PasswordLoginForm() {
           body: JSON.stringify({ email: loginEmail, password }),
         });
         if (!mockResponse.ok) {
-          setErrorMessage(error.message);
+          setErrorMessage(error.message === 'Invalid login credentials'
+            ? 'Нэвтрэх нэр эсвэл нууц үг буруу байна. Бүртгэлээ админаар шалгуулна уу.'
+            : error.message);
           return;
         }
         const mockSession = await mockResponse.json() as { access_token: string };
@@ -62,10 +64,11 @@ export default function PasswordLoginForm() {
           Нэвтрэх нэр эсвэл И-мэйл:
           <input
             type="text"
-            placeholder="teacher@moes.edu.mn"
+            placeholder="@moes.edu.mn хаягаа оруулна уу"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             required
+            className="login-input"
             style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
           />
         </label>
@@ -78,6 +81,7 @@ export default function PasswordLoginForm() {
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               required
+              className="login-input login-password-input"
               style={{ width: '100%', padding: '12px 48px 12px 12px', borderRadius: 8, border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
             />
             <button

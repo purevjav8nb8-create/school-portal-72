@@ -4,6 +4,7 @@ from services.school_survey_listing import list_surveys
 from services.school_survey_mutations import (
     _validated_answer,
     create_survey,
+    delete_survey,
     respond_survey,
     submit_survey,
 )
@@ -15,6 +16,7 @@ __all__ = [
     "_survey_owner",
     "_validated_answer",
     "create_survey",
+    "delete_survey",
     "export_survey_xlsx",
     "list_surveys",
     "respond_survey",

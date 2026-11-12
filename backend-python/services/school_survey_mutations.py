@@ -4,6 +4,7 @@ from uuid import uuid4
 from fastapi import HTTPException
 from database import supabase
 from schemas.teacher_records import SurveyCreate, SurveyResponseCreate, SurveySubmissionCreate
+from services.school_announcements import _is_admin
 from services.teacher_portal import save_teacher_portal_data, teacher_portal_data
 from services.school_surveys_common import _survey_is_open, _survey_owner
 from services.school_survey_listing import list_surveys
@@ -15,6 +16,7 @@ def create_survey(user, survey: SurveyCreate) -> dict[str, Any]:
         "target_units": survey.target_units,
         "starts_at": survey.starts_at.isoformat(), "ends_at": survey.ends_at.isoformat(),
         "createdAt": datetime.now(timezone.utc).isoformat(), "responses": [],
+        "created_by": str(user.id),
         "author": f'{(user.user_metadata or {}).get("last_name", "")} {(user.user_metadata or {}).get("first_name", "")}'.strip() or user.email or "",
     }
     try:
@@ -30,6 +32,25 @@ def create_survey(user, survey: SurveyCreate) -> dict[str, Any]:
     except Exception as error:
         raise HTTPException(status_code=503, detail="Судалгааг хадгалж чадсангүй.") from error
     return item
+
+def delete_survey(user, survey_id: str) -> None:
+    try:
+        admin = _survey_owner(supabase.auth.admin.list_users(per_page=1000))
+        if admin is None:
+            raise HTTPException(status_code=503, detail="Судалгааны эзэмшигч олдсонгүй.")
+        admin_metadata = dict(admin.app_metadata or {})
+        surveys = admin_metadata.get("school_surveys", [])
+        survey = next((item for item in surveys if str(item.get("id")) == survey_id), None)
+        if survey is None:
+            raise HTTPException(status_code=404, detail="Судалгаа олдсонгүй.")
+        if str(survey.get("created_by", "")) != str(user.id) and not _is_admin(user):
+            raise HTTPException(status_code=403, detail="Судалгааг зөвхөн оруулсан хүн эсвэл админ устгах боломжтой.")
+        admin_metadata["school_surveys"] = [item for item in surveys if str(item.get("id")) != survey_id]
+        supabase.auth.admin.update_user_by_id(admin.id, {"app_metadata": admin_metadata})
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(status_code=503, detail="Судалгааг устгаж чадсангүй.") from error
 
 def _validated_answer(survey: dict[str, Any], response: SurveyResponseCreate) -> Any:
     questions = survey.get("questions", [])

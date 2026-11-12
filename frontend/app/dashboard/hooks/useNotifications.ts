@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { backendBaseUrl } from '../../../lib/backendApi';
 import { supabase } from '../../../lib/supabaseClient';
 import { DashboardCategory } from '../types';
@@ -19,8 +19,9 @@ export function useNotifications(
   const [items, setItems] = useState<NotificationItem[]>(personalItems);
   const [counts, setCounts] = useState<NotificationCounts>({});
   const [errorMessage, setErrorMessage] = useState('');
-  const [userScope, setUserScope] = useState('unknown');
-  const storageKey = typeof window === 'undefined' ? '' : `school-portal-notifications-${role}-${userScope}`;
+  const activeStorageKey = useRef('');
+  const itemsLoaded = useRef(false);
+  const pendingReadCategories = useRef(new Set<DashboardCategory>());
 
   const load = useCallback(async () => {
     if (!enabled) return;
@@ -31,16 +32,25 @@ export function useNotifications(
       if (!accessToken) return;
       const currentScope = session?.user.id ?? mockToken?.replace(/^mock:/, '') ?? 'unknown';
       const currentStorageKey = `school-portal-notifications-${role}-${currentScope}`;
-      setUserScope(currentScope);
+      if (activeStorageKey.current !== currentStorageKey) itemsLoaded.current = false;
+      activeStorageKey.current = currentStorageKey;
       const unique = await fetchNotificationItems(role, personalItems, accessToken);
       const read = readReadItems(currentStorageKey);
+      pendingReadCategories.current.forEach((category) => {
+        unique.filter((item) => item.category === category).forEach((item) => read.add(`${category}:${item.id}`));
+      });
+      if (pendingReadCategories.current.size > 0) {
+        window.localStorage.setItem(currentStorageKey, JSON.stringify([...read]));
+        pendingReadCategories.current.clear();
+      }
       setItems(unique);
       setCounts(countUnreadItems(unique, read));
+      itemsLoaded.current = true;
       setErrorMessage('');
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Мэдэгдэл уншигдсангүй.');
     }
-  }, [enabled, personalItems, role, storageKey]);
+  }, [enabled, personalItems, role]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -68,11 +78,16 @@ export function useNotifications(
   }, [enabled, load]);
 
   const markRead = useCallback((category: DashboardCategory) => {
-    const read = readReadItems(storageKey);
+    const currentStorageKey = activeStorageKey.current;
+    if (!currentStorageKey || !itemsLoaded.current) {
+      pendingReadCategories.current.add(category);
+      return;
+    }
+    const read = readReadItems(currentStorageKey);
     items.filter((item) => item.category === category).forEach((item) => read.add(`${category}:${item.id}`));
-    window.localStorage.setItem(storageKey, JSON.stringify([...read]));
+    window.localStorage.setItem(currentStorageKey, JSON.stringify([...read]));
     setCounts((current) => ({ ...current, [category]: 0 }));
-  }, [items, storageKey]);
+  }, [items]);
 
   return { counts, errorMessage, markRead };
 }

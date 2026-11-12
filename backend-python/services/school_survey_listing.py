@@ -16,22 +16,33 @@ def list_surveys(current_user) -> list[dict[str, Any]]:
     except Exception as error:
         raise HTTPException(status_code=503, detail="Судалгаа уншигдсангүй.") from error
     surveys = (admin.app_metadata or {}).get("school_surveys", [])
+    manageable_survey_ids = {
+        str(item.get("id"))
+        for item in surveys
+        if (
+            str(item.get("created_by", "")) == str(current_user.id)
+            or ("created_by" not in item and _is_admin(current_user))
+        )
+    }
     unit = str((current_user.user_metadata or {}).get("unit", "")).strip().upper()
     if not _is_admin(current_user):
-        surveys = [item for item in surveys if not item.get("target_units") or unit in item["target_units"]]
+        surveys = [
+            item for item in surveys
+            if str(item.get("created_by", "")) == str(current_user.id)
+            or not item.get("target_units")
+            or unit in item["target_units"]
+        ]
     own_responses = {
         f'{item.get("survey_id")}:{item.get("question_index", 0)}': item.get("option", item.get("answer"))
         for item in teacher_portal_data(current_user).get("survey_responses", [])
     }
     response_users: dict[str, dict[str, str]] = {}
     response_summary: dict[str, dict[str, dict[str, int]]] = {}
-    if _is_admin(current_user):
+    if manageable_survey_ids:
         for user in users:
-            if _is_admin(user):
-                continue
             for response in teacher_portal_data(user).get("survey_responses", []):
                 survey_id = str(response.get("survey_id", ""))
-                if survey_id:
+                if survey_id in manageable_survey_ids:
                     metadata = user.user_metadata or {}
                     teacher_name = f'{metadata.get("last_name", "")} {metadata.get("first_name", "")}'.strip() or user.email or "Нэргүй багш"
                     response_users.setdefault(survey_id, {})[str(user.id)] = teacher_name
@@ -50,4 +61,9 @@ def list_surveys(current_user) -> list[dict[str, Any]]:
         "respondent_names": sorted(set(response_users.get(str(item["id"]), {}).values())),
         "response_summary": response_summary.get(str(item["id"]), {}),
         "accepts_responses": _survey_is_open(item),
+        "can_view_results": str(item.get("id")) in manageable_survey_ids,
+        "can_delete": (
+            str(item.get("created_by", "")) == str(current_user.id)
+            or _is_admin(current_user)
+        ),
     } for item in surveys]

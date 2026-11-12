@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { UserProfile } from '../types';
 import ChangePasswordDialog from './ChangePasswordDialog';
+import { formatTeacherName } from '../utils/teacherName';
 
 interface Props {
   user: UserProfile | null;
@@ -77,7 +78,7 @@ export default function Header({
           gap: '16px',
         }}
       >
-        {user && (
+        {user && user.role !== 'teacher' && (
           <button type="button" onClick={() => setPasswordDialog(true)} style={{ border: '1px solid #bfdbfe', borderRadius: 8, padding: '6px 8px', background: '#fff', color: '#1d4ed8', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
             Нууц үг солих
           </button>
@@ -92,7 +93,7 @@ export default function Header({
                 color: '#1e293b',
               }}
             >
-              👤 {user.last_name} {user.first_name}
+              👤 {formatTeacherName(`${user.last_name} ${user.first_name}`)}
             </span>
 
             <small
@@ -123,7 +124,7 @@ export default function Header({
           Гарах
         </button>
       </div>
-      <ChangePasswordDialog open={passwordDialog} onClose={() => setPasswordDialog(false)} />
+      {user && user.role !== 'teacher' && <ChangePasswordDialog open={passwordDialog} onClose={() => setPasswordDialog(false)} />}
     </div>
   );
 }

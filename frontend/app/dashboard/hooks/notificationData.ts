@@ -5,15 +5,16 @@ export type NotificationItem = { id: string; category: DashboardCategory };
 
 type AnnouncementRecord = { id?: string };
 type SurveyRecord = { id?: string; response_ids?: string[] };
+type UpdatedRecord = { id?: string; createdAt?: string; submittedAt?: string; reviewedAt?: string; updatedAt?: string };
 type TeacherRecord = {
   user_id?: string;
   trainings?: { id?: string }[];
-  evaluations?: { id?: string }[];
-  activities?: { id?: string }[];
-  awards?: { id?: string }[];
-  professional_degrees?: { id?: string }[];
+  evaluations?: { id?: string; createdAt?: string; evaluation_date?: string }[];
+  activities?: UpdatedRecord[];
+  awards?: UpdatedRecord[];
+  professional_degrees?: UpdatedRecord[];
   teaching_classes_updated_at?: string;
-  program_plan?: { id?: string; submittedAt?: string };
+  program_plan?: UpdatedRecord;
 };
 
 const categories: DashboardCategory[] = ['Мэдээлэл', 'Зар', 'Судалгаа', 'Үнэлгээ', 'Сургалт', 'Шагнал', 'Зэрэг', 'Хянах', 'Чат'];
@@ -86,13 +87,38 @@ export async function fetchNotificationItems(
       const addRecords = (records: { id?: string }[] | undefined, category: DashboardCategory) =>
         records?.forEach((item) => { if (item.id) nextItems.push({ id: `${record.user_id}:${item.id}`, category }); });
       addRecords(record.trainings, 'Сургалт');
-      addRecords(record.evaluations, 'Үнэлгээ');
-      addRecords(record.activities, 'Хянах');
-      addRecords(record.awards, 'Хянах');
-      addRecords(record.professional_degrees, 'Хянах');
-      if (record.teaching_classes_updated_at) nextItems.push({ id: `${record.user_id}:classes:${record.teaching_classes_updated_at}`, category: 'Хянах' });
-      const planId = record.program_plan?.id ?? record.program_plan?.submittedAt;
-      if (planId) nextItems.push({ id: `${record.user_id}:${planId}`, category: 'Хянах' });
+      if (record.evaluations?.length) {
+        const latestEvaluation = [...record.evaluations].sort((left, right) =>
+          String(right.createdAt ?? right.evaluation_date ?? right.id ?? '')
+            .localeCompare(String(left.createdAt ?? left.evaluation_date ?? left.id ?? '')),
+        )[0];
+        nextItems.push({
+          id: `${record.user_id}:evaluations:${latestEvaluation.createdAt ?? latestEvaluation.evaluation_date ?? latestEvaluation.id ?? 'existing'}`,
+          category: 'Үнэлгээ',
+        });
+      }
+      const reviewUpdates = [
+        ...(record.activities ?? []),
+        ...(record.awards ?? []),
+        ...(record.professional_degrees ?? []),
+        ...(record.program_plan ? [record.program_plan] : []),
+        ...(record.teaching_classes_updated_at
+          ? [{ id: record.teaching_classes_updated_at, updatedAt: record.teaching_classes_updated_at }]
+          : []),
+      ].flatMap((item) => {
+        const id = item.id ?? item.submittedAt ?? item.createdAt ?? item.updatedAt;
+        if (!id) return [];
+        return [{ id, timestamp: item.updatedAt ?? item.submittedAt ?? item.createdAt ?? id }];
+      });
+      const latestReviewUpdate = reviewUpdates.sort((left, right) =>
+        right.timestamp.localeCompare(left.timestamp) || right.id.localeCompare(left.id),
+      )[0];
+      if (latestReviewUpdate) {
+        nextItems.push({
+          id: `${record.user_id}:${latestReviewUpdate.id}`,
+          category: 'Хянах',
+        });
+      }
     });
   }
 

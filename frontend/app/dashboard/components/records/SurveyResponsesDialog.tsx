@@ -1,6 +1,7 @@
 'use client';
 
 import { Survey, normalizeQuestion } from './surveyTypes';
+import { formatTeacherName } from '../../utils/teacherName';
 
 export default function SurveyResponsesDialog({
   survey,
@@ -25,7 +26,7 @@ export default function SurveyResponsesDialog({
       </div>
       <section>
         <strong>Хариултын нэгтгэл · {survey.response_ids?.length ?? 0} багш</strong>
-        {!!survey.respondent_names?.length && <p style={{ margin: '6px 0', fontSize: 13 }}><strong>Хариулсан багш:</strong> {survey.respondent_names.join(', ')}</p>}
+        {!!survey.respondent_names?.length && <p style={{ margin: '6px 0', fontSize: 13 }}><strong>Хариулсан багш:</strong> {survey.respondent_names.map(formatTeacherName).join(', ')}</p>}
         {questions.map((question, index) => {
           const normalized = normalizeQuestion(question, survey.options);
           const counts = survey.response_summary?.[index] ?? {};

@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from 'react';
 import LosslessCloudinaryUpload from '../../../../components/LosslessCloudinaryUpload';
+import RecordFeedCard from './RecordFeedCard';
 
 type Award = { id: string; name: string; certificate_number: string; certificate_url: string; organization: string; status?: string; application_url?: string; meeting_minutes_url?: string; reference_url?: string; justification?: string; awarded_date?: string };
 type Degree = { id: string; name: string; certificate_number: string; certificate_url: string; status: string; issued_date?: string };
@@ -123,7 +124,23 @@ export default function ProfessionalProfilePanel({ mode, awards, degrees, onSave
             <button type="submit">Шагнал хадгалах</button>
           </form>
           <button type="button" onClick={() => setRequestOpen('award')} style={{ marginTop: 12, padding: '8px 12px', border: 0, borderRadius: 6, background: '#2563eb', color: '#fff', cursor: 'pointer' }}>Шагналд хүсэлт гаргах</button>
-          {awards.map((item) => <p key={item.id}>Шагнал: {item.name}{item.certificate_number && ` · №${item.certificate_number}`}{item.status === 'Хүсэлт' ? ' · Хүсэлт' : ''}</p>)}
+          <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
+            {awards.map((item) => <RecordFeedCard
+              key={item.id}
+              label="Шагнал"
+              title={item.name}
+              description={item.justification}
+              metadata={[item.certificate_number && `№${item.certificate_number}`, item.organization].filter(Boolean).join(' · ')}
+              date={item.awarded_date}
+              status={item.status}
+              attachments={[
+                ...(item.certificate_url ? [{ name: 'Үнэмлэх PDF', url: item.certificate_url, file_type: 'document' as const }] : []),
+                ...(item.application_url ? [{ name: 'Анкет PDF', url: item.application_url, file_type: 'document' as const }] : []),
+                ...(item.meeting_minutes_url ? [{ name: 'Хурлын протокол PDF', url: item.meeting_minutes_url, file_type: 'document' as const }] : []),
+                ...(item.reference_url ? [{ name: 'Тодорхойлолт PDF', url: item.reference_url, file_type: 'document' as const }] : []),
+              ]}
+            />)}
+          </div>
           {requestOpen === 'award' && <div role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setRequestOpen(null); }} style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'grid', placeItems: 'center', padding: 16, background: 'rgba(15, 23, 42, 0.55)' }}>
             <section role="dialog" aria-modal="true" aria-label="Шагналын хүсэлт" style={{ width: 'min(560px, 100%)', maxHeight: '85vh', overflowY: 'auto', padding: 20, background: '#fff', borderRadius: 12, boxShadow: '0 20px 60px rgba(15, 23, 42, 0.3)' }}>
               <h3 style={{ margin: '0 0 14px' }}>Шагналд хүсэлт гаргах</h3>
@@ -183,7 +200,17 @@ export default function ProfessionalProfilePanel({ mode, awards, degrees, onSave
             <button type="submit">Зэрэг бүртгэх</button>
           </form>
           <button type="button" onClick={() => setRequestOpen('degree')} style={{ marginTop: 12, padding: '8px 12px', border: 0, borderRadius: 6, background: '#2563eb', color: '#fff', cursor: 'pointer' }}>Хүсэлт гаргах</button>
-          {degrees.map((item) => <p key={item.id}>Зэрэг: {item.name}{item.certificate_number && ` · №${item.certificate_number}`} · {item.status}</p>)}
+          <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
+            {degrees.map((item) => <RecordFeedCard
+              key={item.id}
+              label="Мэргэжлийн зэрэг"
+              title={item.name}
+              metadata={item.certificate_number ? `№${item.certificate_number}` : ''}
+              date={item.issued_date}
+              status={item.status}
+              attachments={item.certificate_url ? [{ name: 'Зэргийн үнэмлэх PDF', url: item.certificate_url, file_type: 'document' }] : []}
+            />)}
+          </div>
           {requestOpen === 'degree' && <div role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setRequestOpen(null); }} style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'grid', placeItems: 'center', padding: 16, background: 'rgba(15, 23, 42, 0.55)' }}>
             <section role="dialog" aria-modal="true" aria-label="Мэргэжлийн зэргийн хүсэлт" style={{ width: 'min(460px, 100%)', padding: 20, background: '#fff', borderRadius: 12, boxShadow: '0 20px 60px rgba(15, 23, 42, 0.3)' }}>
               <h3 style={{ margin: '0 0 14px' }}>Зэрэг хүсэх</h3>

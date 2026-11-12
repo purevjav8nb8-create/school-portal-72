@@ -3,13 +3,14 @@
 import { useEffect, useState } from 'react';
 import { backendBaseUrl, fetchWithAuth } from '../../../../lib/backendApi';
 import { supabase } from '../../../../lib/supabaseClient';
-import FileAttachmentActions from './FileAttachmentActions';
+import ActivityFeed, { ActivityFeedItem } from './ActivityFeed';
 
 type Activity = {
   id: string;
   category: string;
   title: string;
   date: string;
+  submittedAt?: string;
   note: string;
   attachments?: { name: string; url: string; file_type: 'image' | 'document' }[];
   images?: string[];
@@ -54,27 +55,21 @@ export default function AdminActivityPanel() {
 
   useEffect(() => { void loadRecords(); }, []);
 
-  const activities = records.flatMap((record) => record.activities.map((activity) => ({ record, activity })));
+  const activities: ActivityFeedItem[] = records.flatMap((record) => record.activities.map((activity) => ({
+    ...activity,
+    id: `${record.user_id}-${activity.id}`,
+    author: record.teacher.name || record.teacher.email,
+  }))).sort((left, right) => (right.submittedAt ?? right.date).localeCompare(left.submittedAt ?? left.date));
 
   return (
     <section style={{ display: 'grid', gap: 12 }}>
       <h2 style={{ margin: 0 }}>Оролцоо</h2>
       {errorMessage && <p role="alert" style={{ color: '#b91c1c' }}>{errorMessage}</p>}
-      {loading ? <p>Оролцооны мэдээлэл ачаалж байна...</p> : activities.length === 0 ? <p>Одоогоор оролцооны мэдээлэл алга.</p> : (
-        <div style={{ display: 'grid', gap: 10 }}>
-          {activities.map(({ record, activity }) => (
-            <article key={`${record.user_id}-${activity.id}`} style={{ padding: 12, border: '1px solid #e2e8f0', borderRadius: 10 }}>
-              <strong>{activity.category}: {activity.title}</strong>
-              <p style={{ margin: '6px 0', color: '#475569' }}>{record.teacher.name} · {record.teacher.email} · {record.teacher.unit}</p>
-              <p style={{ margin: '6px 0' }}>{activity.date}{activity.note ? ` · ${activity.note}` : ''}</p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {(activity.attachments ?? []).map((attachment) => <FileAttachmentActions key={attachment.url} attachment={attachment} />)}
-                {(activity.images ?? []).map((url) => <FileAttachmentActions key={url} attachment={{ name: 'Зураг', url, file_type: 'image' }} />)}
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
+      {loading
+        ? <p>Оролцооны мэдээлэл ачаалж байна...</p>
+        : activities.length === 0
+          ? <p>Одоогоор оролцооны мэдээлэл алга.</p>
+          : <ActivityFeed activities={activities} />}
     </section>
   );
 }

@@ -13,6 +13,7 @@ import ChatBoard from './records/ChatBoard';
 import SurveyBoard from './records/SurveyBoard';
 import TeacherDetailModal from './TeacherDetailModal';
 import AdminTrainingPanel from './AdminTrainingPanel';
+import DataUsagePanel from './DataUsagePanel';
 import { DashboardCategory, ReportGradeBand, Teacher, UserProfile } from '../types';
 import { NotificationCounts } from '../hooks/useNotifications';
 
@@ -84,7 +85,7 @@ export default function AdminDashboardView({
   return (
     <main className="dashboard-compact" style={{ height: '100vh', overflow: 'hidden', backgroundColor: '#f8fafc', padding: 6 }}>
       <Header user={user} onLogout={onLogout} />
-      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '150px minmax(0, 1fr) 180px', gap: 8, marginTop: 7, height: 'calc(100vh - 100px)', alignItems: 'start' }}>
+      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '150px minmax(0, 1fr) 180px', gap: 8, marginTop: 7, height: 'calc(100vh - 100px)', alignItems: 'stretch' }}>
         <aside style={{ overflow: 'hidden' }}>
           <SideMenu
             activeCategory={activeCategory}
@@ -129,11 +130,12 @@ export default function AdminDashboardView({
               selectedSubject={reportSubject}
               setSelectedSubject={setReportSubject}
             />}
-            {activeCategory === 'Судалгаа' && <SurveyBoard isAdmin />}
+            {activeCategory === 'Судалгаа' && <SurveyBoard />}
             {activeCategory === 'Чат' && <ChatBoard isAdmin />}
             {activeCategory === 'Мэдээлэл' && <AnnouncementBoard boardType="Мэдээлэл" />}
             {activeCategory === 'Оролцоо' && <AdminActivityPanel />}
             {activeCategory === 'Зар' && <AnnouncementBoard boardType="Зар" />}
+            {activeCategory === 'Data ашиглалт' && <DataUsagePanel />}
           </div>
         </section>
         <QuickActions
@@ -142,6 +144,8 @@ export default function AdminDashboardView({
           month={selectedMonth}
           gradeBand={reportGradeBand}
           subject={reportSubject}
+          showDataUsageButton
+          onDataUsageClick={() => (onCategoryChange ?? setActiveCategory)('Data ашиглалт')}
         />
       </div>
       <TeacherDetailModal teacher={selectedTeacher} selectedMonth={selectedMonth} onClose={onCloseTeacher} onTeacherUpdated={onTeacherUpdated} />
