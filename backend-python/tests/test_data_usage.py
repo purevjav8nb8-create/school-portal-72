@@ -130,6 +130,23 @@ class DataUsageTests(unittest.TestCase):
 
         asyncio.run(run_test())
 
+    def test_render_empty_metric_values_return_no_data(self):
+        async def run_test():
+            async def handler(_request):
+                return httpx.Response(200, json=[{"unit": "GB", "values": []}])
+
+            with patch.dict(os.environ, {
+                "RENDER_API_KEY": "test-key",
+                "RENDER_RESOURCE_ID": "srv-test",
+            }):
+                async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+                    result = await _render(client)
+
+            self.assertEqual(result["status"], "no_data")
+            self.assertEqual(result["metrics"], [])
+
+        asyncio.run(run_test())
+
     def test_render_converts_bandwidth_megabytes_to_gigabytes(self):
         async def run_test():
             async def handler(request):

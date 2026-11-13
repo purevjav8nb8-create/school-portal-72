@@ -351,6 +351,8 @@ async def _render(client: httpx.AsyncClient) -> dict[str, Any]:
                 running_total += value
                 value = running_total
             points.append({"date": date, "value": value})
+        if not points:
+            return None
         metric = {
             "name": name,
             "unit": metric_unit,
@@ -359,7 +361,7 @@ async def _render(client: httpx.AsyncClient) -> dict[str, Any]:
         }
         if limit is not None:
             metric["limit"] = limit
-        return metric if points else None
+        return metric
 
     try:
         metrics = [metric for metric in await asyncio.gather(*(fetch_metric(*definition) for definition in definitions)) if metric]
