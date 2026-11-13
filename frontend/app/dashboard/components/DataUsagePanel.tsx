@@ -22,6 +22,15 @@ type VercelMonthlyUsage = {
   updated_at: string | null;
 };
 
+type VercelWebAnalytics = {
+  month: string;
+  status: UsageProvider['status'];
+  pageviews: number | null;
+  visitors: number | null;
+  updated_at: string | null;
+  message: string | null;
+};
+
 type VercelMonthlyUsageDraft = {
   fast_data_transfer_gb: string;
   fast_origin_transfer_gb: string;
@@ -146,15 +155,19 @@ function MetricProgress({ metric }: { metric: UsageMetric }) {
 
 function VercelMonthlyUsageCard({
   usage,
+  analytics,
   loading,
+  analyticsLoading,
   error,
-  onRefresh,
+  analyticsError,
   onSaved,
 }: {
   usage: VercelMonthlyUsage | null;
+  analytics: VercelWebAnalytics | null;
   loading: boolean;
+  analyticsLoading: boolean;
   error: string;
-  onRefresh: () => void;
+  analyticsError: string;
   onSaved: (usage: VercelMonthlyUsage) => void;
 }) {
   const [draft, setDraft] = useState<VercelMonthlyUsageDraft | null>(null);
@@ -212,17 +225,12 @@ function VercelMonthlyUsageCard({
         <div>
           <h3 style={{ margin: 0, color: '#0f172a', fontSize: 16 }}>Vercel сарын хэрэглээ</h3>
           <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: 12 }}>
-            {usage ? `${usage.month} · Vercel Usage хуудаснаас утгыг гараар оруулна.` : 'Энэ сарын Vercel Usage утгууд.'}
+            {usage ? `${usage.month} · Хадгалсан утгууд автоматаар харагдана.` : 'Энэ сарын Vercel Usage утгууд.'}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button type="button" onClick={onRefresh} disabled={loading} style={{ border: '1px solid #cbd5e1', borderRadius: 7, padding: '7px 10px', background: '#fff', color: '#334155', fontWeight: 600, cursor: loading ? 'wait' : 'pointer' }}>
-            {loading ? 'Шалгаж байна...' : 'Унших'}
-          </button>
-          <button type="button" onClick={draft ? () => setDraft(null) : startEditing} disabled={loading || saving} style={{ border: 0, borderRadius: 7, padding: '7px 10px', background: '#2563eb', color: '#fff', fontWeight: 700, cursor: loading || saving ? 'wait' : 'pointer' }}>
-            {draft ? 'Болих' : 'Тоонууд оруулах'}
-          </button>
-        </div>
+        <button type="button" onClick={draft ? () => setDraft(null) : startEditing} disabled={loading || saving} style={{ border: 0, borderRadius: 7, padding: '7px 10px', background: '#2563eb', color: '#fff', fontWeight: 700, cursor: loading || saving ? 'wait' : 'pointer' }}>
+          {draft ? 'Болих' : 'Тоонууд оруулах'}
+        </button>
       </header>
       {error && <p role="alert" style={{ margin: '8px 0', color: '#b91c1c', fontSize: 12 }}>{error}</p>}
       {!usage && loading && <p style={{ margin: '12px 0', color: '#64748b', fontSize: 13 }}>Сарын хэрэглээг ачаалж байна...</p>}
@@ -267,6 +275,28 @@ function VercelMonthlyUsageCard({
             Дараагийн календарь сарын эхэнд хэрэглээ автоматаар 0-оос эхэлнэ.
             {usage.updated_at ? ` Сүүлд хадгалсан: ${new Date(usage.updated_at).toLocaleString('mn-MN')}.` : ' Одоогоор утга оруулаагүй.'}
           </small>
+          <div style={{ display: 'grid', gap: 8, paddingTop: 10, borderTop: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+              <strong style={{ color: '#334155', fontSize: 13 }}>Vercel Web Analytics · {analytics?.month ?? usage.month}</strong>
+              {analytics?.status === 'connected' && <span style={{ color: '#15803d', fontSize: 11, fontWeight: 700 }}>Шууд холбогдсон</span>}
+            </div>
+            <p style={{ margin: 0, color: '#64748b', fontSize: 11 }}>
+              Хуудасны бодит үзэлт ба давтагдаагүй хэрэглэгчийг Vercel API-аас авна. Энэ нь transfer/CDN/ISR usage биш.
+            </p>
+            {analyticsLoading
+              ? <small style={{ color: '#64748b' }}>Analytics мэдээлэл ачаалж байна...</small>
+              : analyticsError
+                ? <p role="alert" style={{ margin: 0, color: '#b91c1c', fontSize: 12 }}>{analyticsError}</p>
+                : analytics?.status === 'connected'
+                  ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
+                    <div><small style={{ color: '#64748b' }}>Хуудас үзэлт</small><div style={{ fontWeight: 700 }}>{analytics.pageviews?.toLocaleString('mn-MN')}</div></div>
+                    <div><small style={{ color: '#64748b' }}>Давтагдаагүй хэрэглэгч</small><div style={{ fontWeight: 700 }}>{analytics.visitors?.toLocaleString('mn-MN')}</div></div>
+                  </div>
+                  : <p role={analytics?.status === 'error' ? 'alert' : 'status'} style={{ margin: 0, color: analytics?.status === 'error' ? '#b91c1c' : '#64748b', fontSize: 12 }}>
+                    {analytics?.message ?? 'Vercel Web Analytics тохиргоо хүлээгдэж байна.'}
+                  </p>}
+            {analytics?.updated_at && <small style={{ color: '#64748b', fontSize: 10 }}>API-аас сүүлд авсан: {new Date(analytics.updated_at).toLocaleString('mn-MN')}</small>}
+          </div>
         </div>}
     </article>
   );
@@ -294,13 +324,18 @@ export default function DataUsagePanel() {
   const [monthlyUsage, setMonthlyUsage] = useState<VercelMonthlyUsage | null>(null);
   const [monthlyLoading, setMonthlyLoading] = useState(false);
   const [monthlyError, setMonthlyError] = useState('');
+  const [vercelAnalytics, setVercelAnalytics] = useState<VercelWebAnalytics | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState('');
 
   const loadUsage = async () => {
     setLoading(true);
     setError('');
     setMonthlyLoading(true);
     setMonthlyError('');
-    const [providersResult, monthlyResult] = await Promise.allSettled([
+    setAnalyticsLoading(true);
+    setAnalyticsError('');
+    const [providersResult, monthlyResult, analyticsResult] = await Promise.allSettled([
       fetchWithAuth(`${backendBaseUrl}/api/teachers/admin/data-usage`)
         .then(async (response) => {
           const result = await response.json();
@@ -313,6 +348,12 @@ export default function DataUsagePanel() {
           if (!response.ok) throw new Error(result.detail ?? 'Vercel сарын хэрэглээ ачаалж чадсангүй.');
           setMonthlyUsage(result);
         }),
+      fetchWithAuth(`${backendBaseUrl}/api/teachers/admin/data-usage/vercel-analytics`)
+        .then(async (response) => {
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.detail ?? 'Vercel Analytics мэдээлэл ачаалж чадсангүй.');
+          setVercelAnalytics(result);
+        }),
     ]);
     if (providersResult.status === 'rejected') {
       const loadError = providersResult.reason;
@@ -322,9 +363,14 @@ export default function DataUsagePanel() {
       const loadError = monthlyResult.reason;
       setMonthlyError(loadError instanceof Error ? loadError.message : 'Vercel сарын хэрэглээ ачаалж чадсангүй.');
     }
+    if (analyticsResult.status === 'rejected') {
+      const loadError = analyticsResult.reason;
+      setAnalyticsError(loadError instanceof Error ? loadError.message : 'Vercel Analytics мэдээлэл ачаалж чадсангүй.');
+    }
     setUpdatedAt(new Date().toLocaleString('mn-MN'));
     setLoading(false);
     setMonthlyLoading(false);
+    setAnalyticsLoading(false);
   };
 
   useEffect(() => {
@@ -347,9 +393,11 @@ export default function DataUsagePanel() {
       {loading && providers.length === 0 && <p style={{ color: '#64748b' }}>Хэрэглээний мэдээлэл ачаалж байна...</p>}
       <VercelMonthlyUsageCard
         usage={monthlyUsage}
+        analytics={vercelAnalytics}
         loading={monthlyLoading}
+        analyticsLoading={analyticsLoading}
         error={monthlyError}
-        onRefresh={() => void loadUsage()}
+        analyticsError={analyticsError}
         onSaved={setMonthlyUsage}
       />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 10 }}>
