@@ -86,15 +86,35 @@ export default function AdminDashboardView({
     <main className="dashboard-compact" style={{ height: '100vh', overflow: 'hidden', backgroundColor: '#f8fafc', padding: 6 }}>
       <Header user={user} onLogout={onLogout} />
       <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '150px minmax(0, 1fr) 180px', gap: 8, marginTop: 7, height: 'calc(100vh - 100px)', alignItems: 'stretch' }}>
-        <aside style={{ overflow: 'hidden' }}>
-          <SideMenu
-            activeCategory={activeCategory}
-            setActiveCategory={onCategoryChange ?? setActiveCategory}
-            notificationCounts={notificationCounts}
-            notificationError={notificationError}
-            categories={['Ирц', 'Хянах', 'Үнэлгээ', 'Мэдээлэл', 'Оролцоо', 'Сургалт', 'Судалгаа', 'Зар', 'Чат']}
-          />
-          <AdminTeacherTools teachers={teachers} onTeachersAdded={onTeachersAdded} onTeacherRemoved={onTeacherRemoved} />
+        <aside style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
+            <SideMenu
+              activeCategory={activeCategory}
+              setActiveCategory={onCategoryChange ?? setActiveCategory}
+              notificationCounts={notificationCounts}
+              notificationError={notificationError}
+              categories={['Ирц', 'Хянах', 'Үнэлгээ', 'Мэдээлэл', 'Оролцоо', 'Сургалт', 'Судалгаа', 'Зар', 'Чат']}
+            />
+            <AdminTeacherTools teachers={teachers} onTeachersAdded={onTeachersAdded} onTeacherRemoved={onTeacherRemoved} />
+          </div>
+          <button
+            type="button"
+            onClick={() => (onCategoryChange ?? setActiveCategory)('Data ашиглалт')}
+            style={{
+              flexShrink: 0,
+              marginTop: 8,
+              padding: '9px 10px',
+              border: 'none',
+              borderRadius: 24,
+              background: activeCategory === 'Data ашиглалт' ? '#ea580c' : '#fb923c',
+              color: '#fff',
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            Дата ашиглалт
+          </button>
         </aside>
         <section style={{ minWidth: 0, height: '100%', overflowY: 'auto', overflowX: 'hidden', paddingRight: 4 }}>
           {teacherLoadError && <p role="alert" style={{ margin: '0 0 6px', color: '#b91c1c' }}>{teacherLoadError}</p>}
@@ -144,8 +164,6 @@ export default function AdminDashboardView({
           month={selectedMonth}
           gradeBand={reportGradeBand}
           subject={reportSubject}
-          showDataUsageButton
-          onDataUsageClick={() => (onCategoryChange ?? setActiveCategory)('Data ашиглалт')}
         />
       </div>
       <TeacherDetailModal teacher={selectedTeacher} selectedMonth={selectedMonth} onClose={onCloseTeacher} onTeacherUpdated={onTeacherUpdated} />

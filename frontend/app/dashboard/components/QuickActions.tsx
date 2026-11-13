@@ -26,8 +26,6 @@ interface Props {
   category: DashboardCategory;
   month: string;
   showReports?: boolean;
-  showDataUsageButton?: boolean;
-  onDataUsageClick?: () => void;
   gradeBand?: ReportGradeBand;
   subject?: string;
 }
@@ -45,8 +43,6 @@ export default function QuickActions({
   category,
   month,
   showReports = true,
-  showDataUsageButton = false,
-  onDataUsageClick,
   gradeBand = 'all',
   subject = '',
 }: Props) {
@@ -123,7 +119,6 @@ export default function QuickActions({
         display: 'flex',
         flexDirection: 'column',
         gap: '12px',
-        height: showDataUsageButton ? '100%' : undefined,
       }}
     >
       {showReports && <button style={buttonStyle('#107c41')} onClick={() => void previewExcel()}>📊 Excel Тайлан татах</button>}
@@ -131,17 +126,6 @@ export default function QuickActions({
       {showReports && <button style={buttonStyle('#dc2626')} onClick={() => void previewPdf()}>📄 PDF Тайлан татах</button>}
       {showReports && errorMessage && <small role="alert" style={{ color: '#b91c1c' }}>{errorMessage}</small>}
       <ExternalLoginLinks />
-      {showDataUsageButton && <button
-        type="button"
-        style={{
-          ...buttonStyle(category === 'Data ашиглалт' ? '#ea580c' : '#fb923c'),
-          marginTop: 'auto',
-          borderRadius: '24px',
-        }}
-        onClick={onDataUsageClick}
-      >
-        Data ашиглалт
-      </button>}
       <ReportPreviewDialog
         report={preview}
         pdfUrl={pdfUrl}

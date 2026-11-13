@@ -94,9 +94,19 @@ export default function VercelMonthlyUsageCard({
             {usage ? `${usage.month} · Хадгалсан утгууд автоматаар харагдана.` : 'Энэ сарын Vercel Usage утгууд.'}
           </p>
         </div>
-        <button type="button" onClick={draft ? () => setDraft(null) : startEditing} disabled={loading || saving} style={{ border: 0, borderRadius: 7, padding: '7px 10px', background: '#2563eb', color: '#fff', fontWeight: 700, cursor: loading || saving ? 'wait' : 'pointer' }}>
-          {draft ? 'Болих' : 'Тоонууд оруулах'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <a
+            href="https://vercel.com/portal72/portal72/usage"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ display: 'inline-block', border: '1px solid #2563eb', borderRadius: 7, padding: '6px 9px', color: '#2563eb', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}
+          >
+            Vercel Usage нээх
+          </a>
+          <button type="button" onClick={draft ? () => setDraft(null) : startEditing} disabled={loading || saving} style={{ border: 0, borderRadius: 7, padding: '7px 10px', background: '#2563eb', color: '#fff', fontWeight: 700, cursor: loading || saving ? 'wait' : 'pointer' }}>
+            {draft ? 'Болих' : 'Тоонууд оруулах'}
+          </button>
+        </div>
       </header>
       {error && <p role="alert" style={{ margin: '8px 0', color: '#b91c1c', fontSize: 12 }}>{error}</p>}
       {!usage && loading && <p style={{ margin: '12px 0', color: '#64748b', fontSize: 13 }}>Сарын хэрэглээг ачаалж байна...</p>}
