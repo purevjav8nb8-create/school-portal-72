@@ -1,5 +1,4 @@
 import asyncio
-import json
 import math
 import os
 from collections import defaultdict
@@ -406,107 +405,27 @@ async def _vercel(client: httpx.AsyncClient) -> dict[str, Any]:
         return _provider("vercel", "Vercel", "error", message="Vercel API буруу форматтай өгөгдөл буцаалаа.")
     if not isinstance(project.get("id"), str) or not isinstance(project.get("name"), str):
         return _provider("vercel", "Vercel", "error", message="Vercel API төслийн мэдээлэл буцаасангүй.")
-    team_id = os.getenv("VERCEL_TEAM_ID", "").strip() or project.get("accountId")
-    if not isinstance(team_id, str) or not team_id.strip():
-        return _provider(
-            "vercel",
-            "Vercel",
-            "error",
-            message="Vercel billing scope олдсонгүй. VERCEL_TEAM_ID тохируулна уу.",
-        )
+    deployments = project.get("latestDeployments", [])
+    if not isinstance(deployments, list) or any(not isinstance(item, dict) for item in deployments):
+        return _provider("vercel", "Vercel", "error", message="Vercel API deployment мэдээлэл буруу форматтай байна.")
 
-    now = datetime.now(timezone.utc).replace(microsecond=0)
-    month_start = now.replace(day=1, hour=0, minute=0, second=0)
-    try:
-        billing_response = await client.get(
-            "https://api.vercel.com/v1/billing/charges",
-            params={
-                "from": month_start.isoformat().replace("+00:00", "Z"),
-                "to": now.isoformat().replace("+00:00", "Z"),
-                "teamId": team_id,
-            },
-            headers={"Authorization": f"Bearer {token}"},
-        )
-        billing_response.raise_for_status()
-    except httpx.HTTPStatusError as error:
-        return _provider(
-            "vercel",
-            "Vercel",
-            "error",
-            message=(
-                f"Vercel Billing API алдаа ({error.response.status_code})"
-                f"{_api_error_detail(error.response)}; billing эрх болон VERCEL_TEAM_ID-г шалгана уу."
-            ),
-        )
-    except httpx.RequestError:
-        return _provider("vercel", "Vercel", "error", message="Vercel Billing API-д холбогдож чадсангүй.")
-
-    daily_usage: dict[tuple[str, str], dict[str, float]] = defaultdict(lambda: defaultdict(float))
-    try:
-        for line in billing_response.text.splitlines():
-            if not line.strip():
-                continue
-            try:
-                charge = json.loads(line)
-            except json.JSONDecodeError as error:
-                raise ValueError("Vercel Billing API JSONL өгөгдөл буруу.") from error
-            if not isinstance(charge, dict):
-                raise ValueError("Vercel Billing API буруу бүтэцтэй өгөгдөл буцаалаа.")
-            if charge.get("ChargeCategory") != "Usage":
-                continue
-
-            quantity = _number(charge.get("ConsumedQuantity"))
-            unit = charge.get("ConsumedUnit")
-            service_name = charge.get("ServiceName") or charge.get("SkuId")
-            period_start = charge.get("ChargePeriodStart")
-            if (
-                quantity is None
-                or not isinstance(unit, str)
-                or not unit.strip()
-                or not isinstance(service_name, str)
-                or not service_name.strip()
-                or not isinstance(period_start, str)
-            ):
-                raise ValueError("Vercel Billing API usage мөр дутуу өгөгдөлтэй байна.")
-            try:
-                timestamp = datetime.fromisoformat(period_start.replace("Z", "+00:00"))
-            except ValueError as error:
-                raise ValueError("Vercel Billing API огноо буруу.") from error
-            if timestamp.tzinfo is None:
-                raise ValueError("Vercel Billing API огноонд timezone байхгүй байна.")
-            day = timestamp.astimezone(timezone.utc).date().isoformat()
-            daily_usage[(service_name.strip(), unit.strip())][day] += quantity
-    except ValueError:
-        return _provider("vercel", "Vercel", "error", message="Vercel Billing API буруу форматтай өгөгдөл буцаалаа.")
-
-    name_counts: dict[str, int] = defaultdict(int)
-    for service_name, _ in daily_usage:
-        name_counts[service_name] += 1
-    metrics = []
-    for (service_name, unit), values_by_day in sorted(daily_usage.items()):
-        metric_name = f"{service_name} ({unit})" if name_counts[service_name] > 1 else service_name
-        points = [
-            {"date": day, "value": value}
-            for day, value in sorted(values_by_day.items())
-        ]
-        metrics.append({
-            "name": metric_name,
-            "unit": unit,
-            "points": points,
-            "total": sum(values_by_day.values()),
-        })
+    message = f"Vercel төсөл ({project['name']}) амжилттай холбогдлоо."
+    if deployments:
+        latest = deployments[0]
+        state = latest.get("readyState")
+        deployment_url = latest.get("url")
+        details = [value for value in (state, deployment_url) if isinstance(value, str) and value]
+        if details:
+            message += f" Сүүлийн deployment: {' — '.join(details)}."
+    else:
+        message += " Сүүлийн deployment-ийн мэдээлэл олдсонгүй."
+    message += " Projects API хэрэглэсэн GB болон сарын квотын мэдээлэл өгдөггүй."
 
     return _provider(
         "vercel",
         "Vercel",
-        "connected" if metrics else "no_data",
-        metrics,
-        message=(
-            "Энэ сарын Vercel баг/дансны хэмжигдсэн хэрэглээг Billing API-аас харуулж байна. "
-            "Энэ API бүх хэмжүүрийн квот болон төслийн тусгай задаргааг буцаадаггүй."
-            if metrics
-            else "Vercel Billing API энэ сард Usage мөр буцаасангүй."
-        ),
+        "connected",
+        message=message,
     )
 
 
