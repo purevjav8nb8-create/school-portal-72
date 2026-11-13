@@ -2,46 +2,9 @@
 
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { backendBaseUrl, fetchWithAuth } from '../../../../lib/backendApi';
-import UnitTargetSelector from './UnitTargetSelector';
-import { formatTeacherName } from '../../utils/teacherName';
-
-type ChatConversation = {
-  conversation_id: string;
-  kind: 'private' | 'broadcast';
-  title: string;
-  teacher_id?: string | null;
-  unit?: string | null;
-  last_message: string;
-  latest_at: string;
-  unread_count: number;
-};
-
-type ChatMessage = {
-  id: string;
-  sender_id: string;
-  sender_name: string;
-  body: string;
-  created_at: string;
-  is_mine: boolean;
-  is_read: boolean;
-};
-
-type ChatUser = {
-  user_id: string;
-  conversation_id: string;
-  name: string;
-  email: string;
-  role: string;
-  unit: string;
-};
-
-const fieldStyle = {
-  width: '100%',
-  padding: 10,
-  border: '1px solid #cbd5e1',
-  borderRadius: 8,
-  boxSizing: 'border-box' as const,
-};
+import ChatMessagesPane from './ChatMessagesPane';
+import ChatSidebar from './ChatSidebar';
+import { ChatConversation, ChatMessage, ChatUser } from './chatTypes';
 
 async function chatRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetchWithAuth(`${backendBaseUrl}${path}`, {
@@ -83,9 +46,7 @@ export default function ChatBoard({ isAdmin = false }: { isAdmin?: boolean }) {
   const loadConversations = useCallback(async () => {
     const result = await chatRequest<ChatConversation[]>('/api/teachers/chat/conversations');
     setConversations(result);
-    setSelectedId((current) =>
-      current || result[0]?.conversation_id || '',
-    );
+    setSelectedId((current) => current || result[0]?.conversation_id || '');
     return result;
   }, []);
 
@@ -101,9 +62,7 @@ export default function ChatBoard({ isAdmin = false }: { isAdmin?: boolean }) {
     setSearching(true);
     const timer = window.setTimeout(async () => {
       try {
-        const result = await chatRequest<ChatUser[]>(
-          `/api/teachers/chat/users?q=${encodeURIComponent(query)}`,
-        );
+        const result = await chatRequest<ChatUser[]>(`/api/teachers/chat/users?q=${encodeURIComponent(query)}`);
         if (active) {
           setSearchResults(result);
           setErrorMessage('');
@@ -159,9 +118,7 @@ export default function ChatBoard({ isAdmin = false }: { isAdmin?: boolean }) {
       if (loadingMessages) return;
       loadingMessages = true;
       try {
-        const result = await chatRequest<ChatMessage[]>(
-          `/api/teachers/chat/messages?conversation_id=${encodeURIComponent(selectedId)}`,
-        );
+        const result = await chatRequest<ChatMessage[]>(`/api/teachers/chat/messages?conversation_id=${encodeURIComponent(selectedId)}`);
         if (!active) return;
         setMessages(result);
         setErrorMessage('');
@@ -209,10 +166,9 @@ export default function ChatBoard({ isAdmin = false }: { isAdmin?: boolean }) {
       setSelectedUser(null);
       if (selectedId === 'broadcast') setTargetUnits([]);
       await loadConversations();
-      const updated = await chatRequest<ChatMessage[]>(
+      setMessages(await chatRequest<ChatMessage[]>(
         `/api/teachers/chat/messages?conversation_id=${encodeURIComponent(selectedId)}`,
-      );
-      setMessages(updated);
+      ));
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Мессеж илгээгдсэнгүй.');
     } finally {
@@ -236,104 +192,39 @@ export default function ChatBoard({ isAdmin = false }: { isAdmin?: boolean }) {
     <section style={{ display: 'grid', gap: 8, minHeight: 360 }}>
       <header>
         <h2 style={{ margin: 0 }}>Чат</h2>
-        <p style={{ margin: '5px 0 0', color: '#64748b', fontSize: 13 }}>
-          Хэрэглэгч хайж хувийн чат эхлүүлэх боломжтой.
-        </p>
+        <p style={{ margin: '5px 0 0', color: '#64748b', fontSize: 13 }}>Хэрэглэгч хайж хувийн чат эхлүүлэх боломжтой.</p>
       </header>
       {errorMessage && <p role="alert" style={{ margin: 0, color: '#b91c1c' }}>{errorMessage}</p>}
       {loading ? <p>Чат ачаалж байна...</p> : (
         <div className="chat-layout" style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 250px) minmax(0, 1fr)', minHeight: 360, border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
-          <nav aria-label="Чатын жагсаалт" style={{ borderRight: '1px solid #e2e8f0', background: '#f8fafc', overflowY: 'auto' }}>
-            <div style={{ display: 'grid', gap: 6, padding: 8, borderBottom: '1px solid #e2e8f0' }}>
-              <label htmlFor="chat-user-search" style={{ fontSize: 12, fontWeight: 700, color: '#334155' }}>Хэрэглэгч хайх</label>
-              <input
-                id="chat-user-search"
-                type="search"
-                value={userQuery}
-                onChange={(event) => setUserQuery(event.target.value)}
-                placeholder="Нэр, имэйл эсвэл нэгж..."
-                style={{ ...fieldStyle, padding: '7px 8px', borderRadius: 6 }}
-              />
-              {searching && <small role="status" style={{ color: '#64748b' }}>Хайж байна...</small>}
-              {!searching && userQuery.trim().length >= 2 && searchResults.length === 0 && <small style={{ color: '#64748b' }}>Хэрэглэгч олдсонгүй.</small>}
-              {searchResults.map((item) => (
-                <button
-                  type="button"
-                  key={item.user_id}
-                  onClick={() => {
-                    setSelectedUser(item);
-                    setSelectedId(item.conversation_id);
-                    setMessages([]);
-                  }}
-                  style={{ display: 'grid', gap: 2, padding: '6px 8px', border: '1px solid #dbeafe', borderRadius: 6, background: '#fff', textAlign: 'left', cursor: 'pointer' }}
-                >
-                  <strong style={{ color: '#1e3a8a', fontSize: 12 }}>{formatTeacherName(item.name)}</strong>
-                  <small style={{ color: '#64748b' }}>{[item.role, item.unit, item.email].filter(Boolean).join(' · ')}</small>
-                </button>
-              ))}
-            </div>
-            {conversations.map((conversation) => (
-              <button
-                type="button"
-                key={conversation.conversation_id}
-                onClick={() => {
-                  setSelectedUser(null);
-                  setSelectedId(conversation.conversation_id);
-                }}
-                style={{
-                  display: 'grid',
-                  gap: 4,
-                  width: '100%',
-                  padding: 11,
-                  border: 0,
-                  borderBottom: '1px solid #e2e8f0',
-                  background: selectedId === conversation.conversation_id ? '#dbeafe' : 'transparent',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                }}
-              >
-                <span style={{ display: 'flex', justifyContent: 'space-between', gap: 6, fontWeight: 700, color: '#172554' }}>
-                  <span>{conversation.kind === 'private' ? formatTeacherName(conversation.title) : conversation.title}</span>
-                  {!!conversation.unread_count && <span style={{ color: '#dc2626' }}>{conversation.unread_count}</span>}
-                </span>
-                {conversation.unit && <small style={{ color: '#64748b' }}>{conversation.unit}</small>}
-                <small style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#64748b' }}>{conversation.last_message || 'Шинэ чат эхлүүлэх'}</small>
-              </button>
-            ))}
-            {conversations.length === 0 && <p style={{ padding: 12, color: '#64748b' }}>Чат алга.</p>}
-          </nav>
-          <div style={{ display: 'grid', gridTemplateRows: 'auto minmax(180px, 1fr) auto', minWidth: 0 }}>
-            <header style={{ padding: '10px 12px', borderBottom: '1px solid #e2e8f0' }}>
-              <strong>{selectedConversation ? selectedConversation.kind === 'private' ? formatTeacherName(selectedConversation.title) : selectedConversation.title : 'Чат сонгоно уу'}</strong>
-              {selectedConversation?.kind === 'private' && selectedConversation.unit && <small style={{ display: 'block', marginTop: 2, color: '#64748b' }}>{selectedConversation.unit}</small>}
-              {selectedConversation?.kind === 'broadcast' && <small style={{ display: 'block', marginTop: 3, color: '#64748b' }}>Хоосон шүүлтүүрээр бүх багшид хүргэнэ.</small>}
-            </header>
-            <div aria-live="polite" style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 12, overflowY: 'auto', background: '#fff' }}>
-              {messages.map((message) => (
-                <article key={message.id} style={{ maxWidth: '90%', alignSelf: message.is_mine ? 'flex-end' : 'flex-start', padding: '8px 10px', borderRadius: 10, background: message.is_mine ? '#dbeafe' : '#f1f5f9', overflowWrap: 'anywhere' }}>
-                  <small style={{ display: 'block', marginBottom: 3, color: '#64748b' }}>{formatTeacherName(message.sender_name)} · {new Date(message.created_at).toLocaleString()}</small>
-                  <span style={{ whiteSpace: 'pre-wrap' }}>{message.body}</span>
-                </article>
-              ))}
-              {messages.length === 0 && <p style={{ margin: 'auto', color: '#94a3b8' }}>Мессеж байхгүй байна.</p>}
-            </div>
-            {selectedConversation && (selectedConversation.kind !== 'broadcast' || isAdmin) ? (
-              <form onSubmit={(event) => void send(event)} style={{ display: 'grid', gap: 8, padding: 10, borderTop: '1px solid #e2e8f0' }}>
-                {selectedConversation.kind === 'broadcast' && isAdmin && <UnitTargetSelector
-                  selectedUnits={targetUnits}
-                  setSelectedUnits={setTargetUnits}
-                  label="Хүлээн авах нэгж"
-                  compact
-                />}
-                <label style={{ display: 'grid', gap: 4, fontWeight: 600 }}>Мессеж
-                  <textarea required maxLength={5000} rows={2} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Мессеж бичих..." style={fieldStyle} />
-                </label>
-                <button type="submit" disabled={sending} style={{ justifySelf: 'end', padding: '8px 14px', border: 0, borderRadius: 7, background: sending ? '#94a3b8' : '#2563eb', color: '#fff', cursor: sending ? 'wait' : 'pointer' }}>
-                  {sending ? 'Илгээж байна...' : 'Илгээх'}
-                </button>
-              </form>
-            ) : <p style={{ margin: 0, padding: 12, borderTop: '1px solid #e2e8f0', color: '#64748b', fontSize: 13 }}>Энэ нь админаас ирсэн нийтэд хүргэх мессеж. Хариулах бол хувийн чатыг сонгоно уу.</p>}
-          </div>
+          <ChatSidebar
+            conversations={conversations}
+            selectedId={selectedId}
+            userQuery={userQuery}
+            searchResults={searchResults}
+            searching={searching}
+            onSearch={setUserQuery}
+            onUserSelect={(user) => {
+              setSelectedUser(user);
+              setSelectedId(user.conversation_id);
+              setMessages([]);
+            }}
+            onConversationSelect={(id) => {
+              setSelectedUser(null);
+              setSelectedId(id);
+            }}
+          />
+          <ChatMessagesPane
+            conversation={selectedConversation}
+            messages={messages}
+            isAdmin={isAdmin}
+            draft={draft}
+            targetUnits={targetUnits}
+            sending={sending}
+            onDraftChange={setDraft}
+            onTargetUnitsChange={setTargetUnits}
+            onSend={(event) => void send(event)}
+          />
         </div>
       )}
     </section>

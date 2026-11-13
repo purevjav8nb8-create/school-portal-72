@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Download, Eye, FileText, X } from 'lucide-react';
 import { AnnouncementAttachment, isPdfAttachment } from './AnnouncementAttachments';
+import { cloudinaryFlag, cloudinaryPdfPreview, normalizeCloudinaryUrl } from './cloudinaryUrls';
 
 interface Props {
   attachment: AnnouncementAttachment;
@@ -10,24 +11,6 @@ interface Props {
   showName?: boolean;
   previewWidth?: number;
   previewHeight?: number;
-}
-
-function normalizeCloudinaryUrl(url: string) {
-  return url
-    .replace('/upload/fl_inline/', '/upload/')
-    .replace('/upload/fl_attachment/', '/upload/');
-}
-
-function cloudinaryFlag(url: string, flag: string) {
-  const normalizedUrl = normalizeCloudinaryUrl(url);
-  return normalizedUrl.includes('/upload/') ? normalizedUrl.replace('/upload/', `/upload/${flag}/`) : normalizedUrl;
-}
-
-function cloudinaryPdfPreview(url: string) {
-  const normalizedUrl = normalizeCloudinaryUrl(url);
-  return normalizedUrl.includes('/image/upload/')
-    ? normalizedUrl.replace('/image/upload/', '/image/upload/pg_1,f_jpg/')
-    : normalizedUrl;
 }
 
 function fitPdfUrl(url: string) {

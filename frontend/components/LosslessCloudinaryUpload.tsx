@@ -4,6 +4,9 @@ import { ChangeEvent, useEffect, useId, useState } from 'react';
 import { Download, Eye, Paperclip, Trash2 } from 'lucide-react';
 import { backendBaseUrl } from '../lib/backendApi';
 
+const MAX_IMAGE_DIMENSION = 2560;
+const IMAGE_QUALITY = 0.8;
+
 export type UploadedFile = {
   name: string;
   url: string;
@@ -23,23 +26,25 @@ interface Props {
 
 async function optimizeImage(file: File): Promise<File> {
   if (!file.type.startsWith('image/') || file.type === 'image/svg+xml') return file;
+  let bitmap: ImageBitmap | null = null;
   try {
-    const bitmap = await createImageBitmap(file);
+    bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(bitmap.width, bitmap.height));
     const canvas = document.createElement('canvas');
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
     const context = canvas.getContext('2d', { alpha: true });
     if (!context) return file;
     context.drawImage(bitmap, 0, 0);
-    bitmap.close();
-    const outputType = file.type === 'image/png' ? 'image/png' : 'image/webp';
-    const optimized = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, outputType, 0.82));
+    const optimized = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/webp', IMAGE_QUALITY));
     if (!optimized || optimized.size >= file.size) return file;
-    const extension = outputType === 'image/webp' ? 'webp' : 'png';
+    const extension = optimized.type === 'image/webp' ? 'webp' : 'png';
     const outputName = file.name.replace(/\.[^.]+$/, `.${extension}`);
-    return new File([optimized], outputName, { type: outputType, lastModified: file.lastModified });
+    return new File([optimized], outputName, { type: optimized.type, lastModified: file.lastModified });
   } catch {
     throw new Error(`${file.name} зургийг шахаж чадсангүй.`);
+  } finally {
+    bitmap?.close();
   }
 }
 

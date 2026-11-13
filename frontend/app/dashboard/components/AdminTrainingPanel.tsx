@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import FileAttachmentActions from './records/FileAttachmentActions';
+import { cloudinaryPdfPreview } from './records/cloudinaryUrls';
 import { Teacher } from '../types';
 import { formatTeacherName } from '../utils/teacherName';
 
@@ -14,13 +15,6 @@ type Training = {
   certificateUrl: string;
   imageUrl?: string | null;
 };
-
-function previewUrl(url: string) {
-  const normalized = url.replace('/upload/fl_inline/', '/upload/').replace('/upload/fl_attachment/', '/upload/');
-  return normalized.includes('/image/upload/')
-    ? normalized.replace('/image/upload/', '/image/upload/pg_1,f_jpg/')
-    : normalized;
-}
 
 interface Props {
   teachers: Teacher[];
@@ -107,7 +101,7 @@ export default function AdminTrainingPanel({ teachers }: Props) {
               <div style={attachmentCard}>
                 <strong>Сертификат</strong>
                 <div style={previewFrame}>
-                  <img src={previewUrl(selected.training.certificateUrl)} alt="Сертификат" style={previewImage} />
+                  <img src={cloudinaryPdfPreview(selected.training.certificateUrl)} alt="Сертификат" style={previewImage} />
                 </div>
                 <FileAttachmentActions attachment={{ name: 'Сертификат', url: selected.training.certificateUrl, file_type: selected.training.certificateUrl.toLowerCase().includes('.pdf') ? 'document' : 'image' }} />
               </div>

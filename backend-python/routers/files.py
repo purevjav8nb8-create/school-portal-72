@@ -11,6 +11,39 @@ router = APIRouter(prefix="/api/files", tags=["Files"])
 OFFICE_EXTENSIONS = {".docx", ".xlsx", ".pptx"}
 
 
+def _compress_pdf(content: bytes) -> bytes:
+    source = pymupdf.open(stream=content, filetype="pdf")
+    try:
+        if source.is_encrypted or source.get_sigflags() > 0:
+            return content
+        source.rewrite_images(dpi_threshold=180, dpi_target=150, quality=75)
+        output = BytesIO()
+        source.save(
+            output,
+            garbage=4,
+            deflate=True,
+            deflate_images=True,
+            deflate_fonts=True,
+            clean=True,
+            compression_effort=100,
+        )
+        compressed = output.getvalue()
+        return compressed if len(compressed) < len(content) else content
+    finally:
+        source.close()
+
+
+def _compress_office_file(content: bytes) -> bytes:
+    output = BytesIO()
+    with ZipFile(BytesIO(content)) as source, ZipFile(
+        output, "w", ZIP_DEFLATED, compresslevel=9
+    ) as target:
+        for item in source.infolist():
+            target.writestr(item, source.read(item.filename), compress_type=ZIP_DEFLATED, compresslevel=9)
+    compressed = output.getvalue()
+    return compressed if len(compressed) < len(content) else content
+
+
 @router.post("/compress")
 async def compress_file(file: UploadFile):
     filename = file.filename or "file"
@@ -21,17 +54,9 @@ async def compress_file(file: UploadFile):
     try:
         extension = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
         if file.content_type == "application/pdf" or extension == ".pdf":
-            source = pymupdf.open(stream=content, filetype="pdf")
-            output = BytesIO()
-            source.save(output, garbage=0, deflate=True, clean=False)
-            source.close()
+            compressed = _compress_pdf(content)
         elif extension in OFFICE_EXTENSIONS:
-            output = BytesIO()
-            with ZipFile(BytesIO(content)) as source, ZipFile(output, "w", ZIP_DEFLATED, compresslevel=9) as target:
-                for item in source.infolist():
-                    target.writestr(item, source.read(item.filename))
-            if output.tell() >= len(content):
-                output = BytesIO(content)
+            compressed = _compress_office_file(content)
         else:
             raise HTTPException(status_code=415, detail="Энэ файлын төрлийг шахах боломжгүй.")
     except HTTPException:
@@ -39,10 +64,9 @@ async def compress_file(file: UploadFile):
     except Exception as error:
         raise HTTPException(status_code=422, detail="Файлыг шахаж чадсангүй.") from error
 
-    output.seek(0)
     media_type = "application/pdf" if extension == ".pdf" else file.content_type or "application/octet-stream"
     return StreamingResponse(
-        output,
+        BytesIO(compressed),
         media_type=media_type,
         headers={"Content-Disposition": f"inline; filename*=UTF-8''{quote(filename, safe='')}"},
     )
