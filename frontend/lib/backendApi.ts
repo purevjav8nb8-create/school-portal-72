@@ -26,6 +26,15 @@ async function refreshAccessToken(): Promise<string | null> {
   return refreshInProgress;
 }
 
+async function handleUnauthorizedResponse(response: Response): Promise<Response> {
+  if (response.status !== 401 || typeof window === 'undefined') return response;
+  const { error } = await supabase.auth.signOut();
+  if (error) throw error;
+  window.localStorage.removeItem('school-portal-mock-token');
+  window.location.assign('/');
+  return response;
+}
+
 export async function fetchWithAuth(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
   const { data: { session }, error } = await supabase.auth.getSession();
   if (error) throw new Error('Нэвтрэх эрхийг шалгаж чадсангүй. Дахин нэвтэрнэ үү.');
@@ -39,7 +48,8 @@ export async function fetchWithAuth(input: RequestInfo | URL, init: RequestInit 
     return fetch(input, { ...init, headers });
   };
   const response = await send(accessToken);
-  if (response.status !== 401 || !session) return response;
+  if (response.status !== 401) return response;
+  if (!session) return mockToken ? handleUnauthorizedResponse(response) : response;
 
   const retryWithCurrentSession = async () => {
     const { data: { session: currentSession }, error: currentSessionError } = await supabase.auth.getSession();
@@ -51,14 +61,17 @@ export async function fetchWithAuth(input: RequestInfo | URL, init: RequestInit 
   };
 
   const currentSessionResponse = await retryWithCurrentSession();
-  if (currentSessionResponse) return currentSessionResponse;
+  if (currentSessionResponse && currentSessionResponse.status !== 401) return currentSessionResponse;
 
   try {
     const refreshedToken = await refreshAccessToken();
-    return refreshedToken ? send(refreshedToken) : response;
+    const refreshedResponse = refreshedToken
+      ? await send(refreshedToken)
+      : currentSessionResponse ?? response;
+    return handleUnauthorizedResponse(refreshedResponse);
   } catch (refreshError) {
     const changedSessionResponse = await retryWithCurrentSession();
-    if (changedSessionResponse) return changedSessionResponse;
+    if (changedSessionResponse && changedSessionResponse.status !== 401) return changedSessionResponse;
     throw refreshError;
   }
 }

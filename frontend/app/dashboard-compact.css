@@ -62,7 +62,7 @@
 .dashboard-compact [role='dialog'] > header { padding-bottom: 8px !important; }
 .dashboard-compact [role='dialog'] > div { padding-top: 10px !important; }
 
-@media (max-width: 900px) {
+@media (max-width: 600px) {
   .dashboard-compact {
     height: auto !important;
     min-height: 100vh;

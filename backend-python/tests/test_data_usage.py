@@ -6,7 +6,14 @@ from unittest.mock import patch
 
 import httpx
 
-from services.data_usage import _api_error_detail, _cloudinary, _number, _render, _supabase, _vercel
+from services.data_usage import (
+    _api_error_detail,
+    _cloudinary,
+    _number,
+    _render,
+    _supabase,
+    get_provider_usage,
+)
 
 
 class DataUsageTests(unittest.TestCase):
@@ -241,110 +248,15 @@ class DataUsageTests(unittest.TestCase):
 
         asyncio.run(run_test())
 
-    def test_vercel_loads_daily_web_analytics_with_team_scope(self):
+    def test_provider_usage_does_not_add_duplicate_vercel_card(self):
         async def run_test():
-            requests = []
-            today = datetime.now(timezone.utc).date()
-            month_start = today.replace(day=1)
-            dates = [month_start]
-            if today != month_start:
-                dates.append(today)
+            with patch.dict(os.environ, {}, clear=True):
+                providers = await get_provider_usage()
 
-            async def handler(request):
-                requests.append(request)
-                if request.url.path == "/v9/projects/prj_test":
-                    return httpx.Response(200, json={
-                        "id": "prj_test",
-                        "name": "portal72",
-                        "latestDeployments": [{
-                            "readyState": "READY",
-                            "url": "portal72-example.vercel.app",
-                        }],
-                    })
-                return httpx.Response(200, json={
-                    "data": [
-                        {
-                            "timestamp": f"{day.isoformat()}T00:00:00.000Z",
-                            "pageviews": 20 if index == 0 else 8,
-                            "visitors": 12 if index == 0 else 7,
-                        }
-                        for index, day in enumerate(dates)
-                    ],
-                })
-
-            with patch.dict(os.environ, {
-                "VERCEL_TOKEN": "test-token",
-                "VERCEL_PROJECT_ID": "prj_test",
-                "VERCEL_TEAM_ID": "team_test",
-            }, clear=True):
-                async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-                    result = await _vercel(client)
-
-            self.assertEqual(result["status"], "connected")
-            self.assertEqual(len(result["metrics"]), 2)
-            pageviews, visitors = result["metrics"]
-            self.assertEqual(pageviews["name"], "Хуудас үзэлт")
-            self.assertEqual(pageviews["unit"], "үзэлт")
-            self.assertEqual(pageviews["total"], 28 if len(dates) == 2 else 20)
-            self.assertEqual(pageviews["chart"], "line")
             self.assertEqual(
-                [point["date"] for point in pageviews["points"]],
-                [day.isoformat() for day in dates],
+                [provider["id"] for provider in providers],
+                ["cloudinary", "supabase", "render"],
             )
-            self.assertEqual(visitors["name"], "Зочин")
-            self.assertEqual(visitors["total"], 19 if len(dates) == 2 else 12)
-            self.assertIn("portal72", result["message"])
-            self.assertIn("READY", result["message"])
-            self.assertIn("GB хэрэглээ биш", result["message"])
-            self.assertEqual(len(requests), 2)
-            self.assertEqual(requests[0].url.path, "/v9/projects/prj_test")
-            self.assertEqual(requests[0].headers["Authorization"], "Bearer test-token")
-            self.assertEqual(
-                requests[1].url.path,
-                "/v1/query/web-analytics/visits/aggregate",
-            )
-            self.assertEqual(requests[1].url.params["projectId"], "prj_test")
-            self.assertEqual(requests[1].url.params["teamId"], "team_test")
-            self.assertEqual(requests[1].url.params["since"], month_start.isoformat())
-            self.assertEqual(requests[1].url.params["until"], today.isoformat())
-            self.assertEqual(requests[1].url.params["by"], "day")
-
-        asyncio.run(run_test())
-
-    def test_vercel_web_analytics_api_errors_are_reported(self):
-        async def run_test():
-            async def handler(request):
-                if request.url.path == "/v9/projects/prj_test":
-                    return httpx.Response(200, json={"id": "prj_test", "name": "portal72"})
-                return httpx.Response(404, json={"error": {"message": "Analytics is not enabled"}})
-
-            with patch.dict(os.environ, {
-                "VERCEL_TOKEN": "test-token",
-                "VERCEL_PROJECT_ID": "prj_test",
-            }, clear=True):
-                async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-                    result = await _vercel(client)
-
-            self.assertEqual(result["status"], "error")
-            self.assertIn("Analytics is not enabled", result["message"])
-            self.assertIn("багийн ID", result["message"])
-
-        asyncio.run(run_test())
-
-    def test_vercel_invalid_project_response_returns_error_status(self):
-        async def run_test():
-            async def handler(_request):
-                return httpx.Response(200, json=[])
-
-            with patch.dict(os.environ, {
-                "VERCEL_TOKEN": "test-token",
-                "VERCEL_PROJECT_ID": "prj_test",
-            }, clear=True):
-                async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-                    result = await _vercel(client)
-
-            self.assertEqual(result["status"], "error")
-            self.assertIn("буруу форматтай", result["message"])
 
         asyncio.run(run_test())
 

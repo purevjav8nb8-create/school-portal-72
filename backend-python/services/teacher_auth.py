@@ -1,10 +1,16 @@
+import logging
 import os
 from types import SimpleNamespace
 
+import httpx
 from fastapi import HTTPException
+from supabase_auth.errors import AuthError, AuthRetryableError, AuthUnknownError
 
 from database import supabase
 from services.mock_school_data import get_mock_teacher_by_email, get_mock_teacher_by_id, mock_data_enabled
+
+
+logger = logging.getLogger(__name__)
 
 
 def get_authenticated_user(authorization: str | None):
@@ -33,7 +39,24 @@ def get_authenticated_user(authorization: str | None):
     try:
         response = supabase.auth.get_user(authorization.split(" ", 1)[1])
         user = response.user if response else None
-    except Exception as error:
+    except (AuthRetryableError, AuthUnknownError, httpx.RequestError) as error:
+        logger.warning("Supabase Auth хэрэглэгчийг шалгаж чадсангүй.", exc_info=True)
+        raise HTTPException(
+            status_code=503,
+            detail="Нэвтрэх эрхийг шалгах үйлчилгээ түр холбогдохгүй байна.",
+        ) from error
+    except AuthError as error:
+        status = getattr(error, "status", None)
+        if status == 429 or (isinstance(status, int) and status >= 500):
+            logger.warning(
+                "Supabase Auth шалгалт амжилтгүй боллоо (status=%s, code=%s).",
+                status,
+                error.code,
+            )
+            raise HTTPException(
+                status_code=503,
+                detail="Нэвтрэх эрхийг шалгах үйлчилгээ түр холбогдохгүй байна.",
+            ) from error
         raise HTTPException(status_code=401, detail="Нэвтрэх эрх хүчингүй байна.") from error
     if not user:
         raise HTTPException(status_code=401, detail="Нэвтрэх эрх хүчингүй байна.")
