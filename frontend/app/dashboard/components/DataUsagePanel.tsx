@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { backendBaseUrl, fetchWithAuth } from '../../../lib/backendApi';
 
 type UsagePoint = { date: string; value: number };
-type UsageMetric = { name: string; unit: string; points: UsagePoint[] };
+type UsageMetric = { name: string; unit: string; points: UsagePoint[]; limit?: number; total?: number };
 type UsageProvider = {
   id: string;
   name: string;
@@ -13,56 +13,47 @@ type UsageProvider = {
   message: string | null;
 };
 
-function MetricLineChart({ metric }: { metric: UsageMetric }) {
+function MetricProgress({ metric }: { metric: UsageMetric }) {
   const points = metric.points.filter((point) => Number.isFinite(point.value));
   if (!points.length) return null;
 
-  const width = 560;
-  const height = 150;
-  const left = 38;
-  const right = 12;
-  const top = 12;
-  const bottom = 25;
-  const values = points.map((point) => point.value);
-  const minValue = Math.min(0, ...values);
-  const maxValue = Math.max(1, ...values);
-  const range = maxValue - minValue || 1;
-  const coordinates = points.map((point, index) => {
-    const x = left + (points.length === 1 ? 0 : (index / (points.length - 1)) * (width - left - right));
-    const y = top + ((maxValue - point.value) / range) * (height - top - bottom);
-    return { x, y };
-  });
   const latest = points[points.length - 1];
-  const dateLabel = (value: string) => {
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('mn-MN', { month: '2-digit', day: '2-digit' });
-  };
+  const rawUsed = metric.total ?? latest.value;
+  if (!Number.isFinite(rawUsed)) return null;
+  const used = Math.max(0, rawUsed);
+  const limit = metric.limit !== undefined && Number.isFinite(metric.limit) && metric.limit > 0
+    ? metric.limit
+    : undefined;
+  const remaining = limit === undefined ? undefined : Math.max(0, limit - used);
+  const percentage = limit === undefined ? undefined : used / limit * 100;
+  const formatValue = (value: number) => value.toLocaleString('mn-MN', { maximumFractionDigits: 2 });
 
   return (
-    <div style={{ minWidth: 0 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 2 }}>
+    <div style={{ minWidth: 0, display: 'grid', gap: 5 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
         <strong style={{ color: '#334155', fontSize: 13 }}>{metric.name}</strong>
         <span style={{ color: '#0f172a', fontSize: 12, fontWeight: 700 }}>
-          {latest.value.toLocaleString('mn-MN', { maximumFractionDigits: 2 })} {metric.unit}
+          {percentage === undefined ? `${formatValue(used)} ${metric.unit}` : `${percentage.toFixed(0)}%`}
         </span>
       </div>
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${metric.name}: ${points.length} цэгийн хэрэглээний график`} style={{ display: 'block', width: '100%', height: 150 }}>
-        {[0, 0.5, 1].map((fraction) => {
-          const y = top + fraction * (height - top - bottom);
-          return <line key={fraction} x1={left} x2={width - right} y1={y} y2={y} stroke="#e2e8f0" strokeDasharray="3 4" />;
-        })}
-        <polyline
-          fill="none"
-          stroke="#2563eb"
-          strokeWidth="2.5"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-          points={coordinates.map(({ x, y }) => `${x},${y}`).join(' ')}
-        />
-        {coordinates.map(({ x, y }, index) => <circle key={`${points[index].date}-${index}`} cx={x} cy={y} r={3.5} fill="#2563eb" />)}
-        <text x={left} y={height - 5} fill="#64748b" fontSize="10" textAnchor="start">{dateLabel(points[0].date)}</text>
-        <text x={width - right} y={height - 5} fill="#64748b" fontSize="10" textAnchor="end">{dateLabel(latest.date)}</text>
-      </svg>
+      {limit !== undefined && remaining !== undefined && percentage !== undefined
+        ? <>
+          <div
+            role="progressbar"
+            aria-label={`${metric.name} ашиглалт`}
+            aria-valuemin={0}
+            aria-valuemax={limit}
+            aria-valuenow={Math.min(used, limit)}
+            aria-valuetext={`${formatValue(used)} ${metric.unit} ашигласан, ${formatValue(remaining)} ${metric.unit} үлдсэн`}
+            style={{ height: 7, overflow: 'hidden', borderRadius: 999, background: '#e2e8f0' }}
+          >
+            <div style={{ width: `${Math.min(100, percentage)}%`, height: '100%', borderRadius: 999, background: '#16a34a', transition: 'width .2s ease' }} />
+          </div>
+          <small style={{ color: '#64748b', fontSize: 11 }}>
+            Ашигласан {formatValue(used)} / {formatValue(limit)} {metric.unit} · Үлдсэн {formatValue(remaining)} {metric.unit}
+          </small>
+        </>
+        : <small style={{ color: '#64748b', fontSize: 11 }}>Нийт хязгаар API-аас ирээгүй.</small>}
     </div>
   );
 }
@@ -112,7 +103,7 @@ export default function DataUsagePanel() {
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
         <div>
           <h2 style={{ margin: 0, color: '#0f172a', fontSize: 20 }}>Data ашиглалт</h2>
-          <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: 12 }}>Үйлчилгээ бүрийн хэмжүүр тусдаа нэгжээр харагдана. График нь сүүлийн 7 хоногийн өгөгдөл.</p>
+          <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: 12 }}>Боломжтой хязгаарыг ашигласан болон үлдсэн хэмжээгээр progress bar-аар харуулна.</p>
         </div>
         <button type="button" onClick={() => void loadUsage()} disabled={loading} style={{ border: 0, borderRadius: 7, padding: '8px 12px', background: loading ? '#94a3b8' : '#2563eb', color: '#fff', fontWeight: 700, cursor: loading ? 'wait' : 'pointer' }}>
           {loading ? 'Шинэчилж байна...' : 'Шинэчлэх'}
@@ -130,7 +121,7 @@ export default function DataUsagePanel() {
             </header>
             {provider.message && <p style={{ margin: '5px 0', color: provider.status === 'error' ? '#b91c1c' : '#64748b', fontSize: 12, lineHeight: 1.5 }}>{provider.message}</p>}
             {provider.metrics.length > 0
-              ? <div style={{ display: 'grid', gap: 8 }}>{provider.metrics.map((metric) => <MetricLineChart key={`${provider.id}-${metric.name}`} metric={metric} />)}</div>
+              ? <div style={{ display: 'grid', gap: 12 }}>{provider.metrics.map((metric) => <MetricProgress key={`${provider.id}-${metric.name}`} metric={metric} />)}</div>
               : !provider.message && <p style={{ margin: '12px 0 0', color: '#64748b', fontSize: 12 }}>Одоогоор харуулах хэмжүүр алга.</p>}
           </article>
         ))}
