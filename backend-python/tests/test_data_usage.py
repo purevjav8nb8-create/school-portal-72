@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import unittest
 from datetime import datetime, timezone
@@ -241,13 +242,46 @@ class DataUsageTests(unittest.TestCase):
 
         asyncio.run(run_test())
 
-    def test_vercel_project_lookup_connects_without_team_id_or_fake_usage(self):
+    def test_vercel_loads_month_to_date_usage_from_billing_api(self):
         async def run_test():
             requests = []
+            today = datetime.now(timezone.utc).date().isoformat()
 
             async def handler(request):
                 requests.append(request)
-                return httpx.Response(200, json={"id": "prj_test", "name": "portal72"})
+                if request.url.path == "/v9/projects/prj_test":
+                    return httpx.Response(200, json={
+                        "id": "prj_test",
+                        "name": "portal72",
+                        "accountId": "team_test",
+                    })
+                charges = [
+                    {
+                        "ChargeCategory": "Usage",
+                        "ConsumedQuantity": 2.5,
+                        "ConsumedUnit": "GB",
+                        "ServiceName": "Fast Data Transfer",
+                        "ChargePeriodStart": f"{today}T00:00:00Z",
+                    },
+                    {
+                        "ChargeCategory": "Usage",
+                        "ConsumedQuantity": "1.25",
+                        "ConsumedUnit": "GB",
+                        "ServiceName": "Fast Data Transfer",
+                        "ChargePeriodStart": f"{today}T00:00:00Z",
+                    },
+                    {
+                        "ChargeCategory": "Purchase",
+                        "ConsumedQuantity": None,
+                        "ConsumedUnit": None,
+                        "ServiceName": "Plan",
+                        "ChargePeriodStart": f"{today}T00:00:00Z",
+                    },
+                ]
+                return httpx.Response(
+                    200,
+                    content="\n".join(json.dumps(charge) for charge in charges).encode(),
+                )
 
             with patch.dict(os.environ, {
                 "VERCEL_TOKEN": "test-token",
@@ -257,10 +291,70 @@ class DataUsageTests(unittest.TestCase):
                     result = await _vercel(client)
 
             self.assertEqual(result["status"], "connected")
-            self.assertEqual(result["metrics"], [])
-            self.assertIn("bandwidth", result["message"])
+            self.assertEqual(len(result["metrics"]), 1)
+            metric = result["metrics"][0]
+            self.assertEqual(metric["name"], "Fast Data Transfer")
+            self.assertEqual(metric["unit"], "GB")
+            self.assertEqual(metric["total"], 3.75)
+            self.assertEqual(metric["points"], [{"date": today, "value": 3.75}])
+            self.assertNotIn("limit", metric)
             self.assertEqual(requests[0].url.path, "/v9/projects/prj_test")
-            self.assertNotIn("teamId", requests[0].url.params)
+            self.assertEqual(requests[1].url.path, "/v1/billing/charges")
+            self.assertEqual(requests[1].url.params["teamId"], "team_test")
+            self.assertEqual(requests[1].url.params["from"][:10], today[:8] + "01")
+            self.assertTrue(requests[1].url.params["to"].endswith("Z"))
+            self.assertTrue(all(request.headers["Authorization"] == "Bearer test-token" for request in requests))
+
+        asyncio.run(run_test())
+
+    def test_vercel_billing_api_uses_explicit_team_id_and_reports_api_errors(self):
+        async def run_test():
+            requests = []
+
+            async def handler(request):
+                requests.append(request)
+                if request.url.path == "/v9/projects/prj_test":
+                    return httpx.Response(200, json={
+                        "id": "prj_test",
+                        "name": "portal72",
+                        "accountId": "team_project",
+                    })
+                return httpx.Response(403, json={"error": {"message": "Billing access required"}})
+
+            with patch.dict(os.environ, {
+                "VERCEL_TOKEN": "test-token",
+                "VERCEL_PROJECT_ID": "prj_test",
+                "VERCEL_TEAM_ID": "team_override",
+            }, clear=True):
+                async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+                    result = await _vercel(client)
+
+            self.assertEqual(result["status"], "error")
+            self.assertIn("Billing access required", result["message"])
+            self.assertEqual(requests[1].url.params["teamId"], "team_override")
+
+        asyncio.run(run_test())
+
+    def test_vercel_empty_billing_response_reports_no_data(self):
+        async def run_test():
+            async def handler(request):
+                if request.url.path == "/v9/projects/prj_test":
+                    return httpx.Response(200, json={
+                        "id": "prj_test",
+                        "name": "portal72",
+                        "accountId": "team_test",
+                    })
+                return httpx.Response(200, content=b"")
+
+            with patch.dict(os.environ, {
+                "VERCEL_TOKEN": "test-token",
+                "VERCEL_PROJECT_ID": "prj_test",
+            }, clear=True):
+                async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+                    result = await _vercel(client)
+
+            self.assertEqual(result["status"], "no_data")
+            self.assertEqual(result["metrics"], [])
 
         asyncio.run(run_test())
 
