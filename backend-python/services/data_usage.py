@@ -419,12 +419,92 @@ async def _vercel(client: httpx.AsyncClient) -> dict[str, Any]:
             message += f" Сүүлийн deployment: {' — '.join(details)}."
     else:
         message += " Сүүлийн deployment-ийн мэдээлэл олдсонгүй."
-    message += " Projects API хэрэглэсэн GB болон сарын квотын мэдээлэл өгдөггүй."
+
+    today = datetime.now(timezone.utc).date()
+    params = {
+        "projectId": project_id,
+        "since": today.replace(day=1).isoformat(),
+        "until": today.isoformat(),
+        "by": "day",
+    }
+    team_id = os.getenv("VERCEL_TEAM_ID", "").strip()
+    if team_id:
+        params["teamId"] = team_id
+    try:
+        analytics_response = await client.get(
+            "https://api.vercel.com/v1/query/web-analytics/visits/aggregate",
+            params=params,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        analytics_response.raise_for_status()
+    except httpx.HTTPStatusError as error:
+        return _provider(
+            "vercel",
+            "Vercel",
+            "error",
+            message=(
+                f"Vercel Web Analytics API алдаа ({error.response.status_code})"
+                f"{_api_error_detail(error.response)}; төсөл дээр Web Analytics идэвхтэй эсэх, "
+                "мөн токены эрх болон багийн ID тохиргоог шалгана уу."
+            ),
+        )
+    except httpx.RequestError:
+        return _provider("vercel", "Vercel", "error", message="Vercel Web Analytics API-д холбогдож чадсангүй.")
+    try:
+        analytics = _json_payload(analytics_response, "Vercel Web Analytics", dict)
+    except ValueError:
+        return _provider("vercel", "Vercel", "error", message="Vercel Web Analytics API буруу форматтай өгөгдөл буцаалаа.")
+
+    rows = analytics.get("data")
+    if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+        return _provider("vercel", "Vercel", "error", message="Vercel Web Analytics API буруу бүтэцтэй өгөгдөл буцаалаа.")
+
+    daily_values: dict[str, dict[str, float]] = defaultdict(
+        lambda: {"pageviews": 0.0, "visitors": 0.0}
+    )
+    for row in rows:
+        timestamp = row.get("timestamp")
+        pageviews = _number(row.get("pageviews"))
+        visitors = _number(row.get("visitors"))
+        if not isinstance(timestamp, str) or pageviews is None or visitors is None:
+            return _provider("vercel", "Vercel", "error", message="Vercel Web Analytics мөр дутуу өгөгдөлтэй байна.")
+        try:
+            parsed_timestamp = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+        except ValueError:
+            return _provider("vercel", "Vercel", "error", message="Vercel Web Analytics огноо буруу байна.")
+        if parsed_timestamp.tzinfo is None:
+            return _provider("vercel", "Vercel", "error", message="Vercel Web Analytics огноонд timezone байхгүй байна.")
+        day = parsed_timestamp.astimezone(timezone.utc).date().isoformat()
+        daily_values[day]["pageviews"] += pageviews
+        daily_values[day]["visitors"] += visitors
+
+    metrics = []
+    for key, name, unit in (
+        ("pageviews", "Хуудас үзэлт", "үзэлт"),
+        ("visitors", "Зочин", "зочин"),
+    ):
+        points = [
+            {"date": day, "value": values[key]}
+            for day, values in sorted(daily_values.items())
+        ]
+        if points:
+            metrics.append({
+                "name": name,
+                "unit": unit,
+                "points": points,
+                "total": sum(point["value"] for point in points),
+                "chart": "line",
+            })
+    if metrics:
+        message += " Энэ сарын Web Analytics хуудас үзэлт, зочдын тоо; GB хэрэглээ биш."
+    else:
+        message += " Web Analytics энэ сард өгөгдөл буцаасангүй; Analytics тохиргоог шалгана уу."
 
     return _provider(
         "vercel",
         "Vercel",
-        "connected",
+        "connected" if metrics else "no_data",
+        metrics,
         message=message,
     )
 

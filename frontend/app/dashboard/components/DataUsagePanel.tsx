@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { backendBaseUrl, fetchWithAuth } from '../../../lib/backendApi';
 
 type UsagePoint = { date: string; value: number };
-type UsageMetric = { name: string; unit: string; points: UsagePoint[]; limit?: number; total?: number };
+type UsageMetric = { name: string; unit: string; points: UsagePoint[]; limit?: number; total?: number; chart?: 'line' };
 type UsageProvider = {
   id: string;
   name: string;
@@ -16,6 +16,54 @@ type UsageProvider = {
 function MetricProgress({ metric }: { metric: UsageMetric }) {
   const points = metric.points.filter((point) => Number.isFinite(point.value));
   if (!points.length) return null;
+
+  if (metric.chart === 'line') {
+    const width = 320;
+    const height = 88;
+    const padding = 8;
+    const values = points.map((point) => point.value);
+    const maximum = Math.max(...values);
+    const range = maximum || 1;
+    const coordinates = points.map((point, index) => {
+      const x = points.length === 1
+        ? width / 2
+        : padding + index * (width - padding * 2) / (points.length - 1);
+      const y = height - padding - point.value / range * (height - padding * 2);
+      return { x, y };
+    });
+    const line = coordinates.map(({ x, y }) => `${x},${y}`).join(' ');
+    const total = metric.total ?? values[values.length - 1];
+    const formatValue = (value: number) => value.toLocaleString('mn-MN', { maximumFractionDigits: 0 });
+    const firstPoint = points[0];
+    const lastPoint = points[points.length - 1];
+
+    return (
+      <div style={{ minWidth: 0, display: 'grid', gap: 5 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+          <strong style={{ color: '#334155', fontSize: 13 }}>{metric.name}</strong>
+          <span style={{ color: '#0f172a', fontSize: 12, fontWeight: 700 }}>
+            {formatValue(total)} {metric.unit}
+          </span>
+        </div>
+        <svg
+          role="img"
+          aria-label={`${metric.name} өдөр тутмын график`}
+          viewBox={`0 0 ${width} ${height}`}
+          preserveAspectRatio="none"
+          style={{ width: '100%', height: 72, overflow: 'visible' }}
+        >
+          <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#e2e8f0" />
+          {coordinates.length > 1
+            ? <polyline points={line} fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+            : <circle cx={coordinates[0].x} cy={coordinates[0].y} r="3" fill="#2563eb" />}
+        </svg>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+          <small style={{ color: '#64748b', fontSize: 10 }}>{firstPoint.date}</small>
+          <small style={{ color: '#64748b', fontSize: 10 }}>{lastPoint.date}</small>
+        </div>
+      </div>
+    );
+  }
 
   const latest = points[points.length - 1];
   const rawUsed = metric.total ?? latest.value;
@@ -103,7 +151,7 @@ export default function DataUsagePanel() {
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
         <div>
           <h2 style={{ margin: 0, color: '#0f172a', fontSize: 20 }}>Data ашиглалт</h2>
-          <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: 12 }}>Боломжтой хязгаарыг ашигласан болон үлдсэн хэмжээгээр progress bar-аар харуулна.</p>
+          <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: 12 }}>Боломжтой хязгаар болон өдөр тутмын хэрэглээний графикийг харуулна.</p>
         </div>
         <button type="button" onClick={() => void loadUsage()} disabled={loading} style={{ border: 0, borderRadius: 7, padding: '8px 12px', background: loading ? '#94a3b8' : '#2563eb', color: '#fff', fontWeight: 700, cursor: loading ? 'wait' : 'pointer' }}>
           {loading ? 'Шинэчилж байна...' : 'Шинэчлэх'}
