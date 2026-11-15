@@ -17,6 +17,7 @@ interface Props {
   imageUrl?: string;
   attachments?: AnnouncementAttachment[];
   action?: ReactNode;
+  unread?: boolean;
 }
 
 function formatDate(value: string) {
@@ -38,6 +39,7 @@ export default function RecordFeedCard({
   imageUrl,
   attachments = [],
   action,
+  unread = false,
 }: Props) {
   const preview = imageUrl
     ? { name: 'Зураг', url: imageUrl, file_type: 'image' as const }
@@ -50,7 +52,7 @@ export default function RecordFeedCard({
   );
 
   return (
-    <article style={{ display: 'flex', alignItems: 'stretch', gap: 10, padding: 9, border: '1px solid #e2e8f0', borderRadius: 8, background: '#fff' }}>
+    <article style={{ display: 'flex', alignItems: 'stretch', gap: 10, padding: 9, border: '1px solid #e2e8f0', borderRadius: 8, background: '#fff', fontWeight: unread ? 600 : 400 }}>
       <div style={{ flex: '0 0 96px', width: 96, height: 68, display: 'grid', placeItems: 'center', overflow: 'hidden', borderRadius: 8, background: '#eff6ff', color: '#2563eb' }}>
         {preview
           ? <FileAttachmentActions attachment={preview} inlinePreview previewWidth={96} previewHeight={68} />
@@ -60,10 +62,10 @@ export default function RecordFeedCard({
       </div>
       <div style={{ minWidth: 0, flex: 1 }}>
         <small style={{ color: '#047857' }}>{label}</small>
-        <h3 style={{ margin: '2px 0 4px', fontSize: 16 }}>{title}</h3>
+        <h3 style={{ margin: '2px 0 4px', fontSize: 16, fontWeight: unread ? 700 : 400 }}>{title}</h3>
         {description && <p style={{ margin: '0 0 5px', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{description}</p>}
         {metadata && <p style={{ margin: '0 0 5px', color: '#475569', whiteSpace: 'pre-wrap' }}>{metadata}</p>}
-        {status && <span style={{ display: 'inline-block', marginBottom: 5, padding: '3px 8px', borderRadius: 999, background: '#f1f5f9', color: '#475569', fontSize: 12, fontWeight: 700 }}>{status}</span>}
+        {status && <span style={{ display: 'inline-block', marginBottom: 5, padding: '3px 8px', borderRadius: 999, background: '#f1f5f9', color: '#475569', fontSize: 12, fontWeight: unread ? 700 : 400 }}>{status}</span>}
         {otherPdfPreviews.length > 0 && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 5 }}>
           {otherPdfPreviews.map((attachment) => <FileAttachmentActions key={attachment.url} attachment={attachment} inlinePreview previewWidth={144} previewHeight={100} />)}
         </div>}

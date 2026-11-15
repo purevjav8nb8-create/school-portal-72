@@ -25,7 +25,11 @@ export default function DashboardPage() {
   const [reportGradeBand, setReportGradeBand] = useState<ReportGradeBand>('all');
   const [reportSubject, setReportSubject] = useState('');
   const { teachers, setTeachers, displayTeachers, errorMessage: teacherLoadError } = useTeachers(activeUnit, !loading && !!user);
-  const { counts: notificationCounts, unreadItems, errorMessage: notificationError, markRead, markItemRead } = useNotifications('admin', undefined, !loading && !!user);
+  const { counts: notificationCounts, unreadItems, errorMessage: notificationError, markItemRead } = useNotifications(
+    user?.role ?? 'admin',
+    undefined,
+    !loading && user?.role === 'manager',
+  );
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -120,10 +124,8 @@ export default function DashboardPage() {
       setReportGradeBand={setReportGradeBand}
       reportSubject={reportSubject}
       setReportSubject={setReportSubject}
-      onCategoryChange={(category) => {
-        if (category !== 'Хянах') markRead(category);
-        setActiveCategory(category);
-      }}
+      onCategoryChange={setActiveCategory}
+      onNotificationItemViewed={markItemRead}
       onReviewMaterialViewed={(userId, submittedAt) => markItemRead('Хянах', reviewPlanNotificationId(userId, submittedAt))}
     />
   );

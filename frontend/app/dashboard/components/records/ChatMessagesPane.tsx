@@ -44,7 +44,7 @@ export default function ChatMessagesPane({
         ))}
         {messages.length === 0 && <p style={{ margin: 'auto', color: '#94a3b8' }}>Мессеж байхгүй байна.</p>}
       </div>
-      {conversation && (conversation.kind !== 'broadcast' || isAdmin) ? (
+      {!conversation ? <p style={{ margin: 0, padding: 12, borderTop: '1px solid #e2e8f0', color: '#64748b', fontSize: 13 }}>Чат нээгээгүй байна. Жагсаалтаас унших чатаа сонгоно уу.</p> : conversation.kind !== 'broadcast' || isAdmin ? (
         <form onSubmit={onSend} style={{ display: 'grid', gap: 8, padding: 10, borderTop: '1px solid #e2e8f0' }}>
           {conversation.kind === 'broadcast' && isAdmin && <UnitTargetSelector
             selectedUnits={targetUnits}

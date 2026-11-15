@@ -3,13 +3,26 @@ import { DashboardCategory } from '../types';
 
 export type NotificationItem = { id: string; category: DashboardCategory };
 
-type AnnouncementRecord = { id?: string };
+type AnnouncementRecord = { id?: string; kind?: 'Мэдээлэл' | 'Зар' };
 type SurveyRecord = { id?: string; response_ids?: string[] };
+type ChatConversationRecord = { unread_message_ids?: string[] };
 type UpdatedRecord = { id?: string; createdAt?: string; submittedAt?: string; reviewedAt?: string; updatedAt?: string };
+export type EvaluationNotificationRecord = {
+  grade?: number | string;
+  section?: string;
+  subject?: string;
+  level?: string;
+  students_count?: number | string;
+  average_score?: number | string;
+};
 type TeacherRecord = {
   user_id?: string;
   trainings?: { id?: string }[];
-  evaluations?: { id?: string; createdAt?: string; evaluation_date?: string }[];
+  evaluations?: (EvaluationNotificationRecord & {
+    id?: string;
+    createdAt?: string;
+    evaluation_date?: string;
+  })[];
   activities?: UpdatedRecord[];
   program_plan?: UpdatedRecord & {
     approved?: boolean;
@@ -18,12 +31,34 @@ type TeacherRecord = {
   };
 };
 
-const categories: DashboardCategory[] = ['Мэдээлэл', 'Зар', 'Судалгаа', 'Үнэлгээ', 'Сургалт', 'Оролцоо', 'Шагнал', 'Зэрэг', 'Хянах', 'Чат'];
+const categories: DashboardCategory[] = ['Мэдээлэл', 'Зар', 'Судалгаа', 'Үнэлгээ', 'Сургалт', 'Оролцоо', 'Шагнал', 'Зэрэг', 'Хянах', 'Хөтөлбөр', 'Чат'];
 const apiUrl = backendBaseUrl;
 const transientStatuses = [502, 503, 504];
 
 export function reviewPlanNotificationId(userId: string, submittedAt?: string, id?: string) {
   return `${userId}:program-plan:${submittedAt ?? id ?? 'pending'}`;
+}
+
+export function returnedPlanNotificationId(submittedAt: string, reviewedAt?: string) {
+  return `returned-program-plan:${submittedAt}:${reviewedAt ?? 'returned'}`;
+}
+
+export function evaluationNotificationId(userId: string, evaluation: UpdatedRecord) {
+  return `${userId}:evaluations:${evaluation.createdAt ?? evaluation.submittedAt ?? evaluation.reviewedAt ?? evaluation.updatedAt ?? evaluation.id ?? 'existing'}`;
+}
+
+export function isValidEvaluationRecord(evaluation: EvaluationNotificationRecord) {
+  const grade = Number(evaluation.grade);
+  const studentsCount = Number(evaluation.students_count);
+  const averageScore = Number(evaluation.average_score);
+  return Number.isInteger(grade)
+    && grade > 0
+    && String(evaluation.section ?? '').trim().length > 0
+    && String(evaluation.subject ?? '').trim().length > 0
+    && ['VIII', 'VII', 'VI', 'V', 'IV', 'III', 'II', 'I'].includes(evaluation.level ?? '')
+    && Number.isFinite(studentsCount)
+    && studentsCount > 0
+    && Number.isFinite(averageScore);
 }
 
 async function fetchNotificationResponse(url: string, headers: HeadersInit): Promise<Response> {
@@ -72,20 +107,28 @@ export async function fetchNotificationItems(
   personalItems: NotificationItem[],
   accessToken: string,
 ): Promise<NotificationItem[]> {
+  if (role === 'admin') return [];
   const headers = { Authorization: `Bearer ${accessToken}` };
-  const announcementResponses = await Promise.all(
-    (['Мэдээлэл', 'Зар'] as const).map((category) =>
-      fetchNotificationResponse(`${apiUrl}/api/teachers/announcements?kind=${encodeURIComponent(category)}`, headers),
-    ),
-  );
-  const announcementRecords = await Promise.all(announcementResponses.map((response) => readResponse<AnnouncementRecord[]>(response)));
-  const nextItems = role !== 'teacher' ? [...personalItems] : [];
-  announcementRecords.forEach((records, index) => {
-    const category = (['Мэдээлэл', 'Зар'] as const)[index];
-    records.forEach((record) => { if (record.id) nextItems.push({ id: String(record.id), category }); });
+  const [announcementsResponse, conversationsResponse] = await Promise.all([
+    fetchNotificationResponse(`${apiUrl}/api/teachers/announcements`, headers),
+    fetchNotificationResponse(`${apiUrl}/api/teachers/chat/conversations`, headers),
+  ]);
+  const announcementRecords = await readResponse<AnnouncementRecord[]>(announcementsResponse);
+  const nextItems = [...personalItems];
+  announcementRecords.forEach((record) => {
+    if (!record.id) return;
+    nextItems.push({
+      id: String(record.id),
+      category: record.kind === 'Мэдээлэл' ? 'Мэдээлэл' : 'Зар',
+    });
   });
 
-  if (role !== 'teacher') {
+  const conversations = await readResponse<ChatConversationRecord[]>(conversationsResponse);
+  conversations.forEach((conversation) => {
+    conversation.unread_message_ids?.forEach((id) => nextItems.push({ id, category: 'Чат' }));
+  });
+
+  if (role === 'manager') {
     const [surveysResponse, reviewResponse] = await Promise.all([
       fetchNotificationResponse(`${apiUrl}/api/teachers/surveys`, headers),
       fetchNotificationResponse(`${apiUrl}/api/teachers/review`, headers),
@@ -109,13 +152,17 @@ export async function fetchNotificationItems(
         records?.forEach((item) => { if (item.id) nextItems.push({ id: `${record.user_id}:${item.id}`, category }); });
       addRecords(record.trainings, 'Сургалт');
       addRecords(record.activities, 'Оролцоо');
-      if (record.evaluations?.length) {
-        const latestEvaluation = [...record.evaluations].sort((left, right) =>
+      const validEvaluations = record.evaluations?.filter(isValidEvaluationRecord) ?? [];
+      if (validEvaluations.length) {
+        const latestEvaluation = [...validEvaluations].sort((left, right) =>
           String(right.createdAt ?? right.evaluation_date ?? right.id ?? '')
             .localeCompare(String(left.createdAt ?? left.evaluation_date ?? left.id ?? '')),
         )[0];
         nextItems.push({
-          id: `${record.user_id}:evaluations:${latestEvaluation.createdAt ?? latestEvaluation.evaluation_date ?? latestEvaluation.id ?? 'existing'}`,
+          id: evaluationNotificationId(record.user_id, {
+            ...latestEvaluation,
+            submittedAt: latestEvaluation.evaluation_date,
+          }),
           category: 'Үнэлгээ',
         });
       }

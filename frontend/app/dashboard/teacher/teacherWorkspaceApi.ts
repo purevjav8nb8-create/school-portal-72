@@ -57,6 +57,7 @@ export async function loadTeacherWorkspace(): Promise<LoadResult> {
       return { redirect: '/', clearMockToken: true };
     }
   }
+
   if (authUser && mockToken) window.localStorage.removeItem('school-portal-mock-token');
   if (authUser?.app_metadata?.role === 'admin' || authUser?.app_metadata?.role === 'manager' || authUser?.email?.toLowerCase() === 'admin@moes.edu.mn') {
     return { redirect: '/dashboard/admin' };
@@ -85,4 +86,24 @@ export async function loadTeacherWorkspace(): Promise<LoadResult> {
         : error instanceof Error ? error.message : 'Мэдээлэл уншигдсангүй.',
     };
   }
+}
+
+export async function loadTeacherProgramPlan(): Promise<ProgramPlan | undefined> {
+  const mockToken = window.localStorage.getItem('school-portal-mock-token');
+  let session: Session | null = null;
+  try {
+    const result = await supabase.auth.getSession();
+    if (result.error) throw result.error;
+    session = result.data.session;
+  } catch (error) {
+    if (!mockToken) throw error;
+  }
+  const accessToken = session?.access_token ?? mockToken;
+  if (!accessToken) throw new Error('Дахин нэвтэрнэ үү.');
+  const response = await fetchWithAuth(`${backendBaseUrl}/api/teachers/me/program-plan`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const result = await response.json() as { detail?: string; program_plan?: ProgramPlan | null };
+  if (!response.ok) throw new Error(result.detail ?? 'Хөтөлбөрийн төлөв шинэчлэгдсэнгүй.');
+  return result.program_plan ?? undefined;
 }

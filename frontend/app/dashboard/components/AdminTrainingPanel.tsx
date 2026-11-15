@@ -18,9 +18,11 @@ type Training = {
 
 interface Props {
   teachers: Teacher[];
+  unreadNotificationKeys: ReadonlySet<string>;
+  onTrainingViewed: (id: string) => void;
 }
 
-export default function AdminTrainingPanel({ teachers }: Props) {
+export default function AdminTrainingPanel({ teachers, unreadNotificationKeys, onTrainingViewed }: Props) {
   const [selected, setSelected] = useState<{ teacher: Teacher; training: Training } | null>(null);
   const [teacherId, setTeacherId] = useState('');
   const [teacherSearch, setTeacherSearch] = useState('');
@@ -75,17 +77,27 @@ export default function AdminTrainingPanel({ teachers }: Props) {
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead><tr>{['Багш', 'Сургалтын нэр', 'Төрөл', 'Хугацаа', 'Файл'].map((item) => <th key={item} style={cell}>{item}</th>)}</tr></thead>
-            <tbody>{rows.map(({ teacher, training }) => (
-              <tr key={`${teacher.auth_id}-${training.id}`} style={{ borderTop: '1px solid #e2e8f0' }}>
+            <tbody>{rows.map(({ teacher, training }) => {
+              const notificationId = `${teacher.auth_id}:${training.id}`;
+              const isUnread = unreadNotificationKeys.has(`Сургалт:${notificationId}`);
+              return (
+              <tr key={`${teacher.auth_id}-${training.id}`} style={{ borderTop: '1px solid #e2e8f0', fontWeight: isUnread ? 600 : 400 }}>
                 <td style={cell}>{formatTeacherName(`${teacher.last_name} ${teacher.first_name}`)}</td>
                 <td style={cell}>
-                  <button type="button" onClick={() => setSelected({ teacher, training })} style={linkButton}>{training.name}</button>
+                  <button type="button" onClick={() => {
+                    onTrainingViewed(notificationId);
+                    setSelected({ teacher, training });
+                  }} style={{ ...linkButton, fontWeight: isUnread ? 700 : 400 }}>{training.name}</button>
                 </td>
                 <td style={cell}>{training.trainingType || 'Бусад'}</td>
                 <td style={cell}>{training.startDate} – {training.endDate}</td>
-                <td style={cell}><FileAttachmentActions attachment={{ name: 'Сертификат', url: training.certificateUrl, file_type: training.certificateUrl.toLowerCase().includes('.pdf') ? 'document' : 'image' }} /></td>
+                <td style={cell}><FileAttachmentActions
+                  attachment={{ name: 'Сертификат', url: training.certificateUrl, file_type: training.certificateUrl.toLowerCase().includes('.pdf') ? 'document' : 'image' }}
+                  onViewed={() => onTrainingViewed(notificationId)}
+                /></td>
               </tr>
-            ))}</tbody>
+              );
+            })}</tbody>
           </table>
         </div>
       )}
@@ -103,7 +115,10 @@ export default function AdminTrainingPanel({ teachers }: Props) {
                 <div style={previewFrame}>
                   <img src={cloudinaryPdfPreview(selected.training.certificateUrl)} alt="Сертификат" style={previewImage} />
                 </div>
-                <FileAttachmentActions attachment={{ name: 'Сертификат', url: selected.training.certificateUrl, file_type: selected.training.certificateUrl.toLowerCase().includes('.pdf') ? 'document' : 'image' }} />
+                <FileAttachmentActions
+                  attachment={{ name: 'Сертификат', url: selected.training.certificateUrl, file_type: selected.training.certificateUrl.toLowerCase().includes('.pdf') ? 'document' : 'image' }}
+                  onViewed={() => onTrainingViewed(`${selected.teacher.auth_id}:${selected.training.id}`)}
+                />
               </div>
               {selected.training.imageUrl && (
                 <div style={attachmentCard}>
@@ -111,7 +126,10 @@ export default function AdminTrainingPanel({ teachers }: Props) {
                   <div style={previewFrame}>
                     <img src={selected.training.imageUrl} alt="Сургалтын зураг" style={previewImage} />
                   </div>
-                  <FileAttachmentActions attachment={{ name: 'Сургалтын зураг', url: selected.training.imageUrl, file_type: 'image' }} />
+                  <FileAttachmentActions
+                    attachment={{ name: 'Сургалтын зураг', url: selected.training.imageUrl, file_type: 'image' }}
+                    onViewed={() => onTrainingViewed(`${selected.teacher.auth_id}:${selected.training.id}`)}
+                  />
                 </div>
               )}
             </div>

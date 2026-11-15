@@ -60,6 +60,7 @@ export type TeacherRecords = {
     level: string;
     students_count: number;
     average_score: number;
+    createdAt?: string;
     evaluation_date: string;
   }[];
 };

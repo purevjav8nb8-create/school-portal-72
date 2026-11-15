@@ -50,6 +50,14 @@ def homeroom_evaluations(user) -> list[dict[str, Any]]:
                 })
     return sorted(received, key=lambda item: (item.get("evaluation_date", ""), item.get("createdAt", "")), reverse=True)
 
+def get_my_program_plan(user) -> dict[str, Any] | None:
+    if mock_data_enabled():
+        teacher = get_mock_teacher_by_id(user.id)
+        if teacher is None:
+            raise HTTPException(status_code=404, detail="Загвар багш олдсонгүй.")
+        return teacher.get("program_plan")
+    return teacher_portal_data(user).get("program_plan")
+
 def get_my_teacher_data(user) -> dict[str, Any]:
     if mock_data_enabled():
         teacher = get_mock_teacher_by_id(user.id)

@@ -5,6 +5,7 @@ import TeacherDashboardView from '../components/TeacherDashboardView';
 import { Teacher } from '../types';
 import { DashboardCategory } from '../types';
 import { useNotifications } from '../hooks/useNotifications';
+import { returnedPlanNotificationId } from '../hooks/notificationData';
 import useTeacherWorkspace from './useTeacherWorkspace';
 import useTeacherRecordActions from './useTeacherRecordActions';
 
@@ -30,24 +31,14 @@ export default function TeacherDashboardPage() {
     setSuccessMessage,
   });
   const personalNotificationItems = useMemo(() => {
-    const latestEvaluationByTeacher = new Map<string, (typeof workspace.homeroomEvaluations)[number]>();
-    workspace.homeroomEvaluations.forEach((item) => {
-      const teacherId = item.evaluator_id || item.evaluator || item.id;
-      const current = latestEvaluationByTeacher.get(teacherId);
-      const timestamp = item.createdAt || item.evaluation_date || item.id;
-      const currentTimestamp = current?.createdAt || current?.evaluation_date || current?.id || '';
-      if (!current || timestamp.localeCompare(currentTimestamp) > 0) latestEvaluationByTeacher.set(teacherId, item);
-    });
-    return [
-      ...workspace.awards.map((item) => ({ id: item.id, category: 'Шагнал' as const })),
-      ...workspace.degrees.map((item) => ({ id: item.id, category: 'Зэрэг' as const })),
-      ...[...latestEvaluationByTeacher.values()].map((item) => ({
-        id: item.id,
-        category: 'Үнэлгээ' as const,
-      })),
-    ];
-  }, [workspace.awards, workspace.degrees, workspace.homeroomEvaluations]);
-  const { counts: notificationCounts, errorMessage: notificationError, markRead } = useNotifications(
+    const plan = workspace.programPlan;
+    if (!plan || (!plan.returned && plan.review_status !== 'returned')) return [];
+    return [{
+      id: returnedPlanNotificationId(plan.submittedAt, plan.reviewedAt),
+      category: 'Хөтөлбөр' as const,
+    }];
+  }, [workspace.programPlan]);
+  const { counts: notificationCounts, unreadItems, errorMessage: notificationError, markItemRead } = useNotifications(
     'teacher',
     personalNotificationItems,
     !workspace.loading && !!workspace.user,
@@ -103,6 +94,14 @@ export default function TeacherDashboardPage() {
     onProfessionalSave={actions.saveProfessional}
     notificationCounts={notificationCounts}
     notificationError={notificationError}
-    onNotificationCategoryChange={(category) => { markRead(category); setActiveCategory(category); }}
+    unreadNotificationKeys={unreadItems}
+    onNotificationCategoryChange={setActiveCategory}
+    onNotificationItemViewed={markItemRead}
+    onReturnedPlanViewed={() => {
+      const plan = workspace.programPlan;
+      if (plan && (plan.returned || plan.review_status === 'returned')) {
+        markItemRead('Хөтөлбөр', returnedPlanNotificationId(plan.submittedAt, plan.reviewedAt));
+      }
+    }}
   />;
 }

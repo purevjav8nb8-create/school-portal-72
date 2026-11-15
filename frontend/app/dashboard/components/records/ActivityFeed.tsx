@@ -46,7 +46,22 @@ function toAnnouncement(item: ActivityFeedItem): Announcement {
   };
 }
 
-export default function ActivityFeed({ activities }: { activities: ActivityFeedItem[] }) {
+export default function ActivityFeed({
+  activities,
+  unreadNotificationKeys,
+  onActivityViewed,
+}: {
+  activities: ActivityFeedItem[];
+  unreadNotificationKeys?: ReadonlySet<string>;
+  onActivityViewed?: (id: string) => void;
+}) {
   const announcements = activities.map(toAnnouncement);
-  return <AnnouncementFeed announcements={announcements} />;
+  return (
+    <AnnouncementFeed
+      announcements={announcements}
+      notificationCategory="Оролцоо"
+      unreadNotificationKeys={unreadNotificationKeys}
+      onItemViewed={onActivityViewed}
+    />
+  );
 }

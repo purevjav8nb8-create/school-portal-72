@@ -6,6 +6,7 @@ import { ChatConversation, ChatUser, chatFieldStyle } from './chatTypes';
 interface Props {
   conversations: ChatConversation[];
   selectedId: string;
+  showUnreadCount: boolean;
   userQuery: string;
   searchResults: ChatUser[];
   searching: boolean;
@@ -17,6 +18,7 @@ interface Props {
 export default function ChatSidebar({
   conversations,
   selectedId,
+  showUnreadCount,
   userQuery,
   searchResults,
   searching,
@@ -67,9 +69,9 @@ export default function ChatSidebar({
             cursor: 'pointer',
           }}
         >
-          <span style={{ display: 'flex', justifyContent: 'space-between', gap: 6, fontWeight: 700, color: '#172554' }}>
+          <span style={{ display: 'flex', justifyContent: 'space-between', gap: 6, fontWeight: showUnreadCount && conversation.unread_count > 0 ? 700 : 400, color: '#172554' }}>
             <span>{conversation.kind === 'private' ? formatTeacherName(conversation.title) : conversation.title}</span>
-            {!!conversation.unread_count && <span style={{ color: '#dc2626' }}>{conversation.unread_count}</span>}
+            {showUnreadCount && !!conversation.unread_count && <span style={{ color: '#dc2626' }}>{conversation.unread_count}</span>}
           </span>
           {conversation.unit && <small style={{ color: '#64748b' }}>{conversation.unit}</small>}
           <small style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#64748b' }}>{conversation.last_message || 'Шинэ чат эхлүүлэх'}</small>

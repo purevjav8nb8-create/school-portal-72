@@ -18,6 +18,7 @@ import EvaluationPanel, { EvaluationRecord } from './records/EvaluationPanel';
 import TeachingClassesPanel from './TeachingClassesPanel';
 import { DashboardCategory, Teacher, UserProfile } from '../types';
 import { NotificationCounts } from '../hooks/useNotifications';
+import { returnedPlanNotificationId } from '../hooks/notificationData';
 
 export type TeacherTraining = {
   id: string;
@@ -57,23 +58,36 @@ interface Props {
   onProfessionalSave: (path: string, payload: object) => Promise<void>;
   notificationCounts?: NotificationCounts;
   notificationError?: string;
+  unreadNotificationKeys: ReadonlySet<string>;
   onNotificationCategoryChange?: (category: DashboardCategory) => void;
+  onNotificationItemViewed: (category: DashboardCategory, id: string) => void;
+  onReturnedPlanViewed: () => void;
 }
 
 export default function TeacherDashboardView({
   user, teacher, trainings, evaluations, programPlan, activities, awards, degrees, homeroomEvaluations,
   activeCategory, selectedMonth, setSelectedMonth, busy, errorMessage,
   successMessage, onCategoryChange,   onLogout, onTraining, onProgramPlan, onDeleteProgramPlan, onActivity, onEvaluation, onDeleteEvaluation, onProfessionalSave,
-  notificationCounts = {}, notificationError = '', onNotificationCategoryChange,
+  notificationCounts = {}, notificationError = '', unreadNotificationKeys,
+  onNotificationCategoryChange, onNotificationItemViewed, onReturnedPlanViewed,
 }: Props) {
   const categories: DashboardCategory[] = ['Ирц', 'Хөтөлбөр', 'Мэдээлэл', 'Оролцоо', 'Сургалт', 'Судалгаа', 'Үнэлгээ', 'Зар', 'Чат', 'Зэрэг', 'Шагнал'];
+  const handleCategoryChange = (category: DashboardCategory) => {
+    (onNotificationCategoryChange ?? onCategoryChange)(category);
+    if (category === 'Хөтөлбөр' && (programPlan?.returned || programPlan?.review_status === 'returned')) {
+      onReturnedPlanViewed();
+    }
+  };
+  const returnedPlanUnread = !!programPlan
+    && (programPlan.returned || programPlan.review_status === 'returned')
+    && unreadNotificationKeys.has(`Хөтөлбөр:${returnedPlanNotificationId(programPlan.submittedAt, programPlan.reviewedAt)}`);
 
   return (
     <main className="dashboard-compact" style={{ height: '100vh', overflow: 'hidden', backgroundColor: '#f8fafc', padding: 6 }}>
       <Header user={user} onLogout={onLogout} />
       <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '150px minmax(0, 1fr) 180px', gap: 8, marginTop: 7, height: 'calc(100vh - 100px)', alignItems: 'start' }}>
         <aside style={{ overflow: 'hidden' }}>
-          <SideMenu activeCategory={activeCategory} setActiveCategory={onNotificationCategoryChange ?? onCategoryChange} categories={categories} notificationCounts={notificationCounts} notificationError={notificationError} />
+          <SideMenu activeCategory={activeCategory} setActiveCategory={handleCategoryChange} categories={categories} notificationCounts={notificationCounts} notificationError={notificationError} />
           <TeachingClassesPanel unit={teacher.unit} initialClasses={teacher.teaching_classes ?? []} />
         </aside>
         <section style={{ minWidth: 0, height: '100%', overflowY: 'auto', overflowX: 'hidden', paddingRight: 4 }}>
@@ -120,12 +134,31 @@ export default function TeacherDashboardView({
             {activeCategory === 'Үнэлгээ' && (
               <EvaluationPanel unit={user.unit} subjects={user.subjects ?? (user.subject ? [user.subject] : [])} evaluations={evaluations} sharedEvaluations={homeroomEvaluations} onSubmit={onEvaluation} onDelete={onDeleteEvaluation} />
             )}
-            {activeCategory === 'Хөтөлбөр' && <ProgramPlanPanel programPlan={programPlan} unit={user.unit} subjects={user.subjects ?? (user.subject ? [user.subject] : [])} onSubmit={onProgramPlan} onDelete={onDeleteProgramPlan} busy={busy} />}
+            {activeCategory === 'Хөтөлбөр' && <ProgramPlanPanel
+              programPlan={programPlan}
+              unit={user.unit}
+              subjects={user.subjects ?? (user.subject ? [user.subject] : [])}
+              onSubmit={onProgramPlan}
+              onDelete={onDeleteProgramPlan}
+              busy={busy}
+              notificationUnread={returnedPlanUnread}
+            />}
             {activeCategory === 'Оролцоо' && <ActivityPanel unit={user.unit} subjects={user.subjects ?? (user.subject ? [user.subject] : [])} activities={activities} author={`${user.last_name} ${user.first_name}`.trim() || user.email} onSubmit={onActivity} />}
             {activeCategory === 'Судалгаа' && <SurveyBoard />}
-            {activeCategory === 'Чат' && <ChatBoard />}
-            {activeCategory === 'Мэдээлэл' && <AnnouncementBoard boardType="Мэдээлэл" />}
-            {activeCategory === 'Зар' && <AnnouncementBoard boardType="Зар" />}
+            {activeCategory === 'Чат' && <ChatBoard
+              showUnreadCount
+              onConversationViewed={(ids) => ids.forEach((id) => onNotificationItemViewed('Чат', id))}
+            />}
+            {activeCategory === 'Мэдээлэл' && <AnnouncementBoard
+              boardType="Мэдээлэл"
+              unreadNotificationKeys={unreadNotificationKeys}
+              onAnnouncementViewed={(id) => onNotificationItemViewed('Мэдээлэл', id)}
+            />}
+            {activeCategory === 'Зар' && <AnnouncementBoard
+              boardType="Зар"
+              unreadNotificationKeys={unreadNotificationKeys}
+              onAnnouncementViewed={(id) => onNotificationItemViewed('Зар', id)}
+            />}
             {activeCategory === 'Шагнал' && <FloatingComposer title="Шагнал бүртгэх" label="Шагнал бүртгэх">{() => <ProfessionalProfilePanel mode="award" awards={awards} degrees={degrees} onSave={onProfessionalSave} />}</FloatingComposer>}
             {activeCategory === 'Зэрэг' && <FloatingComposer title="Мэргэжлийн зэрэг" label="Мэргэжлийн зэрэг">{() => <ProfessionalProfilePanel mode="degree" awards={awards} degrees={degrees} onSave={onProfessionalSave} />}</FloatingComposer>}
             {busy && <p role="status">Хадгалж байна...</p>}

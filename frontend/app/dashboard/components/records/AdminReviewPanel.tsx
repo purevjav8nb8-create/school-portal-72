@@ -5,12 +5,11 @@ import { PenLine } from 'lucide-react';
 import { backendBaseUrl, fetchWithAuth } from '../../../../lib/backendApi';
 import { supabase } from '../../../../lib/supabaseClient';
 import { uploadCloudinaryFile } from '../../../../components/LosslessCloudinaryUpload';
+import { isValidEvaluationRecord } from '../../hooks/notificationData';
 import ApprovalAssetsDialog from './ApprovalAssetsDialog';
 import EvaluationSummary from './EvaluationSummary';
 import PlanReviewList from './PlanReviewList';
 import { ApprovalAssets, GradeBand, SubmittedPlanRecord, TeacherRecords } from './adminReviewTypes';
-
-const evaluationLevels = ['VIII', 'VII', 'VI', 'V', 'IV', 'III', 'II', 'I'] as const;
 
 interface Props {
   summaryOnly?: boolean;
@@ -20,6 +19,7 @@ interface Props {
   setSelectedSubject: (subject: string) => void;
   unreadNotificationKeys?: ReadonlySet<string>;
   onPlanViewed?: (userId: string, submittedAt: string) => void;
+  onEvaluationViewed?: (ids: string[]) => void;
 }
 
 export default function AdminReviewPanel({
@@ -30,6 +30,7 @@ export default function AdminReviewPanel({
   setSelectedSubject,
   unreadNotificationKeys = new Set(),
   onPlanViewed,
+  onEvaluationViewed,
 }: Props) {
   const [records, setRecords] = useState<TeacherRecords[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,19 +63,7 @@ export default function AdminReviewPanel({
       const result = await request('/api/teachers/review');
       setRecords(Array.isArray(result) ? (result as TeacherRecords[]).map((record) => ({
         ...record,
-        evaluations: Array.isArray(record.evaluations) ? record.evaluations.filter((evaluation) => {
-          const grade = Number(evaluation.grade);
-          const studentsCount = Number(evaluation.students_count);
-          const averageScore = Number(evaluation.average_score);
-          return Number.isInteger(grade)
-            && grade > 0
-            && String(evaluation.section ?? '').trim().length > 0
-            && String(evaluation.subject ?? '').trim().length > 0
-            && evaluationLevels.includes(evaluation.level as typeof evaluationLevels[number])
-            && Number.isFinite(studentsCount)
-            && studentsCount > 0
-            && Number.isFinite(averageScore);
-        }) : [],
+        evaluations: Array.isArray(record.evaluations) ? record.evaluations.filter(isValidEvaluationRecord) : [],
         awards: Array.isArray(record.awards) ? record.awards : [],
         professional_degrees: Array.isArray(record.professional_degrees) ? record.professional_degrees : [],
       })) : []);
@@ -214,6 +203,8 @@ export default function AdminReviewPanel({
         setSelectedBand={setSelectedBand}
         selectedSubject={selectedSubject}
         setSelectedSubject={setSelectedSubject}
+        unreadNotificationKeys={unreadNotificationKeys}
+        onEvaluationViewed={onEvaluationViewed}
       />}
       {!summaryOnly && <PlanReviewList
         records={submittedRecords}

@@ -7,7 +7,7 @@ import { EvaluationRecord } from '../components/records/EvaluationPanel';
 import { ProgramPlan } from '../components/records/ProgramPlanPanel';
 import { UserProfile } from '../types';
 import { AttendanceRecord } from '../utils/attendance';
-import { loadTeacherWorkspace, TeacherWorkspace } from './teacherWorkspaceApi';
+import { loadTeacherProgramPlan, loadTeacherWorkspace, TeacherWorkspace } from './teacherWorkspaceApi';
 
 export default function useTeacherWorkspace() {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -50,6 +50,33 @@ export default function useTeacherWorkspace() {
     });
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    if (loading || !user) return;
+    let active = true;
+    let refreshing = false;
+    const refreshProgramPlan = async () => {
+      if (refreshing) return;
+      refreshing = true;
+      try {
+        const latestPlan = await loadTeacherProgramPlan();
+        if (active) setProgramPlan((current) =>
+          JSON.stringify(current) === JSON.stringify(latestPlan) ? current : latestPlan,
+        );
+      } catch (error) {
+        if (active) setErrorMessage(error instanceof Error ? error.message : 'Хөтөлбөрийн төлөв шинэчлэгдсэнгүй.');
+      } finally {
+        refreshing = false;
+      }
+    };
+    const interval = window.setInterval(() => { void refreshProgramPlan(); }, 30_000);
+    window.addEventListener('focus', refreshProgramPlan);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshProgramPlan);
+    };
+  }, [loading, user]);
 
   return {
     user, attendance, trainings, setTrainings, evaluations, setEvaluations, programPlan, setProgramPlan,

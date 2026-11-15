@@ -13,7 +13,13 @@ function localDateTime(value: Date) {
   return new Date(value.getTime() - value.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 }
 
-export default function SurveyBoard() {
+export default function SurveyBoard({
+  unreadNotificationKeys = new Set(),
+  onSurveyViewed,
+}: {
+  unreadNotificationKeys?: ReadonlySet<string>;
+  onSurveyViewed?: (id: string) => void;
+}) {
   const [surveys, setSurveys] = useState<Survey[]>([]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -153,29 +159,34 @@ export default function SurveyBoard() {
       setEndsAt={setEndsAt} onSubmit={create}
     />
     {message && <p role="alert" style={{ color: '#b91c1c' }}>{message}</p>}
-    {surveys.length === 0 ? <p>Одоогоор судалгаа алга.</p> : <div style={{ display: 'grid', gap: 10 }}>{surveys.map((survey) => survey.can_view_results ? (
-      <article key={survey.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: 12, border: '1px solid #dbe3ee', borderRadius: 8, background: '#fff' }}>
+    {surveys.length === 0 ? <p>Одоогоор судалгаа алга.</p> : <div style={{ display: 'grid', gap: 10 }}>{surveys.map((survey) => {
+      const notificationIds = [survey.id, ...(survey.response_ids ?? []).map((userId) => `${survey.id}:${userId}`)];
+      const isUnread = notificationIds.some((id) => unreadNotificationKeys.has(`Судалгаа:${id}`));
+      const markSurveyViewed = () => notificationIds.forEach((id) => onSurveyViewed?.(id));
+      return survey.can_view_results ? (
+      <article key={survey.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: 12, border: '1px solid #dbe3ee', borderRadius: 8, background: '#fff', fontWeight: isUnread ? 600 : 400 }}>
         <div style={{ flex: 1 }}>
-          <button type="button" onClick={() => setSelectedSurveyId(survey.id)} style={{ padding: 0, border: 0, background: 'transparent', color: '#0f172a', textAlign: 'left', fontWeight: 700, cursor: 'pointer' }}>
+          <button type="button" onClick={() => { markSurveyViewed(); setSelectedSurveyId(survey.id); }} style={{ padding: 0, border: 0, background: 'transparent', color: '#0f172a', textAlign: 'left', fontWeight: isUnread ? 700 : 400, cursor: 'pointer' }}>
             {survey.title}
           </button>
           {survey.description && <p style={{ margin: '5px 0', color: '#475569' }}>{survey.description}</p>}
           {survey.author && <span style={{ color: '#64748b', fontSize: 12 }}>Оруулсан: {formatTeacherName(survey.author)}</span>}
-          <button type="button" onClick={() => setSelectedSurveyId(survey.id)} style={{ display: 'block', marginTop: 6, padding: 0, border: 0, background: 'transparent', color: '#2563eb', fontSize: 13, cursor: 'pointer' }}>{survey.response_ids?.length ?? 0} хариулт · Хариултыг харах →</button>
+          <button type="button" onClick={() => { markSurveyViewed(); setSelectedSurveyId(survey.id); }} style={{ display: 'block', marginTop: 6, padding: 0, border: 0, background: 'transparent', color: '#2563eb', fontSize: 13, cursor: 'pointer' }}>{survey.response_ids?.length ?? 0} хариулт · Хариултыг харах →</button>
         </div>
         {deleteButton(survey)}
       </article>
     ) : <article key={survey.id} style={{ padding: 12, border: '1px solid #e2e8f0', borderRadius: 8 }}>
-      <b>{survey.title}</b><p style={{ margin: '5px 0' }}>{survey.description}</p>
+      <b style={{ fontWeight: isUnread ? 700 : 400 }}>{survey.title}</b><p style={{ margin: '5px 0' }}>{survey.description}</p>
       {survey.starts_at && survey.ends_at && <p style={{ margin: '5px 0', color: '#64748b', fontSize: 12 }}>Судалгаа авах хугацаа: {new Date(survey.starts_at).toLocaleString('mn-MN')} – {new Date(survey.ends_at).toLocaleString('mn-MN')}</p>}
       {survey.author && <p style={{ margin: '5px 0', color: '#475569', fontSize: 12 }}>Оруулсан: {formatTeacherName(survey.author)}</p>}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
-        <button type="button" onClick={() => setSelectedSurveyId(survey.id)} style={{ padding: '8px 12px', border: 0, borderRadius: 6, background: '#2563eb', color: '#fff', cursor: 'pointer' }}>
+        <button type="button" onClick={() => { markSurveyViewed(); setSelectedSurveyId(survey.id); }} style={{ padding: '8px 12px', border: 0, borderRadius: 6, background: '#2563eb', color: '#fff', cursor: 'pointer' }}>
           {survey.responses && Object.keys(survey.responses).length >= (survey.questions?.length ?? 1) ? 'Бөглөсөн хариуг харах' : !survey.accepts_responses ? 'Судалгааны хугацаа дууссан' : Object.keys(survey.responses ?? {}).length > 0 ? 'Үргэлжлүүлэн бөглөх' : 'Судалгаа бөглөх'}
         </button>
         {deleteButton(survey)}
       </div>
-    </article>)}</div>}
+    </article>;
+    })}</div>}
     {selectedSurvey?.can_view_results && <SurveyResponsesDialog survey={selectedSurvey} downloading={downloadingSurveyId === selectedSurvey.id} onDownload={() => void downloadAnswers(selectedSurvey)} onClose={() => setSelectedSurveyId(undefined)} />}
     {selectedSurvey && !selectedSurvey.can_view_results && <SurveyAnswerDialog survey={selectedSurvey} drafts={answerDrafts} message={message} saving={savingSurvey} setDrafts={setAnswerDrafts} onSubmit={(item, questionsToAnswer) => void submitAnswers(item, questionsToAnswer)} onClose={() => setSelectedSurveyId(undefined)} />}
   </section>;

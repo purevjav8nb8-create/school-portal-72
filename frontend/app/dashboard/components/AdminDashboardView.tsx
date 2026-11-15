@@ -38,6 +38,7 @@ interface Props {
   notificationCounts?: NotificationCounts;
   notificationError?: string;
   unreadNotificationKeys: ReadonlySet<string>;
+  onNotificationItemViewed: (category: DashboardCategory, id: string) => void;
   onReviewMaterialViewed: (userId: string, submittedAt: string) => void;
   teacherLoadError?: string;
   onCategoryChange?: (category: DashboardCategory) => void;
@@ -68,6 +69,7 @@ export default function AdminDashboardView({
   notificationCounts = {},
   notificationError = '',
   unreadNotificationKeys,
+  onNotificationItemViewed,
   onReviewMaterialViewed,
   teacherLoadError = '',
   onCategoryChange,
@@ -140,13 +142,19 @@ export default function AdminDashboardView({
                 onAttendanceChange={onAttendanceChange}
               />
             )}
-            {activeCategory === 'Сургалт' && <AdminTrainingPanel teachers={teachers} />}
+            {activeCategory === 'Сургалт' && <AdminTrainingPanel
+              teachers={teachers}
+              unreadNotificationKeys={unreadNotificationKeys}
+              onTrainingViewed={(id) => onNotificationItemViewed('Сургалт', id)}
+            />}
             {activeCategory === 'Үнэлгээ' && <AdminReviewPanel
               summaryOnly
               selectedBand={reportGradeBand}
               setSelectedBand={setReportGradeBand}
               selectedSubject={reportSubject}
               setSelectedSubject={setReportSubject}
+              unreadNotificationKeys={unreadNotificationKeys}
+              onEvaluationViewed={(ids) => ids.forEach((id) => onNotificationItemViewed('Үнэлгээ', id))}
             />}
             {activeCategory === 'Хянах' && <AdminReviewPanel
               selectedBand={reportGradeBand}
@@ -156,11 +164,29 @@ export default function AdminDashboardView({
               unreadNotificationKeys={unreadNotificationKeys}
               onPlanViewed={onReviewMaterialViewed}
             />}
-            {activeCategory === 'Судалгаа' && <SurveyBoard />}
-            {activeCategory === 'Чат' && <ChatBoard isAdmin />}
-            {activeCategory === 'Мэдээлэл' && <AnnouncementBoard boardType="Мэдээлэл" />}
-            {activeCategory === 'Оролцоо' && <AdminActivityPanel />}
-            {activeCategory === 'Зар' && <AnnouncementBoard boardType="Зар" />}
+            {activeCategory === 'Судалгаа' && <SurveyBoard
+              unreadNotificationKeys={unreadNotificationKeys}
+              onSurveyViewed={(id) => onNotificationItemViewed('Судалгаа', id)}
+            />}
+            {activeCategory === 'Чат' && <ChatBoard
+              isAdmin
+              showUnreadCount={user.role === 'manager'}
+              onConversationViewed={(ids) => ids.forEach((id) => onNotificationItemViewed('Чат', id))}
+            />}
+            {activeCategory === 'Мэдээлэл' && <AnnouncementBoard
+              boardType="Мэдээлэл"
+              unreadNotificationKeys={unreadNotificationKeys}
+              onAnnouncementViewed={(id) => onNotificationItemViewed('Мэдээлэл', id)}
+            />}
+            {activeCategory === 'Оролцоо' && <AdminActivityPanel
+              unreadNotificationKeys={unreadNotificationKeys}
+              onActivityViewed={(id) => onNotificationItemViewed('Оролцоо', id)}
+            />}
+            {activeCategory === 'Зар' && <AnnouncementBoard
+              boardType="Зар"
+              unreadNotificationKeys={unreadNotificationKeys}
+              onAnnouncementViewed={(id) => onNotificationItemViewed('Зар', id)}
+            />}
             {activeCategory === 'Data ашиглалт' && <DataUsagePanel />}
           </div>
         </section>

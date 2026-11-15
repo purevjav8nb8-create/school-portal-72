@@ -24,11 +24,12 @@ interface Props {
   unit: string;
   subjects: string[];
   busy: boolean;
+  notificationUnread?: boolean;
   onSubmit: (documentUrl: string, note: string, grade: number, section: string, subject: string) => Promise<void>;
   onDelete: () => Promise<void>;
 }
 
-export default function ProgramPlanPanel({ programPlan, unit, subjects, busy: operationBusy, onSubmit, onDelete }: Props) {
+export default function ProgramPlanPanel({ programPlan, unit, subjects, busy: operationBusy, notificationUnread = false, onSubmit, onDelete }: Props) {
   const [documentUrl, setDocumentUrl] = useState('');
   const [note, setNote] = useState('');
   const [grade, setGrade] = useState(0);
@@ -79,6 +80,7 @@ export default function ProgramPlanPanel({ programPlan, unit, subjects, busy: op
         date={programPlan?.submittedAt}
         status={programPlan?.approved ? 'Батлагдсан' : (programPlan?.returned || programPlan?.review_status === 'returned') ? 'Засуулахаар буцаасан' : programPlan ? 'Менежерээр хянагдаж байна' : 'Илгээгээгүй'}
         attachments={programPlan?.documentUrl ? [{ name: 'Хөтөлбөр, төлөвлөгөө.pdf', url: programPlan.documentUrl, file_type: 'document' }] : []}
+        unread={notificationUnread}
         action={programPlan && <button
           type="button"
           disabled={busy || operationBusy}

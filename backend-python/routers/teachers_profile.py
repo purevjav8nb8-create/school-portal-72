@@ -2,7 +2,7 @@ from fastapi import APIRouter, Header
 from schemas.teacher_records import ActivityCreate, AwardCreate, EvaluationCreate, ProfessionalDegreeCreate, ProgramPlanSubmit
 from schemas.teachers import TeachingClassesUpdate, TrainingCreate
 from services.teacher_auth import require_teacher
-from services.teacher_portal import add_evaluation, add_my_activity, add_my_award, add_my_professional_degree, add_my_training, delete_evaluation, delete_my_program_plan, get_my_teacher_data, submit_program_plan, update_my_teaching_classes
+from services.teacher_portal import add_evaluation, add_my_activity, add_my_award, add_my_professional_degree, add_my_training, delete_evaluation, delete_my_program_plan, get_my_program_plan, get_my_teacher_data, submit_program_plan, update_my_teaching_classes
 
 router = APIRouter()
 
@@ -10,6 +10,11 @@ router = APIRouter()
 def get_my_profile(authorization: str | None = Header(default=None)):
     user = require_teacher(authorization)
     return get_my_teacher_data(user)
+
+@router.get("/me/program-plan")
+def get_my_program_plan_status(authorization: str | None = Header(default=None)):
+    user = require_teacher(authorization)
+    return {"program_plan": get_my_program_plan(user)}
 
 @router.put("/me/teaching-classes")
 def update_my_classes(

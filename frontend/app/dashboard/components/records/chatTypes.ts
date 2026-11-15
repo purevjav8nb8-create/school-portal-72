@@ -7,6 +7,7 @@ export type ChatConversation = {
   last_message: string;
   latest_at: string;
   unread_count: number;
+  unread_message_ids?: string[];
 };
 
 export type ChatMessage = {

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import FileAttachmentActions from './FileAttachmentActions';
 import { AnnouncementAttachment, isPdfAttachment } from './AnnouncementAttachments';
 import { formatTeacherName } from '../../utils/teacherName';
+import { DashboardCategory } from '../../types';
 
 export type Announcement = {
   id: string;
@@ -19,7 +20,19 @@ export type Announcement = {
   info_type?: 'Амжилт' | 'Оролцоо' | 'Олимпиад' | 'Уралдаан, тэмцээн';
 };
 
-export default function AnnouncementFeed({ announcements }: { announcements: Announcement[] }) {
+interface Props {
+  announcements: Announcement[];
+  notificationCategory?: DashboardCategory;
+  unreadNotificationKeys?: ReadonlySet<string>;
+  onItemViewed?: (id: string) => void;
+}
+
+export default function AnnouncementFeed({
+  announcements,
+  notificationCategory,
+  unreadNotificationKeys = new Set(),
+  onItemViewed,
+}: Props) {
   const [selected, setSelected] = useState<Announcement | null>(null);
 
   return (
@@ -27,7 +40,20 @@ export default function AnnouncementFeed({ announcements }: { announcements: Ann
       {announcements.length === 0 ? <p>Одоогоор зар алга.</p> : (
         <div style={{ display: 'grid', gap: 8 }}>
           {announcements.map((announcement) => (
-            <article key={announcement.id} onClick={() => setSelected(announcement)} style={{ display: 'flex', gap: 10, alignItems: 'stretch', padding: 9, border: '1px solid #e2e8f0', borderRadius: 8, cursor: 'pointer', background: '#fff' }}>
+            <article key={announcement.id} onClick={() => {
+              onItemViewed?.(announcement.id);
+              setSelected(announcement);
+            }} style={{
+              display: 'flex',
+              gap: 10,
+              alignItems: 'stretch',
+              padding: 9,
+              border: '1px solid #e2e8f0',
+              borderRadius: 8,
+              cursor: 'pointer',
+              background: '#fff',
+              fontWeight: notificationCategory && unreadNotificationKeys.has(`${notificationCategory}:${announcement.id}`) ? 600 : 400,
+            }}>
               {announcement.attachments?.filter((attachment) => attachment.file_type === 'image' && !isPdfAttachment(attachment)).slice(0, 1).map((attachment) => (
                 <div key={attachment.url} style={{ flex: '0 0 96px', display: 'flex', alignItems: 'center' }}>
                   <FileAttachmentActions attachment={attachment} inlinePreview previewWidth={96} previewHeight={68} />
@@ -37,7 +63,11 @@ export default function AnnouncementFeed({ announcements }: { announcements: Ann
                 <small style={{ color: announcement.type === 'achievement' ? '#047857' : '#2563eb' }}>
                   {announcement.kind === 'Мэдээлэл' ? announcement.info_type ?? 'Мэдээлэл' : 'Зар'}
                 </small>
-                <h3 style={{ margin: '2px 0 4px', fontSize: 16 }}>{announcement.title}</h3>
+                <h3 style={{
+                  margin: '2px 0 4px',
+                  fontSize: 16,
+                  fontWeight: notificationCategory && unreadNotificationKeys.has(`${notificationCategory}:${announcement.id}`) ? 700 : 400,
+                }}>{announcement.title}</h3>
                 <p style={{ margin: '0 0 5px', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{announcement.body}</p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
                   {announcement.attachments?.filter((attachment) => attachment.file_type !== 'image' || isPdfAttachment(attachment)).map((attachment) =>

@@ -29,7 +29,13 @@ async function chatRequest<T>(path: string, init?: RequestInit): Promise<T> {
   return result as T;
 }
 
-export default function ChatBoard({ isAdmin = false }: { isAdmin?: boolean }) {
+interface Props {
+  isAdmin?: boolean;
+  showUnreadCount?: boolean;
+  onConversationViewed?: (ids: string[]) => void;
+}
+
+export default function ChatBoard({ isAdmin = false, showUnreadCount = false, onConversationViewed }: Props) {
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [selectedId, setSelectedId] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -46,7 +52,6 @@ export default function ChatBoard({ isAdmin = false }: { isAdmin?: boolean }) {
   const loadConversations = useCallback(async () => {
     const result = await chatRequest<ChatConversation[]>('/api/teachers/chat/conversations');
     setConversations(result);
-    setSelectedId((current) => current || result[0]?.conversation_id || '');
     return result;
   }, []);
 
@@ -81,20 +86,9 @@ export default function ChatBoard({ isAdmin = false }: { isAdmin?: boolean }) {
 
   useEffect(() => {
     let active = true;
-    let markExistingRead = true;
     const refresh = async () => {
       try {
-        const result = await loadConversations();
-        if (markExistingRead) {
-          markExistingRead = false;
-          await Promise.all(result.filter((conversation) => conversation.unread_count > 0).map((conversation) =>
-            chatRequest<{ read: number }>('/api/teachers/chat/read', {
-              method: 'POST',
-              body: JSON.stringify({ conversation_id: conversation.conversation_id }),
-            }),
-          ));
-          if (active) await loadConversations();
-        }
+        await loadConversations();
         if (active) setErrorMessage('');
       } catch (error) {
         if (active) setErrorMessage(error instanceof Error ? error.message : 'Чатын жагсаалт уншигдсангүй.');
@@ -126,6 +120,15 @@ export default function ChatBoard({ isAdmin = false }: { isAdmin?: boolean }) {
           method: 'POST',
           body: JSON.stringify({ conversation_id: selectedId }),
         });
+        const selectedConversation = conversations.find((conversation) => conversation.conversation_id === selectedId);
+        if (selectedConversation && selectedConversation.unread_count > 0) {
+          onConversationViewed?.(selectedConversation.unread_message_ids ?? []);
+          setConversations((current) => current.map((conversation) =>
+            conversation.conversation_id === selectedId
+              ? { ...conversation, unread_count: 0, unread_message_ids: [] }
+              : conversation,
+          ));
+        }
       } catch (error) {
         if (active) setErrorMessage(error instanceof Error ? error.message : 'Чатын мессеж уншигдсангүй.');
       } finally {
@@ -138,7 +141,7 @@ export default function ChatBoard({ isAdmin = false }: { isAdmin?: boolean }) {
       active = false;
       window.clearInterval(interval);
     };
-  }, [loadConversations, selectedId]);
+  }, [conversations, loadConversations, onConversationViewed, selectedId]);
 
   const send = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -200,6 +203,7 @@ export default function ChatBoard({ isAdmin = false }: { isAdmin?: boolean }) {
           <ChatSidebar
             conversations={conversations}
             selectedId={selectedId}
+            showUnreadCount={showUnreadCount}
             userQuery={userQuery}
             searchResults={searchResults}
             searching={searching}

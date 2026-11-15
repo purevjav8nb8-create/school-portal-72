@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { formatTeacherName } from '../../utils/teacherName';
 import { GradeBand, TeacherRecords } from './adminReviewTypes';
+import { evaluationNotificationId, isValidEvaluationRecord } from '../../hooks/notificationData';
 
 const evaluationLevels = ['VIII', 'VII', 'VI', 'V', 'IV', 'III', 'II', 'I'] as const;
 const gradeBands = [
@@ -18,6 +19,8 @@ interface Props {
   setSelectedBand: (band: GradeBand) => void;
   selectedSubject: string;
   setSelectedSubject: (subject: string) => void;
+  unreadNotificationKeys?: ReadonlySet<string>;
+  onEvaluationViewed?: (ids: string[]) => void;
 }
 
 export default function EvaluationSummary({
@@ -26,6 +29,8 @@ export default function EvaluationSummary({
   setSelectedBand,
   selectedSubject,
   setSelectedSubject,
+  unreadNotificationKeys = new Set(),
+  onEvaluationViewed,
 }: Props) {
   const summaries = useMemo(() => {
     const groups = new Map<string, {
@@ -33,35 +38,48 @@ export default function EvaluationSummary({
       students: number;
       weightedScore: number;
       teachers: Map<string, { name: string; email: string }>;
+      notificationIds: Set<string>;
     }>();
 
-    records.forEach((record) => record.evaluations.forEach((evaluation) => {
-      const grade = Number(evaluation.grade);
-      const students = Number(evaluation.students_count);
-      const average = Number(evaluation.average_score);
-      const section = String(evaluation.section ?? '').trim();
-      const subject = String(evaluation.subject ?? '').trim();
-      if (!Number.isInteger(grade) || grade < 1 || !section || !subject
-        || !evaluationLevels.includes(evaluation.level as typeof evaluationLevels[number])
-        || !Number.isFinite(students) || students < 0 || !Number.isFinite(average)) return;
+    records.forEach((record) => {
+      const latestEvaluation = [...record.evaluations].sort((left, right) =>
+        String(right.createdAt ?? right.evaluation_date ?? right.id)
+          .localeCompare(String(left.createdAt ?? left.evaluation_date ?? left.id)),
+      )[0];
+      record.evaluations.forEach((evaluation) => {
+        if (!isValidEvaluationRecord(evaluation)) return;
+        const grade = Number(evaluation.grade);
+        const students = Number(evaluation.students_count);
+        const average = Number(evaluation.average_score);
+        const section = String(evaluation.section ?? '').trim();
+        const subject = String(evaluation.subject ?? '').trim();
 
-      const key = `${grade}-${section}-${subject}`;
-      const current = groups.get(key) ?? {
-        levels: {},
-        students: 0,
-        weightedScore: 0,
-        teachers: new Map<string, { name: string; email: string }>(),
-      };
-      const teacherId = record.user_id || record.teacher.email || record.teacher.name;
-      current.teachers.set(teacherId, {
-        name: formatTeacherName(record.teacher.name),
-        email: record.teacher.email,
+        const key = `${grade}-${section}-${subject}`;
+        const current = groups.get(key) ?? {
+          levels: {},
+          students: 0,
+          weightedScore: 0,
+          teachers: new Map<string, { name: string; email: string }>(),
+          notificationIds: new Set<string>(),
+        };
+        const teacherId = record.user_id || record.teacher.email || record.teacher.name;
+        current.teachers.set(teacherId, {
+          name: formatTeacherName(record.teacher.name),
+          email: record.teacher.email,
+        });
+        current.levels[evaluation.level] = (current.levels[evaluation.level] ?? 0) + students;
+        current.students += students;
+        current.weightedScore += average * students;
+        if (evaluation === latestEvaluation) {
+          current.notificationIds.add(evaluationNotificationId(record.user_id, {
+            createdAt: evaluation.createdAt,
+            submittedAt: evaluation.evaluation_date,
+            id: evaluation.id,
+          }));
+        }
+        groups.set(key, current);
       });
-      current.levels[evaluation.level] = (current.levels[evaluation.level] ?? 0) + students;
-      current.students += students;
-      current.weightedScore += average * students;
-      groups.set(key, current);
-    }));
+    });
 
     return [...groups.entries()].map(([key, value]) => {
       const [grade, section, ...subjectParts] = key.split('-');
@@ -77,6 +95,7 @@ export default function EvaluationSummary({
         teacherCount: teachers.length,
         teacherNames: teachers.map(({ name, email }) => nameCounts.get(name) > 1 ? `${name} (${email})` : name).join(', '),
         average: value.students ? value.weightedScore / value.students : 0,
+        notificationIds: [...value.notificationIds],
       };
     }).sort((left, right) =>
       left.grade - right.grade || left.section.localeCompare(right.section) || left.subject.localeCompare(right.subject),
@@ -120,16 +139,29 @@ export default function EvaluationSummary({
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 12 }}>
-            <thead><tr>{['Анги', ...(!activeSubject ? ['Хичээл'] : []), ...evaluationLevels, 'Нийт', 'Дундаж', 'Багш (тоо)'].map((label) => <th key={label} style={{ padding: '4px 6px', background: '#fff' }}>{label}</th>)}</tr></thead>
+            <thead><tr>{['Анги', ...(!activeSubject ? ['Хичээл'] : []), ...evaluationLevels, 'Нийт', 'Дундаж', 'Багш (тоо)', 'Уншсан'].map((label) => <th key={label} style={{ padding: '4px 6px', background: '#fff' }}>{label}</th>)}</tr></thead>
             <tbody>
               {rows.map((item) => (
-                <tr key={`${item.grade}-${item.section}-${item.subject}`} style={{ borderTop: '1px solid #e2e8f0' }}>
+                <tr
+                  key={`${item.grade}-${item.section}-${item.subject}`}
+                  style={{
+                    borderTop: '1px solid #e2e8f0',
+                    fontWeight: item.notificationIds.some((id) => unreadNotificationKeys.has(`Үнэлгээ:${id}`)) ? 600 : 400,
+                  }}
+                >
                   <td style={{ padding: '4px 6px', fontWeight: 600 }}>{item.grade}-{item.section}</td>
                   {!activeSubject && <td style={{ padding: '4px 6px' }}>{item.subject}</td>}
                   {evaluationLevels.map((level) => <td key={level} style={{ padding: '4px 6px' }}>{item.levels[level] ?? 0}</td>)}
                   <td style={{ padding: '4px 6px' }}>{item.students}</td>
                   <td style={{ padding: '4px 6px' }}>{item.average.toFixed(1)}</td>
                   <td style={{ padding: '4px 6px' }}>{item.teacherNames}{item.teacherCount ? ` (${item.teacherCount})` : ''}</td>
+                  <td style={{ padding: '4px 6px' }}>
+                    {item.notificationIds.some((id) => unreadNotificationKeys.has(`Үнэлгээ:${id}`)) && (
+                      <button type="button" onClick={() => onEvaluationViewed?.(item.notificationIds)} aria-label="Үнэлгээний мэдээллийг уншсан гэж тэмдэглэх">
+                        Уншсан
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
               <tr style={{ borderTop: '2px solid #94a3b8', background: '#e2e8f0', fontWeight: 700 }}>
@@ -138,6 +170,7 @@ export default function EvaluationSummary({
                 {evaluationLevels.map((level) => <td key={level} style={{ padding: '4px 6px' }}>{totals.levels[level]}</td>)}
                 <td style={{ padding: '4px 6px' }}>{totals.students}</td>
                 <td style={{ padding: '4px 6px' }}>{(totals.students ? totals.weightedScore / totals.students : 0).toFixed(1)}</td>
+                <td style={{ padding: '4px 6px' }} />
                 <td style={{ padding: '4px 6px' }} />
               </tr>
             </tbody>

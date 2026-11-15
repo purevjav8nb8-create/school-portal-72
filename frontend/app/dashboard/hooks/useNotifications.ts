@@ -16,17 +16,17 @@ export function useNotifications(
   personalItems: NotificationItem[] = emptyItems,
   enabled = true,
 ) {
+  const notificationsEnabled = enabled && role !== 'admin';
   const [items, setItems] = useState<NotificationItem[]>(personalItems);
   const [counts, setCounts] = useState<NotificationCounts>({});
   const [unreadItems, setUnreadItems] = useState<Set<string>>(new Set());
   const [errorMessage, setErrorMessage] = useState('');
   const activeStorageKey = useRef('');
   const itemsLoaded = useRef(false);
-  const pendingReadCategories = useRef(new Set<DashboardCategory>());
   const pendingReadItems = useRef(new Set<string>());
 
   const load = useCallback(async () => {
-    if (!enabled) return;
+    if (!notificationsEnabled) return;
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const mockToken = window.localStorage.getItem('school-portal-mock-token');
@@ -34,17 +34,22 @@ export function useNotifications(
       if (!accessToken) return;
       const currentScope = session?.user.id ?? mockToken?.replace(/^mock:/, '') ?? 'unknown';
       const currentStorageKey = `school-portal-notifications-${role}-${currentScope}`;
+      const legacyManagerStorageKey = `school-portal-notifications-admin-${currentScope}`;
       if (activeStorageKey.current !== currentStorageKey) itemsLoaded.current = false;
       activeStorageKey.current = currentStorageKey;
       const unique = await fetchNotificationItems(role, personalItems, accessToken);
-      const read = readReadItems(currentStorageKey);
-      pendingReadCategories.current.forEach((category) => {
-        unique.filter((item) => item.category === category).forEach((item) => read.add(`${category}:${item.id}`));
-      });
-      pendingReadItems.current.forEach((itemKey) => read.add(itemKey));
-      if (pendingReadCategories.current.size > 0 || pendingReadItems.current.size > 0) {
+      const hasCurrentReadState = window.localStorage.getItem(currentStorageKey) !== null;
+      const read = hasCurrentReadState
+        ? readReadItems(currentStorageKey)
+        : role === 'manager'
+          ? readReadItems(legacyManagerStorageKey)
+          : new Set<string>();
+      if (!hasCurrentReadState && role === 'manager' && read.size > 0) {
         window.localStorage.setItem(currentStorageKey, JSON.stringify([...read]));
-        pendingReadCategories.current.clear();
+      }
+      pendingReadItems.current.forEach((itemKey) => read.add(itemKey));
+      if (pendingReadItems.current.size > 0) {
+        window.localStorage.setItem(currentStorageKey, JSON.stringify([...read]));
         pendingReadItems.current.clear();
       }
       setItems(unique);
@@ -59,10 +64,10 @@ export function useNotifications(
         ? `Мэдэгдлийн мэдээлэл шинэчлэгдсэнгүй: ${error.message}`
         : 'Мэдэгдлийн мэдээлэл шинэчлэгдсэнгүй.');
     }
-  }, [enabled, personalItems, role]);
+  }, [notificationsEnabled, personalItems, role]);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!notificationsEnabled) return;
     let active = true;
     let loading = false;
     const refresh = async () => {
@@ -84,24 +89,10 @@ export function useNotifications(
       window.removeEventListener('focus', refreshWhenVisible);
       document.removeEventListener('visibilitychange', refreshWhenVisible);
     };
-  }, [enabled, load]);
-
-  const markRead = useCallback((category: DashboardCategory) => {
-    const currentStorageKey = activeStorageKey.current;
-    if (!currentStorageKey || !itemsLoaded.current) {
-      pendingReadCategories.current.add(category);
-      return;
-    }
-    const read = readReadItems(currentStorageKey);
-    items.filter((item) => item.category === category).forEach((item) => read.add(`${category}:${item.id}`));
-    window.localStorage.setItem(currentStorageKey, JSON.stringify([...read]));
-    setCounts(countUnreadItems(items, read));
-    setUnreadItems(new Set(items
-      .filter((item) => !read.has(`${item.category}:${item.id}`))
-      .map((item) => `${item.category}:${item.id}`)));
-  }, [items]);
+  }, [notificationsEnabled, load]);
 
   const markItemRead = useCallback((category: DashboardCategory, id: string) => {
+    if (!notificationsEnabled) return;
     const itemKey = `${category}:${id}`;
     const currentStorageKey = activeStorageKey.current;
     if (!currentStorageKey || !itemsLoaded.current) {
@@ -115,7 +106,7 @@ export function useNotifications(
     setUnreadItems(new Set(items
       .filter((item) => !read.has(`${item.category}:${item.id}`))
       .map((item) => `${item.category}:${item.id}`)));
-  }, [items]);
+  }, [items, notificationsEnabled]);
 
-  return { counts, unreadItems, errorMessage, markRead, markItemRead };
+  return { counts, unreadItems, errorMessage, markItemRead };
 }

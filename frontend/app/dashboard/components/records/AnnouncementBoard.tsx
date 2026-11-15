@@ -12,9 +12,11 @@ const apiUrl = backendBaseUrl;
 
 interface Props {
   boardType: 'Мэдээлэл' | 'Зар';
+  unreadNotificationKeys?: ReadonlySet<string>;
+  onAnnouncementViewed?: (id: string) => void;
 }
 
-export default function AnnouncementBoard({ boardType }: Props) {
+export default function AnnouncementBoard({ boardType, unreadNotificationKeys = new Set(), onAnnouncementViewed }: Props) {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -118,7 +120,12 @@ export default function AnnouncementBoard({ boardType }: Props) {
         )}
       </FloatingComposer>
       {message && <p role="status">{message}</p>}
-      <AnnouncementFeed announcements={announcements} />
+      <AnnouncementFeed
+        announcements={announcements}
+        notificationCategory={boardType}
+        unreadNotificationKeys={unreadNotificationKeys}
+        onItemViewed={onAnnouncementViewed}
+      />
     </section>
   );
 }

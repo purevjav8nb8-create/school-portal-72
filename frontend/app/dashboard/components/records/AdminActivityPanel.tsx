@@ -22,7 +22,13 @@ type TeacherRecord = {
   activities: Activity[];
 };
 
-export default function AdminActivityPanel() {
+export default function AdminActivityPanel({
+  unreadNotificationKeys,
+  onActivityViewed,
+}: {
+  unreadNotificationKeys: ReadonlySet<string>;
+  onActivityViewed: (id: string) => void;
+}) {
   const [records, setRecords] = useState<TeacherRecord[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -57,7 +63,7 @@ export default function AdminActivityPanel() {
 
   const activities: ActivityFeedItem[] = records.flatMap((record) => record.activities.map((activity) => ({
     ...activity,
-    id: `${record.user_id}-${activity.id}`,
+    id: `${record.user_id}:${activity.id}`,
     author: record.teacher.name || record.teacher.email,
   }))).sort((left, right) => (right.submittedAt ?? right.date).localeCompare(left.submittedAt ?? left.date));
 
@@ -69,7 +75,11 @@ export default function AdminActivityPanel() {
         ? <p>Оролцооны мэдээлэл ачаалж байна...</p>
         : activities.length === 0
           ? <p>Одоогоор оролцооны мэдээлэл алга.</p>
-          : <ActivityFeed activities={activities} />}
+          : <ActivityFeed
+            activities={activities}
+            unreadNotificationKeys={unreadNotificationKeys}
+            onActivityViewed={onActivityViewed}
+          />}
     </section>
   );
 }
