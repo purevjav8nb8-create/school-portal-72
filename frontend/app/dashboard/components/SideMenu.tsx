@@ -42,7 +42,7 @@ export default function SideMenu({ activeCategory, setActiveCategory, categories
           </button>
         );
       })}
-      {notificationError && <p role="alert" style={{ margin: '4px 2px', color: '#b91c1c', fontSize: 11 }}>{notificationError}</p>}
+      {notificationError && <p role="status" style={{ margin: '4px 2px', color: '#b45309', fontSize: 11 }}>{notificationError}</p>}
     </div>
   );
 }

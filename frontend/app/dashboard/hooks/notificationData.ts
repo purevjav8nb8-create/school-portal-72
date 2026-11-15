@@ -19,6 +19,22 @@ type TeacherRecord = {
 
 const categories: DashboardCategory[] = ['Мэдээлэл', 'Зар', 'Судалгаа', 'Үнэлгээ', 'Сургалт', 'Шагнал', 'Зэрэг', 'Хянах', 'Чат'];
 const apiUrl = backendBaseUrl;
+const transientStatuses = [502, 503, 504];
+
+async function fetchNotificationResponse(url: string, headers: HeadersInit): Promise<Response> {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const response = await fetchWithAuth(url, { headers });
+      if (!transientStatuses.includes(response.status) || attempt === 1) return response;
+    } catch (error) {
+      const retryable = error instanceof TypeError
+        || (error instanceof Error && error.message.includes('Нэвтрэх эрхийг шалгаж чадсангүй'));
+      if (!retryable || attempt === 1) throw error;
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 500));
+  }
+  throw new Error('Мэдэгдлийн мэдээллийг татаж чадсангүй.');
+}
 
 async function readResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -54,7 +70,7 @@ export async function fetchNotificationItems(
   const headers = { Authorization: `Bearer ${accessToken}` };
   const announcementResponses = await Promise.all(
     (['Мэдээлэл', 'Зар'] as const).map((category) =>
-      fetchWithAuth(`${apiUrl}/api/teachers/announcements?kind=${encodeURIComponent(category)}`, { headers }),
+      fetchNotificationResponse(`${apiUrl}/api/teachers/announcements?kind=${encodeURIComponent(category)}`, headers),
     ),
   );
   const announcementRecords = await Promise.all(announcementResponses.map((response) => readResponse<AnnouncementRecord[]>(response)));
@@ -66,8 +82,8 @@ export async function fetchNotificationItems(
 
   if (role !== 'teacher') {
     const [surveysResponse, reviewResponse] = await Promise.all([
-      fetchWithAuth(`${apiUrl}/api/teachers/surveys`, { headers }),
-      fetchWithAuth(`${apiUrl}/api/teachers/review`, { headers }),
+      fetchNotificationResponse(`${apiUrl}/api/teachers/surveys`, headers),
+      fetchNotificationResponse(`${apiUrl}/api/teachers/review`, headers),
     ]);
     const [surveys, teacherRecords] = await Promise.all([
       readResponse<SurveyRecord[]>(surveysResponse),

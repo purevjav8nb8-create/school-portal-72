@@ -48,7 +48,9 @@ export function useNotifications(
       itemsLoaded.current = true;
       setErrorMessage('');
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Мэдэгдэл уншигдсангүй.');
+      setErrorMessage(error instanceof Error
+        ? `Мэдэгдлийн мэдээлэл шинэчлэгдсэнгүй: ${error.message}`
+        : 'Мэдэгдлийн мэдээлэл шинэчлэгдсэнгүй.');
     }
   }, [enabled, personalItems, role]);
 
