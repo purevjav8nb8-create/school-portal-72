@@ -11,13 +11,14 @@ type TeacherRecord = {
   trainings?: { id?: string }[];
   evaluations?: { id?: string; createdAt?: string; evaluation_date?: string }[];
   activities?: UpdatedRecord[];
-  awards?: UpdatedRecord[];
-  professional_degrees?: UpdatedRecord[];
-  teaching_classes_updated_at?: string;
-  program_plan?: UpdatedRecord;
+  program_plan?: UpdatedRecord & {
+    approved?: boolean;
+    returned?: boolean;
+    review_status?: 'pending' | 'returned' | 'approved';
+  };
 };
 
-const categories: DashboardCategory[] = ['Мэдээлэл', 'Зар', 'Судалгаа', 'Үнэлгээ', 'Сургалт', 'Шагнал', 'Зэрэг', 'Хянах', 'Чат'];
+const categories: DashboardCategory[] = ['Мэдээлэл', 'Зар', 'Судалгаа', 'Үнэлгээ', 'Сургалт', 'Оролцоо', 'Шагнал', 'Зэрэг', 'Хянах', 'Чат'];
 const apiUrl = backendBaseUrl;
 const transientStatuses = [502, 503, 504];
 
@@ -103,6 +104,7 @@ export async function fetchNotificationItems(
       const addRecords = (records: { id?: string }[] | undefined, category: DashboardCategory) =>
         records?.forEach((item) => { if (item.id) nextItems.push({ id: `${record.user_id}:${item.id}`, category }); });
       addRecords(record.trainings, 'Сургалт');
+      addRecords(record.activities, 'Оролцоо');
       if (record.evaluations?.length) {
         const latestEvaluation = [...record.evaluations].sort((left, right) =>
           String(right.createdAt ?? right.evaluation_date ?? right.id ?? '')
@@ -113,25 +115,10 @@ export async function fetchNotificationItems(
           category: 'Үнэлгээ',
         });
       }
-      const reviewUpdates = [
-        ...(record.activities ?? []),
-        ...(record.awards ?? []),
-        ...(record.professional_degrees ?? []),
-        ...(record.program_plan ? [record.program_plan] : []),
-        ...(record.teaching_classes_updated_at
-          ? [{ id: record.teaching_classes_updated_at, updatedAt: record.teaching_classes_updated_at }]
-          : []),
-      ].flatMap((item) => {
-        const id = item.id ?? item.submittedAt ?? item.createdAt ?? item.updatedAt;
-        if (!id) return [];
-        return [{ id, timestamp: item.updatedAt ?? item.submittedAt ?? item.createdAt ?? id }];
-      });
-      const latestReviewUpdate = reviewUpdates.sort((left, right) =>
-        right.timestamp.localeCompare(left.timestamp) || right.id.localeCompare(left.id),
-      )[0];
-      if (latestReviewUpdate) {
+      const plan = record.program_plan;
+      if (plan && !plan.approved && !plan.returned && plan.review_status !== 'returned' && plan.review_status !== 'approved') {
         nextItems.push({
-          id: `${record.user_id}:${latestReviewUpdate.id}`,
+          id: `${record.user_id}:program-plan:${plan.submittedAt ?? plan.id ?? 'pending'}`,
           category: 'Хянах',
         });
       }
