@@ -1,5 +1,6 @@
 import { backendBaseUrl, fetchWithAuth } from '../../../lib/backendApi';
 import { supabase } from '../../../lib/supabaseClient';
+import type { Session } from '@supabase/supabase-js';
 import { TeacherTraining } from '../components/TeacherDashboardView';
 import { TeacherActivity } from '../components/records/ActivityPanel';
 import { EvaluationRecord } from '../components/records/EvaluationPanel';
@@ -29,8 +30,22 @@ type LoadResult = {
 };
 
 export async function loadTeacherWorkspace(): Promise<LoadResult> {
-  const { data: { user: authUser } } = await supabase.auth.getUser();
   const mockToken = window.localStorage.getItem('school-portal-mock-token');
+  let session: Session | null = null;
+  try {
+    const result = await supabase.auth.getSession();
+    if (result.error) throw result.error;
+    session = result.data.session;
+  } catch (error) {
+    if (!mockToken) {
+      return {
+        errorMessage: error instanceof Error
+          ? error.message
+          : 'Нэвтрэх эрхийг шалгаж чадсангүй.',
+      };
+    }
+  }
+  const authUser = session?.user ?? null;
   if (!authUser && !mockToken) return { redirect: '/' };
   if (mockToken && !authUser) {
     try {
@@ -46,7 +61,6 @@ export async function loadTeacherWorkspace(): Promise<LoadResult> {
   if (authUser?.app_metadata?.role === 'admin' || authUser?.app_metadata?.role === 'manager' || authUser?.email?.toLowerCase() === 'admin@moes.edu.mn') {
     return { redirect: '/dashboard/admin' };
   }
-  const { data: { session } } = await supabase.auth.getSession();
   if (!session) return { redirect: '/' };
 
   try {

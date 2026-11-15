@@ -6,8 +6,8 @@ from services.attendance_automation import ensure_today_attendance, school_today
 from services.mock_school_data import load_mock_school_data, mock_data_enabled
 
 def list_teacher_accounts() -> list[dict[str, Any]]:
-    ensure_today_attendance()
     if mock_data_enabled():
+        ensure_today_attendance()
         accounts = []
         today = school_today().isoformat()
         for index, teacher in enumerate(load_mock_school_data()["teachers"], start=1):
@@ -49,6 +49,7 @@ def list_teacher_accounts() -> list[dict[str, Any]]:
         users = supabase.auth.admin.list_users(per_page=1000)
     except Exception as error:
         raise HTTPException(status_code=503, detail="Багшийн жагсаалтыг Supabase-ээс уншиж чадсангүй.") from error
+    users = ensure_today_attendance(users) or users
 
     teachers = []
     admin_email = os.getenv("ADMIN_EMAIL", "admin@moes.edu.mn").lower()

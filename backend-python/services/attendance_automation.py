@@ -30,7 +30,7 @@ def _is_teacher(user: Any, admin_email: str) -> bool:
     )
 
 
-def ensure_today_attendance() -> None:
+def ensure_today_attendance(users: list[Any] | None = None) -> list[Any] | None:
     today = school_today().isoformat()
     if mock_data_enabled():
         try:
@@ -42,17 +42,18 @@ def ensure_today_attendance() -> None:
                     )
         except (KeyError, RuntimeError) as error:
             raise HTTPException(status_code=503, detail="Өнөөдрийн ирцийн бүртгэл үүсгэсэнгүй.") from error
-        return
+        return None
 
     if supabase is None:
         raise HTTPException(status_code=503, detail="Supabase backend тохируулагдаагүй байна.")
-    try:
-        users = supabase.auth.admin.list_users(per_page=1000)
-    except Exception as error:
-        raise HTTPException(status_code=503, detail="Багшийн жагсаалтыг Supabase-ээс уншиж чадсангүй.") from error
+    if users is None:
+        try:
+            users = supabase.auth.admin.list_users(per_page=1000)
+        except Exception as error:
+            raise HTTPException(status_code=503, detail="Багшийн жагсаалтыг Supabase-ээс уншиж чадсангүй.") from error
 
     admin_email = os.getenv("ADMIN_EMAIL", "admin@moes.edu.mn").lower()
-    for user in users:
+    for index, user in enumerate(users):
         if not _is_teacher(user, admin_email):
             continue
         app_metadata = user.app_metadata or {}
@@ -60,12 +61,15 @@ def ensure_today_attendance() -> None:
         if any(item.get("date") == today for item in records):
             continue
         try:
-            supabase.auth.admin.update_user_by_id(
+            updated_user = supabase.auth.admin.update_user_by_id(
                 user.id,
                 {"app_metadata": {
                     **app_metadata,
                     "teacher_attendance": [*records, {"date": today, "status": "Ирсэн"}],
                 }},
-            )
+            ).user
+            if updated_user is not None:
+                users[index] = updated_user
         except Exception as error:
             raise HTTPException(status_code=503, detail="Өнөөдрийн ирцийн бүртгэл үүсгэсэнгүй.") from error
+    return users

@@ -21,7 +21,7 @@ export default function PasswordLoginForm() {
       : email.trim().toLowerCase();
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email: loginEmail, password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email: loginEmail, password });
       if (error) {
         const mockResponse = await fetch(`${backendBaseUrl}/api/teachers/mock-login`, {
           method: 'POST',
@@ -40,10 +40,9 @@ export default function PasswordLoginForm() {
         window.location.href = '/dashboard/teacher';
         return;
       }
-      const { data: { user } } = await supabase.auth.getUser();
       window.localStorage.removeItem('school-portal-mock-token');
-      const isAdmin = user?.app_metadata?.role === 'admin' || user?.app_metadata?.role === 'manager'
-        || user?.email?.toLowerCase() === 'admin@moes.edu.mn';
+      const isAdmin = data.user?.app_metadata?.role === 'admin' || data.user?.app_metadata?.role === 'manager'
+        || data.user?.email?.toLowerCase() === 'admin@moes.edu.mn';
       window.location.href = isAdmin ? '/dashboard/admin' : '/dashboard/teacher';
     } catch {
       setErrorMessage('Сүлжээний алдаа гарлаа. Дахин оролдоно уу.');

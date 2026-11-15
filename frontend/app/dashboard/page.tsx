@@ -18,6 +18,7 @@ export default function DashboardPage() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState('');
   const [user, setUser] = useState<UserProfile | null>(null);
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const [reportGradeBand, setReportGradeBand] = useState<ReportGradeBand>('all');
@@ -27,25 +28,32 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) {
-        window.location.href = '/';
-        return;
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        const authUser = session?.user;
+        if (!authUser) {
+          window.location.href = '/';
+          return;
+        }
+        const role = authUser.app_metadata?.role;
+        if (role !== 'admin' && role !== 'manager' && authUser.email?.toLowerCase() !== 'admin@moes.edu.mn') {
+          window.location.href = '/dashboard/teacher';
+          return;
+        }
+        setUser({
+          last_name: authUser.user_metadata?.last_name ?? 'Системийн',
+          first_name: authUser.user_metadata?.first_name ?? 'Админ',
+          email: authUser.email ?? '',
+          unit: authUser.user_metadata?.unit ?? 'Захиргаа',
+          subject: authUser.user_metadata?.subject ?? 'Администратор',
+          role: role === 'manager' ? 'manager' : 'admin',
+        });
+      } catch {
+        setAuthError('Нэвтрэх эрхийг шалгаж чадсангүй. Дахин ачаална уу.');
+      } finally {
+        setLoading(false);
       }
-      const role = authUser.app_metadata?.role;
-      if (role !== 'admin' && role !== 'manager' && authUser.email?.toLowerCase() !== 'admin@moes.edu.mn') {
-        window.location.href = '/dashboard/teacher';
-        return;
-      }
-      setUser({
-        last_name: authUser.user_metadata?.last_name ?? 'Системийн',
-        first_name: authUser.user_metadata?.first_name ?? 'Админ',
-        email: authUser.email ?? '',
-        unit: authUser.user_metadata?.unit ?? 'Захиргаа',
-        subject: authUser.user_metadata?.subject ?? 'Администратор',
-        role: role === 'manager' ? 'manager' : 'admin',
-      });
-      setLoading(false);
     };
     void checkAuth();
   }, []);
@@ -75,6 +83,7 @@ export default function DashboardPage() {
   };
 
   if (loading) return <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>Ачаалж байна...</div>;
+  if (authError) return <div role="alert" style={{ padding: 24, color: '#b91c1c' }}>{authError}</div>;
   if (!user) return null;
 
   return (
