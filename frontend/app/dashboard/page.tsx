@@ -7,6 +7,7 @@ import AdminDashboardView from './components/AdminDashboardView';
 import { DashboardCategory, ReportGradeBand, Teacher, UserProfile } from './types';
 import { useTeachers } from './hooks/useTeachers';
 import { useNotifications } from './hooks/useNotifications';
+import { reviewPlanNotificationId } from './hooks/notificationData';
 
 const apiUrl = backendBaseUrl;
 
@@ -24,7 +25,7 @@ export default function DashboardPage() {
   const [reportGradeBand, setReportGradeBand] = useState<ReportGradeBand>('all');
   const [reportSubject, setReportSubject] = useState('');
   const { teachers, setTeachers, displayTeachers, errorMessage: teacherLoadError } = useTeachers(activeUnit, !loading && !!user);
-  const { counts: notificationCounts, errorMessage: notificationError, markRead } = useNotifications('admin', undefined, !loading && !!user);
+  const { counts: notificationCounts, unreadItems, errorMessage: notificationError, markRead, markItemRead } = useNotifications('admin', undefined, !loading && !!user);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -113,12 +114,17 @@ export default function DashboardPage() {
       }}
       notificationCounts={notificationCounts}
       notificationError={notificationError}
+      unreadNotificationKeys={unreadItems}
       teacherLoadError={teacherLoadError}
       reportGradeBand={reportGradeBand}
       setReportGradeBand={setReportGradeBand}
       reportSubject={reportSubject}
       setReportSubject={setReportSubject}
-      onCategoryChange={(category) => { markRead(category); setActiveCategory(category); }}
+      onCategoryChange={(category) => {
+        if (category !== 'Хянах') markRead(category);
+        setActiveCategory(category);
+      }}
+      onReviewMaterialViewed={(userId, submittedAt) => markItemRead('Хянах', reviewPlanNotificationId(userId, submittedAt))}
     />
   );
 }

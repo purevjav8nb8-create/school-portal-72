@@ -37,6 +37,8 @@ interface Props {
   onTeacherUpdated: (teacher: Teacher) => void;
   notificationCounts?: NotificationCounts;
   notificationError?: string;
+  unreadNotificationKeys: ReadonlySet<string>;
+  onReviewMaterialViewed: (userId: string, submittedAt: string) => void;
   teacherLoadError?: string;
   onCategoryChange?: (category: DashboardCategory) => void;
   reportGradeBand: ReportGradeBand;
@@ -65,6 +67,8 @@ export default function AdminDashboardView({
   onTeacherUpdated,
   notificationCounts = {},
   notificationError = '',
+  unreadNotificationKeys,
+  onReviewMaterialViewed,
   teacherLoadError = '',
   onCategoryChange,
   reportGradeBand,
@@ -149,6 +153,8 @@ export default function AdminDashboardView({
               setSelectedBand={setReportGradeBand}
               selectedSubject={reportSubject}
               setSelectedSubject={setReportSubject}
+              unreadNotificationKeys={unreadNotificationKeys}
+              onPlanViewed={onReviewMaterialViewed}
             />}
             {activeCategory === 'Судалгаа' && <SurveyBoard />}
             {activeCategory === 'Чат' && <ChatBoard isAdmin />}

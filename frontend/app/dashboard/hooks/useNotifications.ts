@@ -18,10 +18,12 @@ export function useNotifications(
 ) {
   const [items, setItems] = useState<NotificationItem[]>(personalItems);
   const [counts, setCounts] = useState<NotificationCounts>({});
+  const [unreadItems, setUnreadItems] = useState<Set<string>>(new Set());
   const [errorMessage, setErrorMessage] = useState('');
   const activeStorageKey = useRef('');
   const itemsLoaded = useRef(false);
   const pendingReadCategories = useRef(new Set<DashboardCategory>());
+  const pendingReadItems = useRef(new Set<string>());
 
   const load = useCallback(async () => {
     if (!enabled) return;
@@ -39,12 +41,17 @@ export function useNotifications(
       pendingReadCategories.current.forEach((category) => {
         unique.filter((item) => item.category === category).forEach((item) => read.add(`${category}:${item.id}`));
       });
-      if (pendingReadCategories.current.size > 0) {
+      pendingReadItems.current.forEach((itemKey) => read.add(itemKey));
+      if (pendingReadCategories.current.size > 0 || pendingReadItems.current.size > 0) {
         window.localStorage.setItem(currentStorageKey, JSON.stringify([...read]));
         pendingReadCategories.current.clear();
+        pendingReadItems.current.clear();
       }
       setItems(unique);
       setCounts(countUnreadItems(unique, read));
+      setUnreadItems(new Set(unique
+        .filter((item) => !read.has(`${item.category}:${item.id}`))
+        .map((item) => `${item.category}:${item.id}`)));
       itemsLoaded.current = true;
       setErrorMessage('');
     } catch (error) {
@@ -88,8 +95,27 @@ export function useNotifications(
     const read = readReadItems(currentStorageKey);
     items.filter((item) => item.category === category).forEach((item) => read.add(`${category}:${item.id}`));
     window.localStorage.setItem(currentStorageKey, JSON.stringify([...read]));
-    setCounts((current) => ({ ...current, [category]: 0 }));
+    setCounts(countUnreadItems(items, read));
+    setUnreadItems(new Set(items
+      .filter((item) => !read.has(`${item.category}:${item.id}`))
+      .map((item) => `${item.category}:${item.id}`)));
   }, [items]);
 
-  return { counts, errorMessage, markRead };
+  const markItemRead = useCallback((category: DashboardCategory, id: string) => {
+    const itemKey = `${category}:${id}`;
+    const currentStorageKey = activeStorageKey.current;
+    if (!currentStorageKey || !itemsLoaded.current) {
+      pendingReadItems.current.add(itemKey);
+      return;
+    }
+    const read = readReadItems(currentStorageKey);
+    read.add(itemKey);
+    window.localStorage.setItem(currentStorageKey, JSON.stringify([...read]));
+    setCounts(countUnreadItems(items, read));
+    setUnreadItems(new Set(items
+      .filter((item) => !read.has(`${item.category}:${item.id}`))
+      .map((item) => `${item.category}:${item.id}`)));
+  }, [items]);
+
+  return { counts, unreadItems, errorMessage, markRead, markItemRead };
 }

@@ -11,6 +11,7 @@ interface Props {
   showName?: boolean;
   previewWidth?: number;
   previewHeight?: number;
+  onViewed?: () => void;
 }
 
 function fitPdfUrl(url: string) {
@@ -55,6 +56,7 @@ export default function FileAttachmentActions({
   showName = true,
   previewWidth = 220,
   previewHeight = 110,
+  onViewed,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [previewFailed, setPreviewFailed] = useState(false);
@@ -90,8 +92,8 @@ export default function FileAttachmentActions({
               ? <iframe title={`${attachment.name} preview`} src={fitPdfUrl(previewUrl)} style={{ display: 'block', width: '100%', height: '100%', border: 0 }} />
               : <div aria-hidden="true" style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', color: '#2563eb' }}><FileText size={28} /></div>}
           <div style={{ position: 'absolute', right: 4, bottom: 4, display: 'flex', gap: 3, opacity: 0.85 }}>
-            <button type="button" onClick={(event) => { event.stopPropagation(); setOpen(true); }} aria-label={`${attachment.name} харах`} title="Файлыг харах" style={imageActionButton}><Eye size={14} /></button>
-            <a href={downloadUrl} onClick={(event) => event.stopPropagation()} aria-label={`${attachment.name} татах`} title="Файл татах" style={imageActionButton}><Download size={14} /></a>
+            <button type="button" onClick={(event) => { event.stopPropagation(); onViewed?.(); setOpen(true); }} aria-label={`${attachment.name} харах`} title="Файлыг харах" style={imageActionButton}><Eye size={14} /></button>
+            <a href={downloadUrl} onClick={(event) => { event.stopPropagation(); onViewed?.(); }} aria-label={`${attachment.name} татах`} title="Файл татах" style={imageActionButton}><Download size={14} /></a>
           </div>
         </div>
         {previewDialog}
@@ -104,11 +106,11 @@ export default function FileAttachmentActions({
       <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
         {showName && <span>{attachment.name}</span>}
         {canPreview && (
-          <button type="button" title="Файлыг харах" aria-label={`${attachment.name} харах`} onClick={() => setOpen(true)} style={imageActionButton}>
+          <button type="button" title="Файлыг харах" aria-label={`${attachment.name} харах`} onClick={() => { onViewed?.(); setOpen(true); }} style={imageActionButton}>
             <Eye size={16} />
           </button>
         )}
-        <a href={downloadUrl} title="Файл татах" aria-label={`${attachment.name} татах`} style={imageActionButton}>
+        <a href={downloadUrl} onClick={onViewed} title="Файл татах" aria-label={`${attachment.name} татах`} style={imageActionButton}>
           <Download size={16} />
         </a>
       </div>

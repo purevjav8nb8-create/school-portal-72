@@ -18,6 +18,8 @@ interface Props {
   setSelectedBand: (band: GradeBand) => void;
   selectedSubject: string;
   setSelectedSubject: (subject: string) => void;
+  unreadNotificationKeys?: ReadonlySet<string>;
+  onPlanViewed?: (userId: string, submittedAt: string) => void;
 }
 
 export default function AdminReviewPanel({
@@ -26,6 +28,8 @@ export default function AdminReviewPanel({
   setSelectedBand,
   selectedSubject,
   setSelectedSubject,
+  unreadNotificationKeys = new Set(),
+  onPlanViewed,
 }: Props) {
   const [records, setRecords] = useState<TeacherRecords[]>([]);
   const [loading, setLoading] = useState(true);
@@ -215,6 +219,8 @@ export default function AdminReviewPanel({
         records={submittedRecords}
         approvalAssetsReady={!!approvalAssets.signature_url && !!approvalAssets.stamp_url}
         reviewingPlan={reviewingPlan}
+        unreadNotificationKeys={unreadNotificationKeys}
+        onPlanViewed={onPlanViewed}
         onReview={(userId, approved) => void reviewPlan(userId, approved)}
         onReturn={(userId) => void returnPlan(userId)}
         onDelete={(userId) => void deletePlan(userId)}

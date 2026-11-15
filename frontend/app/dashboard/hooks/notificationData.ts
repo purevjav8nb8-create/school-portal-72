@@ -22,6 +22,10 @@ const categories: DashboardCategory[] = ['Мэдээлэл', 'Зар', 'Суда
 const apiUrl = backendBaseUrl;
 const transientStatuses = [502, 503, 504];
 
+export function reviewPlanNotificationId(userId: string, submittedAt?: string, id?: string) {
+  return `${userId}:program-plan:${submittedAt ?? id ?? 'pending'}`;
+}
+
 async function fetchNotificationResponse(url: string, headers: HeadersInit): Promise<Response> {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
@@ -118,7 +122,7 @@ export async function fetchNotificationItems(
       const plan = record.program_plan;
       if (plan && !plan.approved && !plan.returned && plan.review_status !== 'returned' && plan.review_status !== 'approved') {
         nextItems.push({
-          id: `${record.user_id}:program-plan:${plan.submittedAt ?? plan.id ?? 'pending'}`,
+          id: reviewPlanNotificationId(record.user_id, plan.submittedAt, plan.id),
           category: 'Хянах',
         });
       }
