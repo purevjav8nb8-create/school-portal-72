@@ -16,9 +16,21 @@ export default function PasswordLoginForm() {
     event.preventDefault();
     setErrorMessage('');
     setLoading(true);
-    const loginEmail = email.trim().toLowerCase() === 'admin'
+    const enteredLogin = email.trim().toLowerCase();
+    if (!enteredLogin) {
+      setErrorMessage('Нэвтрэх нэр эсвэл и-мэйл хаягаа оруулна уу.');
+      setLoading(false);
+      return;
+    }
+    const isEmailAddress = enteredLogin.includes('@');
+    if (isEmailAddress && !/^[^@\s]+@moes\.edu\.mn$/.test(enteredLogin)) {
+      setErrorMessage('Зөвхөн @moes.edu.mn хаягаар нэвтэрнэ үү.');
+      setLoading(false);
+      return;
+    }
+    const loginEmail = enteredLogin === 'admin'
       ? 'admin@moes.edu.mn'
-      : email.trim().toLowerCase();
+      : isEmailAddress ? enteredLogin : `${enteredLogin}@moes.edu.mn`;
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email: loginEmail, password });
@@ -63,7 +75,7 @@ export default function PasswordLoginForm() {
           Нэвтрэх нэр эсвэл И-мэйл:
           <input
             type="text"
-            placeholder="@moes.edu.mn хаягаа оруулна уу"
+            placeholder="Нэвтрэх нэр эсвэл нэр@moes.edu.mn"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             required
@@ -101,7 +113,7 @@ export default function PasswordLoginForm() {
           {loading ? 'Нэвтэрч байна...' : 'Нэвтрэх'}
         </button>
         <p style={{ margin: '-6px 0 0', color: '#64748b', fontSize: 13, textAlign: 'center' }}>
-          @moes.edu.mn хаягаар нэвтэрнэ.
+          Нэвтрэх нэр бичвэл @moes.edu.mn автоматаар залгана.
         </p>
       </form>
     </>
