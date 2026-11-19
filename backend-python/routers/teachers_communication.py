@@ -3,7 +3,7 @@ from fastapi.responses import Response
 from schemas.school_chat import ChatMessageCreate, ChatReadRequest
 from schemas.teacher_records import AnnouncementCreate, SurveyCreate, SurveyResponseCreate, SurveySubmissionCreate
 from services.school_announcements import create_announcement, list_announcements
-from services.school_chat import create_chat_message, list_chat_conversations, list_chat_messages, list_chat_users, mark_chat_read
+from services.school_chat import create_chat_message, delete_private_conversation, list_chat_conversations, list_chat_messages, list_chat_users, mark_chat_read
 from services.school_surveys import create_survey, delete_survey, export_survey_xlsx, list_surveys, respond_survey, submit_survey
 from services.teacher_auth import get_authenticated_user
 
@@ -16,6 +16,14 @@ def get_announcements(kind: str | None = None, authorization: str | None = Heade
 @router.get("/chat/conversations")
 def get_chat_conversations(authorization: str | None = Header(default=None)):
     return list_chat_conversations(get_authenticated_user(authorization))
+
+@router.delete("/chat/conversations")
+def remove_chat_conversation(
+    conversation_id: str,
+    authorization: str | None = Header(default=None),
+):
+    delete_private_conversation(get_authenticated_user(authorization), conversation_id)
+    return {"deleted": True}
 
 @router.get("/chat/users")
 def get_chat_users(

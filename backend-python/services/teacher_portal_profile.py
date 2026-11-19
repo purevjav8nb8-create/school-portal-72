@@ -1,8 +1,8 @@
 from typing import Any
 from fastapi import HTTPException
-from database import supabase
 from services.mock_school_data import get_mock_teacher_by_id, load_mock_school_data, mock_data_enabled
 from services.teacher_portal_common import teacher_attendance_records, teacher_portal_data
+from services.teacher_portal_storage import list_portal_records
 
 def homeroom_evaluations(user) -> list[dict[str, Any]]:
     metadata = user.user_metadata or {}
@@ -25,19 +25,21 @@ def homeroom_evaluations(user) -> list[dict[str, Any]]:
             for teacher in load_mock_school_data()["teachers"]
         ]
     else:
-        try:
-            sources = [
-                (account.id, account.user_metadata or {}, account.user_metadata or {}, account.email or "")
-                for account in supabase.auth.admin.list_users(per_page=1000)
-            ]
-        except Exception as error:
-            raise HTTPException(status_code=503, detail="Анги удирдсан багшийн үнэлгээ уншигдсангүй.") from error
+        sources = [
+            (
+                str(record.get("teacher_id", "")),
+                {"last_name": "", "first_name": "", "teacher_name": record.get("teacher_name", "")},
+                record,
+                record.get("teacher_email", ""),
+            )
+            for record in list_portal_records("evaluations")
+        ]
 
     received = []
     for source_id, source_metadata, source_data, source_email in sources:
         if source_id == str(user.id):
             continue
-        portal = source_data if mock_data_enabled() else source_metadata.get("teacher_portal", {})
+        portal = source_data if mock_data_enabled() else {"evaluations": [source_data.get("payload", {})]}
         for evaluation in portal.get("evaluations", []):
             class_key = (evaluation.get("grade"), evaluation.get("section"))
             if class_key in homeroom_classes:
@@ -45,7 +47,7 @@ def homeroom_evaluations(user) -> list[dict[str, Any]]:
                     **evaluation,
                     "id": f"{source_id}:{evaluation.get('id', '')}",
                     "evaluator_id": source_id,
-                    "evaluator": f'{source_metadata.get("last_name", "")} {source_metadata.get("first_name", "")}'.strip(),
+                    "evaluator": source_metadata.get("teacher_name") or f'{source_metadata.get("last_name", "")} {source_metadata.get("first_name", "")}'.strip(),
                     "evaluator_email": source_email,
                 })
     return sorted(received, key=lambda item: (item.get("evaluation_date", ""), item.get("createdAt", "")), reverse=True)

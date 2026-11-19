@@ -8,16 +8,14 @@ import { DashboardCategory, ReportGradeBand, Teacher, UserProfile } from './type
 import { useTeachers } from './hooks/useTeachers';
 import { useNotifications } from './hooks/useNotifications';
 import { reviewPlanNotificationId } from './hooks/notificationData';
+import { schoolMonth, schoolToday } from '../../lib/schoolDate';
 
 const apiUrl = backendBaseUrl;
 
 export default function DashboardPage() {
   const [activeCategory, setActiveCategory] = useState<DashboardCategory>('Ирц');
   const [activeUnit, setActiveUnit] = useState<'НИЙТ' | 'БАЗАН' | 'БУЗАН' | 'НУЗАН'>('НИЙТ');
-  const [selectedMonth, setSelectedMonth] = useState(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  });
+  const [selectedMonth, setSelectedMonth] = useState(schoolMonth);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState('');
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -77,7 +75,7 @@ export default function DashboardPage() {
       const response = await fetchWithAuth(`${apiUrl}/api/teachers/${teacher.auth_id}/attendance`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: new Date().toISOString().slice(0, 10), status }),
+        body: JSON.stringify({ date: schoolToday(), status }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.detail ?? 'Ирц хадгалагдсангүй.');

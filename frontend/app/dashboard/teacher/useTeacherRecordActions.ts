@@ -24,13 +24,13 @@ type ActionsState = {
 
 export default function useTeacherRecordActions(state: ActionsState) {
   const saveRecord = async (path: string, payload: object, method = 'POST') => {
-    let { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await supabase.auth.getSession();
     const mockToken = window.localStorage.getItem('school-portal-mock-token');
-    if (!session && mockToken) session = { access_token: mockToken } as typeof session;
-    if (!session && !mockToken) throw new Error('Дахин нэвтэрнэ үү.');
+    const accessToken = session?.access_token ?? mockToken;
+    if (!accessToken) throw new Error('Дахин нэвтэрнэ үү.');
     const response = await fetchWithAuth(`${backendBaseUrl}${path}`, {
       method,
-      headers: { Authorization: `Bearer ${session!.access_token}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
     const responseText = await response.text();

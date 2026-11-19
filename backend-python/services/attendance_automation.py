@@ -20,6 +20,8 @@ def school_today() -> date:
 
 
 def _is_teacher(user: Any, admin_email: str) -> bool:
+    if isinstance(user, dict):
+        return user.get("role") == "teacher"
     metadata = user.user_metadata or {}
     app_metadata = user.app_metadata or {}
     email = (user.email or "").lower()
@@ -48,28 +50,40 @@ def ensure_today_attendance(users: list[Any] | None = None) -> list[Any] | None:
         raise HTTPException(status_code=503, detail="Supabase backend тохируулагдаагүй байна.")
     if users is None:
         try:
-            users = supabase.auth.admin.list_users(per_page=1000)
+            from services.teacher_portal_storage import list_teacher_profiles
+
+            users = list_teacher_profiles()
         except Exception as error:
             raise HTTPException(status_code=503, detail="Багшийн жагсаалтыг Supabase-ээс уншиж чадсангүй.") from error
 
     admin_email = os.getenv("ADMIN_EMAIL", "admin@moes.edu.mn").lower()
-    for index, user in enumerate(users):
+    teacher_ids = []
+    for user in users:
         if not _is_teacher(user, admin_email):
             continue
-        app_metadata = user.app_metadata or {}
-        records = app_metadata.get("teacher_attendance", [])
-        if any(item.get("date") == today for item in records):
-            continue
-        try:
-            updated_user = supabase.auth.admin.update_user_by_id(
-                user.id,
-                {"app_metadata": {
-                    **app_metadata,
-                    "teacher_attendance": [*records, {"date": today, "status": "Ирсэн"}],
-                }},
-            ).user
-            if updated_user is not None:
-                users[index] = updated_user
-        except Exception as error:
-            raise HTTPException(status_code=503, detail="Өнөөдрийн ирцийн бүртгэл үүсгэсэнгүй.") from error
+        teacher_ids.append(str(user["user_id"] if isinstance(user, dict) else user.id))
+    if not teacher_ids:
+        return users
+    try:
+        existing = (
+            supabase.table("teacher_attendance")
+            .select("teacher_id")
+            .eq("attendance_date", today)
+            .in_("teacher_id", teacher_ids)
+            .execute()
+        )
+        already_recorded = {item["teacher_id"] for item in (existing.data or [])}
+        rows = [
+            {"teacher_id": teacher_id, "attendance_date": today, "status": "Ирсэн"}
+            for teacher_id in teacher_ids
+            if teacher_id not in already_recorded
+        ]
+        if rows:
+            supabase.table("teacher_attendance").upsert(
+                rows,
+                on_conflict="teacher_id,attendance_date",
+                ignore_duplicates=True,
+            ).execute()
+    except Exception as error:
+        raise HTTPException(status_code=503, detail="Өнөөдрийн ирцийн бүртгэл үүсгэсэнгүй.") from error
     return users

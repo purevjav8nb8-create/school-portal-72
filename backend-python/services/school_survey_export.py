@@ -3,23 +3,15 @@ from typing import Any
 from urllib.parse import quote
 from fastapi import HTTPException
 from openpyxl import Workbook
-from database import supabase
 from services.school_announcements import _is_admin
-from services.teacher_portal import teacher_portal_data
-from services.school_surveys_common import _survey_owner
+from services.teacher_portal_storage import get_school_survey, list_survey_responses
 
 def export_survey_xlsx(current_user, survey_id: str) -> tuple[bytes, str]:
-    users = supabase.auth.admin.list_users(per_page=1000)
-    admin = _survey_owner(users)
-    if admin is None:
+    row = get_school_survey(survey_id)
+    if row is None:
         raise HTTPException(status_code=404, detail="Судалгаа олдсонгүй.")
 
-    survey = next(
-        (item for item in (admin.app_metadata or {}).get("school_surveys", []) if item.get("id") == survey_id),
-        None,
-    )
-    if survey is None:
-        raise HTTPException(status_code=404, detail="Судалгаа олдсонгүй.")
+    survey = row.get("payload") or {}
     if str(survey.get("created_by", "")) != str(current_user.id) and "created_by" in survey:
         raise HTTPException(status_code=403, detail="Энэ судалгааны нэгтгэлийг зөвхөн оруулсан хэрэглэгч харах боломжтой.")
     if "created_by" not in survey and not _is_admin(current_user):
@@ -47,21 +39,15 @@ def export_survey_xlsx(current_user, survey_id: str) -> tuple[bytes, str]:
     append_text_row(summary_sheet, ["Асуулт", "Хариулт", "Хариултын тоо"])
     counts: dict[int, dict[str, int]] = {}
 
-    for user in users:
-        responses = [
-            response
-            for response in teacher_portal_data(user).get("survey_responses", [])
-            if str(response.get("survey_id", "")) == survey_id
-        ]
-        if not responses:
-            continue
+    grouped_responses: dict[str, list[dict[str, Any]]] = {}
+    respondent_names: dict[str, str] = {}
+    for response_row in list_survey_responses(survey_id):
+        teacher_id = str(response_row.get("teacher_id", ""))
+        grouped_responses.setdefault(teacher_id, []).append(response_row.get("payload") or {})
+        respondent_names[teacher_id] = response_row.get("respondent_name") or "Нэргүй багш"
 
-        metadata = user.user_metadata or {}
-        teacher_name = (
-            f'{metadata.get("last_name", "")} {metadata.get("first_name", "")}'.strip()
-            or user.email
-            or "Нэргүй багш"
-        )
+    for teacher_id, responses in grouped_responses.items():
+        teacher_name = respondent_names.get(teacher_id, "Нэргүй багш")
         answer_by_question: dict[int, Any] = {}
         submitted_at = ""
         for response in responses:

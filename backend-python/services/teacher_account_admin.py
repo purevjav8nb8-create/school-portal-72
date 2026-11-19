@@ -3,6 +3,7 @@ from fastapi import HTTPException
 from database import supabase
 from schemas.teachers import ManagerCreate, PasswordUpdate
 from services.mock_school_data import load_mock_school_data, mock_data_enabled
+from services.teacher_portal_storage import list_teacher_profiles, save_teacher_profile
 
 def create_manager_account(manager: ManagerCreate) -> dict[str, Any]:
     email = manager.email.strip().lower()
@@ -29,6 +30,7 @@ def create_manager_account(manager: ManagerCreate) -> dict[str, Any]:
         if getattr(error, "code", None) == "email_exists":
             raise HTTPException(status_code=409, detail=f"{email} хаягтай хэрэглэгч аль хэдийн байна.") from error
         raise HTTPException(status_code=409, detail=f"{email} менежерийн хэрэглэгч үүссэнгүй.") from error
+    save_teacher_profile(created_user)
     return {**metadata, "auth_id": created_user.id, "email": email}
 
 def update_account_password(user_id: str, password: PasswordUpdate) -> None:
@@ -54,17 +56,13 @@ def list_manageable_accounts(current_user_id: str) -> list[dict[str, str]]:
         ]
     if supabase is None:
         raise HTTPException(status_code=503, detail="Supabase backend тохируулагдаагүй байна.")
-    try:
-        users = supabase.auth.admin.list_users(per_page=1000)
-    except Exception as error:
-        raise HTTPException(status_code=503, detail="Хэрэглэгчдийн жагсаалт уншигдсангүй.") from error
     return [
         {
-            "id": str(user.id),
-            "email": user.email or "",
-            "first_name": (user.user_metadata or {}).get("first_name", ""),
-            "last_name": (user.user_metadata or {}).get("last_name", ""),
-            "role": (user.app_metadata or {}).get("role", "teacher"),
+            "id": str(profile["user_id"]),
+            "email": str(profile.get("email", "")),
+            "first_name": str(profile.get("first_name", "")),
+            "last_name": str(profile.get("last_name", "")),
+            "role": str(profile.get("role", "teacher")),
         }
-        for user in users
+        for profile in list_teacher_profiles()
     ]

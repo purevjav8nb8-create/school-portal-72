@@ -3,6 +3,7 @@
 import { FormEvent, useState } from 'react';
 import AnnouncementAttachments, { AnnouncementAttachment } from './AnnouncementAttachments';
 import ClassFields from './ClassFields';
+import { schoolToday } from '../../../../lib/schoolDate';
 
 export type ActivityCategory =
   | 'Хичээлд суусан'
@@ -30,7 +31,7 @@ interface Props {
 export default function ActivityForm({ unit, subjects, onSubmit }: Props) {
   const [category, setCategory] = useState<ActivityCategory>('Хичээлд суусан');
   const [title, setTitle] = useState('');
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(schoolToday);
   const [note, setNote] = useState('');
   const [grade, setGrade] = useState(0);
   const [section, setSection] = useState('');

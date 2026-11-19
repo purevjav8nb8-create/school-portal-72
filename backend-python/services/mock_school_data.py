@@ -9,7 +9,15 @@ DEFAULT_DATA_PATH = Path(__file__).resolve().parents[1] / "seed" / "mock_school_
 
 
 def mock_data_enabled() -> bool:
-    return os.getenv("USE_MOCK_DATA", "false").strip().lower() in {"1", "true", "yes"}
+    enabled = os.getenv("USE_MOCK_DATA", "false").strip().lower() in {"1", "true", "yes"}
+    environment = os.getenv("ENVIRONMENT", "").strip().lower()
+    if enabled and environment in {"prod", "production"}:
+        raise RuntimeError("USE_MOCK_DATA-г production орчинд идэвхжүүлэх боломжгүй.")
+    return enabled
+
+
+def validate_mock_configuration() -> None:
+    mock_data_enabled()
 
 
 def load_mock_school_data() -> dict[str, Any]:

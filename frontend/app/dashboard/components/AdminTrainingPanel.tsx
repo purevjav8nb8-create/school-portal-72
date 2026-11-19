@@ -64,7 +64,7 @@ export default function AdminTrainingPanel({ teachers, unreadNotificationKeys, o
           />
           {teacherPickerOpen && <div id="training-teacher-options" role="listbox" style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20, maxHeight: 220, overflowY: 'auto', border: '1px solid #cbd5e1', borderRadius: 7, background: '#fff', boxShadow: '0 8px 20px rgba(15,23,42,.12)' }}>
             <button type="button" role="option" aria-selected={!teacherId} onMouseDown={(event) => event.preventDefault()} onClick={() => { setTeacherId(''); setTeacherPickerOpen(false); }} style={pickerOption}>Бүх багш</button>
-            {matchingTeachers.map((teacher) => <button key={teacher.auth_id} type="button" role="option" aria-selected={teacher.auth_id === teacherId} onMouseDown={(event) => event.preventDefault()} onClick={() => { setTeacherId(teacher.auth_id); setTeacherPickerOpen(false); }} style={pickerOption}>
+            {matchingTeachers.filter((teacher): teacher is Teacher & { auth_id: string } => typeof teacher.auth_id === 'string').map((teacher) => <button key={teacher.auth_id} type="button" role="option" aria-selected={teacher.auth_id === teacherId} onMouseDown={(event) => event.preventDefault()} onClick={() => { setTeacherId(teacher.auth_id); setTeacherPickerOpen(false); }} style={pickerOption}>
               {formatTeacherName(`${teacher.last_name} ${teacher.first_name}`)}
             </button>)}
             {matchingTeachers.length === 0 && <span style={{ display: 'block', padding: '7px 9px', color: '#64748b', fontWeight: 400 }}>Багш олдсонгүй.</span>}

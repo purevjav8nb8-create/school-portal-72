@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from database import supabase
 from services.attendance_automation import ensure_today_attendance, school_today
 from services.mock_school_data import load_mock_school_data, mock_data_enabled
+from services.teacher_portal_storage import list_teacher_portal_data_by_id, list_teacher_profiles
 
 def list_teacher_accounts() -> list[dict[str, Any]]:
     if mock_data_enabled():
@@ -45,24 +46,42 @@ def list_teacher_accounts() -> list[dict[str, Any]]:
         return accounts
     if supabase is None:
         raise HTTPException(status_code=503, detail="Supabase backend тохируулагдаагүй байна.")
+    profiles = list_teacher_profiles()
+    ensure_today_attendance(profiles)
+    portal_by_teacher = list_teacher_portal_data_by_id()
+    teacher_ids = [
+        str(profile["user_id"])
+        for profile in profiles
+        if profile.get("role") == "teacher"
+    ]
     try:
-        users = supabase.auth.admin.list_users(per_page=1000)
+        attendance_result = (
+            supabase.table("teacher_attendance")
+            .select("teacher_id,attendance_date,status")
+            .in_("teacher_id", teacher_ids)
+            .order("attendance_date")
+            .execute()
+        ) if teacher_ids else None
     except Exception as error:
-        raise HTTPException(status_code=503, detail="Багшийн жагсаалтыг Supabase-ээс уншиж чадсангүй.") from error
-    users = ensure_today_attendance(users) or users
+        raise HTTPException(status_code=503, detail="Багшийн ирцийг Supabase-ээс уншиж чадсангүй.") from error
+    attendance_by_teacher: dict[str, list[dict[str, str]]] = {}
+    for row in (attendance_result.data or []) if attendance_result else []:
+        attendance_by_teacher.setdefault(row["teacher_id"], []).append({
+            "date": row["attendance_date"],
+            "status": row["status"],
+        })
 
     teachers = []
     admin_email = os.getenv("ADMIN_EMAIL", "admin@moes.edu.mn").lower()
-    for user in users:
-        metadata = user.user_metadata or {}
-        app_metadata = user.app_metadata or {}
-        email = (user.email or "").lower()
-        if app_metadata.get("role") in {"admin", "manager"} or email == admin_email:
+    for profile in profiles:
+        user_id = str(profile["user_id"])
+        email = str(profile.get("email", "")).lower()
+        if profile.get("role") in {"admin", "manager"} or email == admin_email:
             continue
-        if metadata.get("role") != "teacher" and not email.endswith("@moes.edu.mn"):
+        if profile.get("role") != "teacher":
             continue
-        portal = metadata.get("teacher_portal", {})
-        attendance_records = app_metadata.get("teacher_attendance", [])
+        portal = portal_by_teacher.get(user_id, {})
+        attendance_records = attendance_by_teacher.get(user_id, [])
         latest_attendance = max(attendance_records, key=lambda item: item.get("date", ""), default={})
         weekly_hours = sum(item.get("weekly_hours", 0) for item in portal.get("teaching_classes", []))
         latest_month = max((item.get("date", "")[:7] for item in attendance_records), default="")
@@ -72,12 +91,12 @@ def list_teacher_accounts() -> list[dict[str, Any]]:
         ) if month_records else 0
         teachers.append({
             "id": len(teachers) + 1,
-            "auth_id": user.id,
-            "last_name": metadata.get("last_name", ""),
-            "first_name": metadata.get("first_name", ""),
-            "email": user.email or "",
-            "unit": metadata.get("unit", "БАЗАН"),
-            "subject": metadata.get("subject", ""),
+            "auth_id": user_id,
+            "last_name": profile.get("last_name", ""),
+            "first_name": profile.get("first_name", ""),
+            "email": profile.get("email", ""),
+            "unit": profile.get("unit") or "БАЗАН",
+            "subject": profile.get("subject", ""),
             "attendance": latest_attendance.get("status", "Ирсэн"),
             "monthly_attendance_rate": monthly_rate,
             "training_status": "Хамрагдсан" if portal.get("trainings") else "Хамрагдаагүй",
@@ -85,7 +104,7 @@ def list_teacher_accounts() -> list[dict[str, Any]]:
             "evaluation_records": portal.get("evaluations", []),
             "rating": 0,
             "monthly_login_count": 0,
-            "lms_username": metadata.get("lms_username", ""),
+            "lms_username": profile.get("lms_username", ""),
             "daily_records": attendance_records,
             "teaching_classes": portal.get("teaching_classes", []),
             "weekly_teaching_hours": weekly_hours,

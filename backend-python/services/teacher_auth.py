@@ -71,6 +71,17 @@ def require_admin(authorization: str | None):
     return user
 
 
+def require_primary_admin(authorization: str | None):
+    user = get_authenticated_user(authorization)
+    admin_email = os.getenv("ADMIN_EMAIL", "admin@moes.edu.mn").lower()
+    if (
+        (user.app_metadata or {}).get("role") != "admin"
+        and (user.email or "").lower() != admin_email
+    ):
+        raise HTTPException(status_code=403, detail="Зөвхөн системийн админ энэ үйлдлийг хийх эрхтэй.")
+    return user
+
+
 def require_teacher(authorization: str | None):
     user = get_authenticated_user(authorization)
     admin_email = os.getenv("ADMIN_EMAIL", "admin@moes.edu.mn").lower()

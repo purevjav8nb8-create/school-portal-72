@@ -2,12 +2,17 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 from fastapi import HTTPException
-from database import supabase
 from schemas.teacher_records import SurveyCreate, SurveyResponseCreate, SurveySubmissionCreate
 from services.school_announcements import _is_admin
-from services.teacher_portal import save_teacher_portal_data, teacher_portal_data
-from services.school_surveys_common import _survey_is_open, _survey_owner
+from services.school_surveys_common import _survey_is_open
 from services.school_survey_listing import list_surveys
+from services.teacher_portal_storage import (
+    delete_school_survey,
+    get_school_survey,
+    get_portal_collection,
+    save_school_survey,
+    save_survey_responses,
+)
 
 def create_survey(user, survey: SurveyCreate) -> dict[str, Any]:
     item = {
@@ -20,36 +25,23 @@ def create_survey(user, survey: SurveyCreate) -> dict[str, Any]:
         "author": f'{(user.user_metadata or {}).get("last_name", "")} {(user.user_metadata or {}).get("first_name", "")}'.strip() or user.email or "",
     }
     try:
-        admin = _survey_owner(supabase.auth.admin.list_users(per_page=1000))
-        if admin is None:
-            raise HTTPException(status_code=404, detail="Судалгааны эзэмшигч олдсонгүй.")
-        admin_metadata = dict(admin.app_metadata or {})
-        surveys = [item, *admin_metadata.get("school_surveys", [])]
-        admin_metadata["school_surveys"] = surveys
-        supabase.auth.admin.update_user_by_id(admin.id, {"app_metadata": admin_metadata})
-    except HTTPException:
-        raise
+        save_school_survey(user, item)
     except Exception as error:
         raise HTTPException(status_code=503, detail="Судалгааг хадгалж чадсангүй.") from error
     return item
 
 def delete_survey(user, survey_id: str) -> None:
     try:
-        admin = _survey_owner(supabase.auth.admin.list_users(per_page=1000))
-        if admin is None:
-            raise HTTPException(status_code=503, detail="Судалгааны эзэмшигч олдсонгүй.")
-        admin_metadata = dict(admin.app_metadata or {})
-        surveys = admin_metadata.get("school_surveys", [])
-        survey = next((item for item in surveys if str(item.get("id")) == survey_id), None)
-        if survey is None:
+        row = get_school_survey(survey_id)
+        if row is None:
             raise HTTPException(status_code=404, detail="Судалгаа олдсонгүй.")
+        survey = row.get("payload") or {}
         if str(survey.get("created_by", "")) != str(user.id) and not _is_admin(user):
             raise HTTPException(status_code=403, detail="Судалгааг зөвхөн оруулсан хүн эсвэл админ устгах боломжтой.")
-        admin_metadata["school_surveys"] = [item for item in surveys if str(item.get("id")) != survey_id]
-        supabase.auth.admin.update_user_by_id(admin.id, {"app_metadata": admin_metadata})
-    except HTTPException:
-        raise
+        delete_school_survey(survey_id)
     except Exception as error:
+        if isinstance(error, HTTPException):
+            raise
         raise HTTPException(status_code=503, detail="Судалгааг устгаж чадсангүй.") from error
 
 def _validated_answer(survey: dict[str, Any], response: SurveyResponseCreate) -> Any:
@@ -96,13 +88,11 @@ def submit_survey(user, survey_id: str, submission: SurveySubmissionCreate) -> l
         }
         for response in submission.answers
     ]
-    portal = teacher_portal_data(user)
     responses = [
-        item for item in portal.get("survey_responses", [])
+        item for item in get_portal_collection(str(user.id), "survey_responses")
         if item.get("survey_id") != survey_id
     ]
-    portal["survey_responses"] = [*responses, *answers]
-    save_teacher_portal_data(user, portal)
+    save_survey_responses(user, [*responses, *answers])
     return answers
 
 def respond_survey(user, survey_id: str, response: SurveyResponseCreate) -> dict[str, Any]:
@@ -117,11 +107,9 @@ def respond_survey(user, survey_id: str, response: SurveyResponseCreate) -> dict
         "option": _validated_answer(survey, response),
         "submittedAt": datetime.now(timezone.utc).isoformat(),
     }
-    portal = teacher_portal_data(user)
     responses = [
-        existing for existing in portal.get("survey_responses", [])
+        existing for existing in get_portal_collection(str(user.id), "survey_responses")
         if not (existing.get("survey_id") == survey_id and int(existing.get("question_index", 0)) == response.question_index)
     ]
-    portal["survey_responses"] = [*responses, item]
-    save_teacher_portal_data(user, portal)
+    save_survey_responses(user, [*responses, item])
     return item

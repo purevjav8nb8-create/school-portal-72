@@ -8,11 +8,14 @@ from services.teacher_portal_profile import get_my_program_plan
 
 
 class TeacherPortalProfileTests(unittest.TestCase):
-    def test_reads_program_plan_from_teacher_metadata(self):
+    def test_reads_program_plan_from_portal_store(self):
         plan = {"review_status": "returned"}
-        user = SimpleNamespace(user_metadata={"teacher_portal": {"program_plan": plan}})
+        user = SimpleNamespace(id="teacher-1")
 
-        with patch("services.teacher_portal_profile.mock_data_enabled", return_value=False):
+        with patch(
+            "services.teacher_portal_profile.teacher_portal_data",
+            return_value={"program_plan": plan},
+        ):
             self.assertEqual(get_my_program_plan(user), plan)
 
     def test_reads_program_plan_from_mock_teacher(self):

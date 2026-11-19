@@ -14,7 +14,13 @@ export type Activity = {
 };
 
 export type GradeBand = 'all' | 'primary' | 'middle' | 'high';
-export type ApprovalAssets = { signature_url: string; stamp_url: string };
+export type ApprovalAssets = { signature_url: string; stamp_url: string; composite_url: string };
+export type ManagerApprovalAsset = {
+  user_id: string;
+  email: string;
+  name: string;
+  composite_url: string;
+};
 
 export type TeacherRecords = {
   user_id: string;

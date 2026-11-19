@@ -13,6 +13,7 @@ interface Props {
   onSelectTeacher: (teacher: Teacher) => void;
   onAttendanceChange: (id: number, status: Teacher['attendance']) => void;
   readOnly?: boolean;
+  canManagePublicHolidays?: boolean;
 }
 
 export default function AttendanceTable({
@@ -23,6 +24,7 @@ export default function AttendanceTable({
   onSelectTeacher,
   onAttendanceChange,
   readOnly = false,
+  canManagePublicHolidays = false,
 }: Props) {
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const monthRecords = teachers.flatMap((teacher) => (teacher.daily_records ?? []).filter((record) => record.date.startsWith(selectedMonth)));
@@ -43,6 +45,7 @@ export default function AttendanceTable({
         selectedMonth={selectedMonth}
         setSelectedMonth={setSelectedMonth}
         readOnly={readOnly}
+        canManagePublicHolidays={canManagePublicHolidays}
         attendanceRate={attendanceRate}
         counts={{ present: presentCount, late: lateCount, leave: leaveCount, sick: sickCount, absent: absentCount }}
       />

@@ -6,8 +6,9 @@ import { GradeBand, TeacherRecords } from './adminReviewTypes';
 import { evaluationNotificationId, isValidEvaluationRecord } from '../../hooks/notificationData';
 
 const evaluationLevels = ['VIII', 'VII', 'VI', 'V', 'IV', 'III', 'II', 'I'] as const;
+const defaultGradeBand = { id: 'all', label: 'Бүгд', min: 1, max: 12 } as const;
 const gradeBands = [
-  { id: 'all', label: 'Бүгд', min: 1, max: 12 },
+  defaultGradeBand,
   { id: 'primary', label: 'Бага (1–5)', min: 1, max: 5 },
   { id: 'middle', label: 'Дунд (6–9)', min: 6, max: 9 },
   { id: 'high', label: 'Ахлах (10–12)', min: 10, max: 12 },
@@ -93,7 +94,7 @@ export default function EvaluationSummary({
         levels: value.levels,
         students: value.students,
         teacherCount: teachers.length,
-        teacherNames: teachers.map(({ name, email }) => nameCounts.get(name) > 1 ? `${name} (${email})` : name).join(', '),
+        teacherNames: teachers.map(({ name, email }) => (nameCounts.get(name) ?? 0) > 1 ? `${name} (${email})` : name).join(', '),
         average: value.students ? value.weightedScore / value.students : 0,
         notificationIds: [...value.notificationIds],
       };
@@ -102,7 +103,7 @@ export default function EvaluationSummary({
     );
   }, [records]);
 
-  const band = gradeBands.find((item) => item.id === selectedBand) ?? gradeBands[0];
+  const band = gradeBands.find((item) => item.id === selectedBand) ?? defaultGradeBand;
   const bandSummary = summaries.filter((item) => item.grade >= band.min && item.grade <= band.max);
   const subjects = [...new Set(bandSummary.map((item) => item.subject))].sort((a, b) => a.localeCompare(b));
   const activeSubject = subjects.includes(selectedSubject) ? selectedSubject : '';
@@ -139,38 +140,41 @@ export default function EvaluationSummary({
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 12 }}>
-            <thead><tr>{['Анги', ...(!activeSubject ? ['Хичээл'] : []), ...evaluationLevels, 'Нийт', 'Дундаж', 'Багш (тоо)', 'Уншсан'].map((label) => <th key={label} style={{ padding: '4px 6px', background: '#fff' }}>{label}</th>)}</tr></thead>
+            <thead><tr>{['Анги', ...(!activeSubject ? ['Хичээл'] : []), ...evaluationLevels, 'Нийт', 'Дундаж', 'Багш (тоо)'].map((label) => <th key={label} style={{ padding: '4px 6px', background: '#fff' }}>{label}</th>)}</tr></thead>
             <tbody>
-              {rows.map((item) => (
-                <tr
+              {rows.map((item) => {
+                const isUnread = item.notificationIds.some((id) => unreadNotificationKeys.has(`Үнэлгээ:${id}`));
+                const markViewed = () => onEvaluationViewed?.(item.notificationIds);
+                return <tr
                   key={`${item.grade}-${item.section}-${item.subject}`}
+                  tabIndex={isUnread ? 0 : undefined}
+                  onClick={isUnread ? markViewed : undefined}
+                  onKeyDown={isUnread ? (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      markViewed();
+                    }
+                  } : undefined}
                   style={{
                     borderTop: '1px solid #e2e8f0',
-                    fontWeight: item.notificationIds.some((id) => unreadNotificationKeys.has(`Үнэлгээ:${id}`)) ? 600 : 400,
+                    fontWeight: isUnread ? 600 : 400,
+                    cursor: isUnread ? 'pointer' : undefined,
                   }}
                 >
-                  <td style={{ padding: '4px 6px', fontWeight: 600 }}>{item.grade}-{item.section}</td>
+                  <td style={{ padding: '4px 6px' }}>{item.grade}-{item.section}</td>
                   {!activeSubject && <td style={{ padding: '4px 6px' }}>{item.subject}</td>}
                   {evaluationLevels.map((level) => <td key={level} style={{ padding: '4px 6px' }}>{item.levels[level] ?? 0}</td>)}
                   <td style={{ padding: '4px 6px' }}>{item.students}</td>
                   <td style={{ padding: '4px 6px' }}>{item.average.toFixed(1)}</td>
                   <td style={{ padding: '4px 6px' }}>{item.teacherNames}{item.teacherCount ? ` (${item.teacherCount})` : ''}</td>
-                  <td style={{ padding: '4px 6px' }}>
-                    {item.notificationIds.some((id) => unreadNotificationKeys.has(`Үнэлгээ:${id}`)) && (
-                      <button type="button" onClick={() => onEvaluationViewed?.(item.notificationIds)} aria-label="Үнэлгээний мэдээллийг уншсан гэж тэмдэглэх">
-                        Уншсан
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                </tr>;
+              })}
               <tr style={{ borderTop: '2px solid #94a3b8', background: '#e2e8f0', fontWeight: 700 }}>
                 <td style={{ padding: '4px 6px' }}>Нэгтгэл</td>
                 {!activeSubject && <td style={{ padding: '4px 6px' }} />}
                 {evaluationLevels.map((level) => <td key={level} style={{ padding: '4px 6px' }}>{totals.levels[level]}</td>)}
                 <td style={{ padding: '4px 6px' }}>{totals.students}</td>
                 <td style={{ padding: '4px 6px' }}>{(totals.students ? totals.weightedScore / totals.students : 0).toFixed(1)}</td>
-                <td style={{ padding: '4px 6px' }} />
                 <td style={{ padding: '4px 6px' }} />
               </tr>
             </tbody>

@@ -1,6 +1,15 @@
 from typing import Any
+from fastapi import HTTPException
+
 from services.school_chat_access import _conversation_messages, _private_participants, _visible_broadcast
-from services.school_chat_common import _CHAT_TABLE, _MAX_MESSAGES, _chat_directory, _load_rows, _metadata, _read_ids, _user_id, _user_name
+from services.school_chat_common import _CHAT_TABLE, _MAX_MESSAGES, _chat_directory, _delete_conversation_rows, _load_rows, _metadata, _read_ids, _user_id, _user_name
+
+
+def delete_private_conversation(user, conversation_id: str) -> None:
+    if not conversation_id.startswith("private:"):
+        raise HTTPException(status_code=422, detail="Зөвхөн хувийн чатыг устгах боломжтой.")
+    _conversation_messages(conversation_id, user)
+    _delete_conversation_rows(conversation_id)
 
 def list_chat_messages(user, conversation_id: str) -> list[dict[str, Any]]:
     rows = _conversation_messages(conversation_id, user)

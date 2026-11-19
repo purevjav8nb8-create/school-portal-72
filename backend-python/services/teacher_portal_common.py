@@ -1,13 +1,34 @@
 from typing import Any
 from fastapi import HTTPException
 from database import supabase
-from services.mock_school_data import mock_data_enabled, update_mock_teacher_portal
+from services.mock_school_data import mock_data_enabled
+from services.teacher_portal_storage import (
+    get_teacher_portal_data,
+    save_teacher_portal_data as save_teacher_portal_records,
+)
 
 def teacher_portal_data(user) -> dict[str, Any]:
-    return (user.user_metadata or {}).get("teacher_portal", {})
+    return get_teacher_portal_data(user)
 
 def teacher_attendance_records(user) -> list[dict[str, str]]:
-    return (user.app_metadata or {}).get("teacher_attendance", [])
+    if mock_data_enabled():
+        return (user.app_metadata or {}).get("teacher_attendance", [])
+    if supabase is None:
+        raise HTTPException(status_code=503, detail="Supabase backend тохируулагдаагүй байна.")
+    try:
+        result = (
+            supabase.table("teacher_attendance")
+            .select("attendance_date,status")
+            .eq("teacher_id", user.id)
+            .order("attendance_date")
+            .execute()
+        )
+    except Exception as error:
+        raise HTTPException(status_code=503, detail="Ирцийг Supabase-ээс уншиж чадсангүй.") from error
+    return [
+        {"date": item["attendance_date"], "status": item["status"]}
+        for item in (result.data or [])
+    ]
 
 def validate_teacher_class(user, grade: int, section: str, subject: str) -> None:
     metadata = user.user_metadata or {}
@@ -24,25 +45,25 @@ def validate_teacher_class(user, grade: int, section: str, subject: str) -> None
         raise HTTPException(status_code=422, detail="Бүлгийн сонголт буруу байна.")
 
 def save_teacher_portal_data(user, portal_data: dict[str, Any]):
-    if mock_data_enabled():
-        try:
-            return update_mock_teacher_portal(user.id, portal_data)
-        except KeyError as error:
-            raise HTTPException(status_code=404, detail="Загвар багш олдсонгүй.") from error
-        except RuntimeError as error:
-            raise HTTPException(status_code=503, detail=str(error)) from error
-
-    metadata = dict(user.user_metadata or {})
-    metadata["teacher_portal"] = portal_data
-    try:
-        return supabase.auth.admin.update_user_by_id(user.id, {"user_metadata": metadata}).user
-    except Exception as error:
-        raise HTTPException(status_code=503, detail="Багшийн мэдээллийг Supabase-д хадгалж чадсангүй.") from error
+    return save_teacher_portal_records(user, portal_data)
 
 def save_teacher_attendance(user, records: list[dict[str, str]]):
-    app_metadata = dict(user.app_metadata or {})
-    app_metadata["teacher_attendance"] = records
+    if supabase is None:
+        raise HTTPException(status_code=503, detail="Supabase backend тохируулагдаагүй байна.")
+    rows = [
+        {
+            "teacher_id": user.id,
+            "attendance_date": record["date"],
+            "status": record["status"],
+        }
+        for record in records
+    ]
+    if not rows:
+        return
     try:
-        return supabase.auth.admin.update_user_by_id(user.id, {"app_metadata": app_metadata}).user
+        return supabase.table("teacher_attendance").upsert(
+            rows,
+            on_conflict="teacher_id,attendance_date",
+        ).execute()
     except Exception as error:
         raise HTTPException(status_code=503, detail="Ирцийг Supabase-д хадгалж чадсангүй.") from error

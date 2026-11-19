@@ -67,10 +67,16 @@ export default function useAdminTeacherTools(
         setIsManager(false);
         return;
       }
-      const result = await requestAdminJson('/api/teachers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(teacher) });
+      const result = await requestAdminJson('/api/teachers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...teacher, password: teacher.password || undefined }),
+      });
       const created = (result as { teacher: CreatedTeacher }).teacher;
       onTeachersAdded([toTeacher(created, Date.now())]);
-      setMessage(`${created.email} хэрэглэгч үүслээ. Нэвтрэхдээ оруулсан нууц үгийг ашиглана.`);
+      setMessage(created.invitation_sent
+        ? `${created.email} хаягт нэвтрэх урилга илгээлээ.`
+        : `${created.email} хэрэглэгч үүслээ. Нэвтрэхдээ оруулсан нууц үгийг ашиглана.`);
       setTeacher({ first_name: '', last_name: '', email: '', unit: 'БАЗАН', subject: '', password: '' });
       setIsManager(false);
     }, 'Багш нэмэхэд алдаа гарлаа.');
@@ -88,7 +94,9 @@ export default function useAdminTeacherTools(
       const created = result.created as CreatedTeacher[];
       const failed = (result.failed ?? []) as { row: number; detail: string }[];
       onTeachersAdded(created.map((item, index) => toTeacher(item, Date.now() + index)));
-      const credentials = created.map((item) => `${item.email}: ${item.password ?? 'Excel файлаас өгсөн нууц үг'}`);
+      const credentials = created.map((item) => item.invitation_sent
+        ? `${item.email}: урилгын и-мэйл илгээсэн`
+        : `${item.email}: Excel файлаар өгсөн нууц үгтэй`);
       const failures = failed.map((item) => `Мөр ${item.row}: ${item.detail}`);
       setMessage([...credentials, ...failures].join('\n') || 'Файлаас хэрэглэгч үүсгэсэнгүй.');
     }, 'Файл боловсруулахад алдаа гарлаа.');
@@ -115,7 +123,7 @@ export default function useAdminTeacherTools(
   };
 
   const downloadTemplate = () => {
-    const csv = ['first_name,last_name,email,unit,subject,password', 'Болормаа,Бат,bagsh@moes.edu.mn,БАЗАН,Математик,12345678'].join('\n');
+    const csv = ['first_name,last_name,email,unit,subject,password', 'Болормаа,Бат,bagsh@moes.edu.mn,БАЗАН,Математик,'].join('\n');
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }));
     const link = document.createElement('a');
     link.href = url;

@@ -9,9 +9,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import teachers, reports, files
 from services.attendance_automation import ensure_today_attendance
+from services.mock_school_data import validate_mock_configuration
 
 logger = logging.getLogger(__name__)
 school_timezone = ZoneInfo("Asia/Ulaanbaatar")
+validate_mock_configuration()
 
 
 async def _attendance_scheduler():

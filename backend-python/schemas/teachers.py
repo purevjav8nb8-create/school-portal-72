@@ -97,6 +97,19 @@ class AttendanceUpdate(BaseModel):
     status: str
 
 
+class PublicHolidayCreate(BaseModel):
+    holiday_date: date
+    name: str = Field(default="Бүх нийтийн амралт", min_length=1, max_length=120)
+
+    @field_validator("name")
+    @classmethod
+    def reject_blank_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Амралтын өдрийн нэр хоосон байж болохгүй.")
+        return value
+
+
 class TeachingClass(BaseModel):
     grade: int = Field(ge=1, le=12)
     section: str = Field(min_length=1, max_length=1)

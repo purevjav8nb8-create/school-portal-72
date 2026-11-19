@@ -13,11 +13,12 @@ const actionStyle = { display: 'flex', alignItems: 'center', gap: 8, width: '100
 const fieldStyle = { width: '100%', boxSizing: 'border-box' as const, padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: 8, background: '#f8fafc', color: '#1e293b', fontSize: 13, outline: 'none' };
 
 export default function AdminTeacherCreationTools({
-  busy, teacher, setTeacher, isManager, setIsManager, managedUsers, selectedUserId,
+  busy, canManagePasswords, teacher, setTeacher, isManager, setIsManager, managedUsers, selectedUserId,
   setSelectedUserId, targetPassword, setTargetPassword, onAddTeacher, onResetPassword,
   onDownloadTemplate, onImport,
 }: {
   busy: boolean;
+  canManagePasswords: boolean;
   teacher: TeacherDraft;
   setTeacher: Dispatch<SetStateAction<TeacherDraft>>;
   isManager: boolean;
@@ -34,6 +35,7 @@ export default function AdminTeacherCreationTools({
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const [resetMode, setResetMode] = useState(false);
+  const showResetMode = canManagePasswords && resetMode;
   const [userSearch, setUserSearch] = useState('');
   const [userOptionsOpen, setUserOptionsOpen] = useState(false);
   const filteredUsers = managedUsers.filter((item) =>
@@ -42,11 +44,11 @@ export default function AdminTeacherCreationTools({
   const selectedUser = managedUsers.find((item) => item.id === selectedUserId);
   const userLabel = (item: ManagedUser) => `${formatTeacherName(`${item.last_name} ${item.first_name}`)} — ${item.email} (${item.role})`;
   return <>
-    <FloatingComposer title={resetMode ? 'Нууц үг шинэчлэх' : 'Шинэ хэрэглэгч нэмэх'} label="Багш нэмэх" onOpen={() => setResetMode(false)} headerAction={resetMode ? <button type="button" onClick={() => setResetMode(false)} style={{ ...actionStyle, width: 'auto', padding: '6px 9px' }}>Багш нэмэх</button> : <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+    <FloatingComposer title={showResetMode ? 'Нууц үг шинэчлэх' : 'Шинэ хэрэглэгч нэмэх'} label="Багш нэмэх" onOpen={() => setResetMode(false)} headerAction={showResetMode ? <button type="button" onClick={() => setResetMode(false)} style={{ ...actionStyle, width: 'auto', padding: '6px 9px' }}>Багш нэмэх</button> : <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
       <button type="button" onClick={onDownloadTemplate} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 9px', border: 0, borderRadius: 8, background: '#fb923c', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}><FileUp size={13} /> Загвар файл</button>
-      <button type="button" onClick={() => setResetMode(true)} style={{ ...actionStyle, width: 'auto', padding: '6px 9px', borderRadius: 8 }}>Нууц үг солих</button>
+      {canManagePasswords && <button type="button" onClick={() => setResetMode(true)} style={{ ...actionStyle, width: 'auto', padding: '6px 9px', borderRadius: 8 }}>Нууц үг солих</button>}
     </div>} trigger={<button type="button" style={actionStyle} disabled={busy}><UserPlus size={17} /> Багш нэмэх</button>}>
-      {(close) => resetMode ? <form onSubmit={(event) => void onResetPassword(event, close)} style={{ display: 'grid', gap: 12 }}>
+      {(close) => showResetMode ? <form onSubmit={(event) => void onResetPassword(event, close)} style={{ display: 'grid', gap: 12 }}>
         <div style={labelStyle}>
           <label htmlFor="password-user-search">Хэрэглэгч</label>
           <div style={{ position: 'relative' }}>
@@ -104,8 +106,10 @@ export default function AdminTeacherCreationTools({
           <label style={labelStyle}>Нэгж<select value={teacher.unit} onChange={(event) => setTeacher({ ...teacher, unit: event.target.value as Teacher['unit'], subject: '' })} style={fieldStyle}><option>БАЗАН</option><option>БУЗАН</option><option>НУЗАН</option></select></label>
           <label style={labelStyle}>Заах хичээл<select required value={teacher.subject} onChange={(event) => setTeacher({ ...teacher, subject: event.target.value })} style={fieldStyle}><option value="" disabled>Заах хичээл сонгох</option>{subjectsForUnit(teacher.unit).map((subject) => <option key={subject}>{subject}</option>)}</select></label>
         </>}
-        <label style={labelStyle}>Нууц үг<input required type="password" minLength={isManager ? 6 : 8} autoComplete="new-password" placeholder={isManager ? 'Дор хаяж 6 тэмдэгт' : 'Дор хаяж 8 тэмдэгт'} value={teacher.password} onChange={(event) => setTeacher({ ...teacher, password: event.target.value })} style={fieldStyle} /></label>
-        {isManager && <small style={{ color: '#b45309' }}>Менежер анх нэвтэрсний дараа нууц үгээ солино уу.</small>}
+        <label style={labelStyle}>{isManager ? 'Нууц үг' : 'Нууц үг (заавал биш)'}
+          <input required={isManager} type="password" minLength={isManager ? 6 : 8} autoComplete="new-password" placeholder={isManager ? 'Дор хаяж 6 тэмдэгт' : 'Хоосон орхивол и-мэйл урилга илгээнэ'} value={teacher.password} onChange={(event) => setTeacher({ ...teacher, password: event.target.value })} style={fieldStyle} />
+        </label>
+        {isManager && <small style={{ color: '#b45309' }}>Нууц үгийг зөвхөн админ өөрчилнө.</small>}
         <button type="submit" disabled={busy} style={submitStyle}>{busy ? 'Нэмж байна...' : `${isManager ? 'Менежер' : 'Багш'} үүсгэх`}</button>
       </form>}
     </FloatingComposer>

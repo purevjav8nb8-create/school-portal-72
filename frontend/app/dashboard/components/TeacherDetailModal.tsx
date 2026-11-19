@@ -39,7 +39,7 @@ export default function TeacherDetailModal({ teacher, selectedMonth, onClose, on
 
   async function saveTeacher(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!form || !teacher.auth_id) return;
+    if (!form || !teacher?.auth_id) return;
     setSaving(true);
     setErrorMessage('');
     try {

@@ -1,14 +1,17 @@
-from fastapi import APIRouter, File, Header, HTTPException, UploadFile
+from datetime import date
+
+from fastapi import APIRouter, File, Header, HTTPException, Path, UploadFile
 from pydantic import BaseModel
 from fastapi.responses import Response
 from schemas.teacher_records import ActivityReview, ProgramPlanApprovalAssets, ProgramPlanReview
-from schemas.teachers import AttendanceUpdate, ManagerCreate, PasswordUpdate, TeacherUpdate
+from schemas.teachers import AttendanceUpdate, ManagerCreate, PasswordUpdate, PublicHolidayCreate, TeacherUpdate
 from services.teacher_accounts import create_manager_account, delete_teacher_account, list_manageable_accounts, update_account_password, update_teacher_account
-from services.teacher_auth import require_admin
+from services.teacher_auth import get_authenticated_user, require_admin, require_primary_admin
+from services.school_public_holidays import delete_public_holiday, list_public_holidays, save_public_holiday
 from services.teacher_import import import_teacher_file
 from services.teacher_portal import update_teacher_attendance
 from services.mock_school_data import get_mock_teacher_by_email, mock_data_enabled
-from services.program_plan_approval import get_approval_assets, save_approval_assets
+from services.program_plan_approval import create_approval_composite, get_approval_assets, list_manager_approval_assets, save_approval_assets
 from services.teacher_records import create_program_plan_approval_pdf, delete_program_plan, list_teacher_records, return_program_plan, review_activity, review_program_plan
 
 router = APIRouter()
@@ -16,6 +19,33 @@ router = APIRouter()
 class MockLoginRequest(BaseModel):
     email: str
     password: str
+
+@router.get("/public-holidays/{year}")
+def get_public_holidays(
+    year: int = Path(ge=1900, le=2200),
+    authorization: str | None = Header(default=None),
+):
+    get_authenticated_user(authorization)
+    return list_public_holidays(year)
+
+@router.post("/public-holidays/{year}")
+def add_public_holiday(
+    holiday: PublicHolidayCreate,
+    authorization: str | None = Header(default=None),
+    year: int = Path(ge=1900, le=2200),
+):
+    user = require_primary_admin(authorization)
+    return save_public_holiday(year, holiday, user)
+
+@router.delete("/public-holidays/{year}/{holiday_date}")
+def remove_public_holiday(
+    holiday_date: date,
+    authorization: str | None = Header(default=None),
+    year: int = Path(ge=1900, le=2200),
+):
+    require_primary_admin(authorization)
+    delete_public_holiday(year, holiday_date)
+    return {"deleted": True}
 
 @router.post("/mock-login")
 def mock_login(credentials: MockLoginRequest):
@@ -48,13 +78,29 @@ def get_program_plan_approval_assets(authorization: str | None = Header(default=
     user = require_admin(authorization)
     return get_approval_assets(user)
 
+@router.get("/review/program-plan/approval-assets/managers")
+def get_manager_program_plan_approval_assets(authorization: str | None = Header(default=None)):
+    require_primary_admin(authorization)
+    return list_manager_approval_assets()
+
 @router.put("/review/program-plan/approval-assets")
 def set_program_plan_approval_assets(
     assets: ProgramPlanApprovalAssets,
     authorization: str | None = Header(default=None),
 ):
     user = require_admin(authorization)
-    return save_approval_assets(user, assets.signature_url, assets.stamp_url)
+    if not assets.composite_url:
+        raise HTTPException(status_code=422, detail="Гарын үсэг, тамганы тунгалаг нийлмэл зураг шаардлагатай.")
+    return save_approval_assets(user, assets.signature_url, assets.stamp_url, assets.composite_url)
+
+@router.post("/review/program-plan/approval-assets/composite")
+def create_program_plan_approval_composite(
+    assets: ProgramPlanApprovalAssets,
+    authorization: str | None = Header(default=None),
+):
+    require_admin(authorization)
+    content = create_approval_composite(assets.signature_url, assets.stamp_url)
+    return Response(content=content, media_type="image/png")
 
 @router.patch("/review/{user_id}/program-plan")
 def set_program_plan_review(
@@ -85,11 +131,10 @@ def return_teacher_program_plan(
 @router.post("/review/{user_id}/program-plan/approved-pdf")
 def get_program_plan_approval_pdf(
     user_id: str,
-    assets: ProgramPlanApprovalAssets,
     authorization: str | None = Header(default=None),
 ):
-    require_admin(authorization)
-    content = create_program_plan_approval_pdf(user_id, assets)
+    approver = require_admin(authorization)
+    content = create_program_plan_approval_pdf(user_id, approver)
     return Response(content=content, media_type="application/pdf")
 
 @router.patch("/review/{user_id}/activities/{activity_id}")
@@ -130,7 +175,7 @@ def update_user_password(
     password: PasswordUpdate,
     authorization: str | None = Header(default=None),
 ):
-    require_admin(authorization)
+    require_primary_admin(authorization)
     update_account_password(user_id, password)
     return {"updated": True}
 

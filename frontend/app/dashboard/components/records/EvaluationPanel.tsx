@@ -7,6 +7,7 @@ import EvaluationTable, { EvaluationClassSummary } from './EvaluationTable';
 import SharedEvaluationList from './SharedEvaluationList';
 import { EVALUATION_LEVELS } from './evaluationTypes';
 import type { EvaluationRecord } from './evaluationTypes';
+import { schoolToday } from '../../../../lib/schoolDate';
 export { EVALUATION_LEVELS } from './evaluationTypes';
 export type { EvaluationRecord } from './evaluationTypes';
 
@@ -29,7 +30,7 @@ export default function EvaluationPanel({ unit, subjects, evaluations, onSubmit,
     Object.fromEntries(EVALUATION_LEVELS.map((item) => [item, ''])) as Record<typeof EVALUATION_LEVELS[number], string>
   );
   const [averageScore, setAverageScore] = useState('');
-  const [evaluationDate, setEvaluationDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [evaluationDate, setEvaluationDate] = useState(schoolToday);
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 

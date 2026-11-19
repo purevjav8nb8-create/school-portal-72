@@ -101,7 +101,7 @@ export default function AdminDashboardView({
               notificationError={notificationError}
               categories={['Ирц', 'Хянах', 'Үнэлгээ', 'Мэдээлэл', 'Оролцоо', 'Сургалт', 'Судалгаа', 'Зар', 'Чат']}
             />
-            <AdminTeacherTools teachers={teachers} onTeachersAdded={onTeachersAdded} onTeacherRemoved={onTeacherRemoved} />
+            <AdminTeacherTools teachers={teachers} onTeachersAdded={onTeachersAdded} onTeacherRemoved={onTeacherRemoved} canManagePasswords={user.role === 'admin'} />
           </div>
           <button
             type="button"
@@ -140,6 +140,7 @@ export default function AdminDashboardView({
                 setSelectedMonth={setSelectedMonth}
                 onSelectTeacher={onTeacherSelect}
                 onAttendanceChange={onAttendanceChange}
+                canManagePublicHolidays={user.role === 'admin'}
               />
             )}
             {activeCategory === 'Сургалт' && <AdminTrainingPanel
@@ -157,6 +158,7 @@ export default function AdminDashboardView({
               onEvaluationViewed={(ids) => ids.forEach((id) => onNotificationItemViewed('Үнэлгээ', id))}
             />}
             {activeCategory === 'Хянах' && <AdminReviewPanel
+              isPrimaryAdmin={user.role === 'admin'}
               selectedBand={reportGradeBand}
               setSelectedBand={setReportGradeBand}
               selectedSubject={reportSubject}

@@ -5,8 +5,12 @@ from uuid import uuid4
 
 from fastapi import HTTPException
 
-from database import supabase
 from schemas.teacher_records import AnnouncementCreate
+from services.teacher_portal_storage import (
+    list_portal_records,
+    list_school_announcements,
+    save_school_announcement,
+)
 
 _PUBLIC_INFO_TYPES = {"Амжилт", "Олимпиад", "Уралдаан, тэмцээн"}
 _PRIVATE_INFO_TYPES = {"Оролцоо"}
@@ -36,54 +40,35 @@ def _can_view_announcement(item: dict[str, Any], author_id: str, current_user) -
 
 
 def list_announcements(current_user=None, kind: str | None = None) -> list[dict[str, Any]]:
-    try:
-        users = supabase.auth.admin.list_users(per_page=1000)
-    except Exception as error:
-        raise HTTPException(status_code=503, detail="Зар уншигдсангүй.") from error
-
     feed = []
-    admin_email = os.getenv("ADMIN_EMAIL", "admin@moes.edu.mn").lower()
-    for user in users:
-        metadata = user.user_metadata or {}
-        email = (user.email or "").lower()
-        if _is_admin(user):
-            for item in (user.app_metadata or {}).get("school_announcements", []):
-                if kind and item.get("kind", "Зар") != kind:
-                    continue
-                if not _can_view_announcement(item, user.id, current_user):
-                    continue
-                feed.append({**item, "type": "achievement" if item.get("kind") == "Мэдээлэл" else "announcement"})
-        if metadata.get("role") == "teacher" or (email.endswith("@moes.edu.mn") and email != admin_email):
-            portal = metadata.get("teacher_portal", {})
-            teacher_name = f"{metadata.get('last_name', '')} {metadata.get('first_name', '')}".strip() or user.email
-            feed.extend(
-                {
-                    **item,
-                    "type": "achievement" if item.get("kind") == "Мэдээлэл" else "announcement",
-                    "author": item.get("author") or teacher_name,
-                }
-                for item in portal.get("announcements", [])
-                if not kind or item.get("kind", "Зар") == kind
-                if _can_view_announcement(item, user.id, current_user)
-            )
-            for activity in portal.get("activities", []):
-                if activity.get("category") not in _PUBLIC_INFO_TYPES or (kind and kind != "Мэдээлэл"):
-                    continue
-                feed.append({
-                    "id": activity.get("id"),
-                    "type": "achievement",
-                    "kind": "Мэдээлэл",
-                    "info_type": activity.get("category"),
-                    "title": activity.get("title", "Амжилт"),
-                    "body": activity.get("note", ""),
-                    "createdAt": activity.get("submittedAt", ""),
-                    "author": teacher_name,
-                    "attachments": activity.get("attachments", []) + [
-                        {"name": f"Зураг {index + 1}", "url": image, "file_type": "image"}
-                        for index, image in enumerate(activity.get("images", []))
-                    ],
-                    "review_status": activity.get("review_status", "pending"),
-                })
+    for row in list_school_announcements():
+        item = row.get("payload") or {}
+        owner_id = str(row.get("owner_id", ""))
+        if kind and item.get("kind", "Зар") != kind:
+            continue
+        if not _can_view_announcement(item, owner_id, current_user):
+            continue
+        feed.append({**item, "type": "achievement" if item.get("kind") == "Мэдээлэл" else "announcement"})
+
+    for row in list_portal_records("activities"):
+        activity = row.get("payload") or {}
+        if activity.get("category") not in _PUBLIC_INFO_TYPES or (kind and kind != "Мэдээлэл"):
+            continue
+        feed.append({
+            "id": activity.get("id"),
+            "type": "achievement",
+            "kind": "Мэдээлэл",
+            "info_type": activity.get("category"),
+            "title": activity.get("title", "Амжилт"),
+            "body": activity.get("note", ""),
+            "createdAt": activity.get("submittedAt", ""),
+            "author": row.get("teacher_name") or activity.get("author", ""),
+            "attachments": activity.get("attachments", []) + [
+                {"name": f"Зураг {index + 1}", "url": image, "file_type": "image"}
+                for index, image in enumerate(activity.get("images", []))
+            ],
+            "review_status": activity.get("review_status", "pending"),
+        })
     return sorted(feed, key=lambda item: item.get("createdAt", ""), reverse=True)
 
 
@@ -104,16 +89,7 @@ def create_announcement(author_user, announcement: AnnouncementCreate) -> dict[s
         "info_type": announcement.info_type,
     }
     try:
-        if _is_admin(author_user):
-            app_metadata = dict(author_user.app_metadata or {})
-            app_metadata["school_announcements"] = [item, *app_metadata.get("school_announcements", [])]
-            supabase.auth.admin.update_user_by_id(author_user.id, {"app_metadata": app_metadata})
-        else:
-            user_metadata = dict(author_user.user_metadata or {})
-            portal = dict(user_metadata.get("teacher_portal", {}))
-            portal["announcements"] = [item, *portal.get("announcements", [])]
-            user_metadata["teacher_portal"] = portal
-            supabase.auth.admin.update_user_by_id(author_user.id, {"user_metadata": user_metadata})
+        save_school_announcement(author_user, item)
     except Exception as error:
         raise HTTPException(status_code=503, detail="Зарыг хадгалж чадсангүй.") from error
     return item

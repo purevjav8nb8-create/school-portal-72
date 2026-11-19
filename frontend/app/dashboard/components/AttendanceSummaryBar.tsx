@@ -1,4 +1,5 @@
 import styles from './AttendanceSummaryBar.module.css';
+import PublicHolidayManager from './PublicHolidayManager';
 
 interface Props {
   activeUnit: string;
@@ -7,10 +8,11 @@ interface Props {
   readOnly: boolean;
   attendanceRate: number;
   counts: { present: number; late: number; leave: number; sick: number; absent: number };
+  canManagePublicHolidays?: boolean;
 }
 
 export default function AttendanceSummaryBar({
-  activeUnit, selectedMonth, setSelectedMonth, readOnly, attendanceRate, counts,
+  activeUnit, selectedMonth, setSelectedMonth, readOnly, attendanceRate, counts, canManagePublicHolidays = false,
 }: Props) {
   const months = Array.from({ length: 12 }, (_, offset) => {
     const date = new Date();
@@ -30,6 +32,9 @@ export default function AttendanceSummaryBar({
           </select>
         </label>
       </div>
+      {canManagePublicHolidays && <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <PublicHolidayManager initialYear={Number(selectedMonth.slice(0, 4))} />
+      </div>}
       <div className={styles.summary}>
         <div className={styles.rate}>
           <span>Ирцийн хувь <b>{attendanceRate}%</b></span>

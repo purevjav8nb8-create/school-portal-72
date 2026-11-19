@@ -3,6 +3,7 @@ from typing import Any
 from fastapi import HTTPException
 from database import supabase
 from services.mock_school_data import load_mock_school_data, mock_data_enabled
+from services.teacher_portal_storage import list_teacher_profiles
 
 _CHAT_TABLE = "school_chat_messages"
 
@@ -16,7 +17,9 @@ def _metadata(user) -> dict[str, Any]:
     return user if isinstance(user, dict) else (getattr(user, "user_metadata", None) or {})
 
 def _user_id(user) -> str:
-    return str(user.get("auth_id") if isinstance(user, dict) else user.id)
+    if isinstance(user, dict):
+        return str(user.get("user_id") or user.get("auth_id") or user.get("id", ""))
+    return str(user.id)
 
 def _user_email(user) -> str:
     return str(user.get("email", "") if isinstance(user, dict) else getattr(user, "email", "") or "")
@@ -32,13 +35,13 @@ def _user_name(user) -> str:
 def _user_role(user) -> str:
     configured_email = os.getenv("ADMIN_EMAIL", "admin@moes.edu.mn").lower()
     app_metadata = user.get("app_metadata", {}) if isinstance(user, dict) else (getattr(user, "app_metadata", None) or {})
+    role = app_metadata.get("role") or _metadata(user).get("role")
     if (
-        _metadata(user).get("role") in {"admin", "manager"}
-        or app_metadata.get("role") in {"admin", "manager"}
+        role in {"admin", "manager"}
         or _user_email(user).lower() == configured_email
     ):
-        return "Сургалтын менежер" if app_metadata.get("role") == "manager" else "Админ"
-    if _metadata(user).get("role") == "teacher" or _user_email(user).lower().endswith("@moes.edu.mn"):
+        return "Сургалтын менежер" if role == "manager" else "Админ"
+    if role == "teacher" or _user_email(user).lower().endswith("@moes.edu.mn"):
         return "Багш"
     return "Хэрэглэгч"
 
@@ -64,7 +67,7 @@ def _require_database() -> None:
 def _list_auth_users() -> list[Any]:
     _require_database()
     try:
-        return supabase.auth.admin.list_users(per_page=1000)
+        return list_teacher_profiles()
     except Exception as error:
         raise HTTPException(status_code=503, detail="Чатын хэрэглэгчдийн жагсаалт уншигдсангүй.") from error
 
@@ -96,6 +99,15 @@ def _load_conversation_rows(conversation_id: str) -> list[dict[str, Any]]:
             detail="Чатын хүснэгт олдсонгүй эсвэл унших боломжгүй байна. Supabase migration ажиллуулна уу.",
         ) from error
     return result.data or []
+
+
+def _delete_conversation_rows(conversation_id: str) -> None:
+    _require_database()
+    try:
+        supabase.table(_CHAT_TABLE).delete().eq("conversation_id", conversation_id).execute()
+    except Exception as error:
+        raise HTTPException(status_code=503, detail="Хувийн чатыг устгаж чадсангүй.") from error
+
 
 def _read_ids(user_id: str, message_ids: list[str]) -> set[str]:
     if not message_ids:

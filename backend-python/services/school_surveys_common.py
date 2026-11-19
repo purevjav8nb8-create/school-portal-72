@@ -2,7 +2,11 @@ from datetime import datetime, timezone
 import os
 from typing import Any
 from fastapi import HTTPException
-from database import supabase
+from services.teacher_portal_storage import (
+    delete_school_survey,
+    list_school_surveys,
+    save_school_survey,
+)
 
 def _survey_owner(users: list[Any]) -> Any | None:
     admin_email = os.getenv("ADMIN_EMAIL", "admin@moes.edu.mn").lower()
@@ -31,14 +35,14 @@ def _survey_is_open(survey: dict[str, Any]) -> bool:
     return True
 
 def _save_surveys(surveys: list[dict[str, Any]]) -> None:
-    try:
-        admin = _survey_owner(supabase.auth.admin.list_users(per_page=1000))
-        if admin is None:
+    existing = {str(row.get("id")): row for row in list_school_surveys()}
+    for survey in surveys:
+        row = existing.get(str(survey.get("id")))
+        owner_id = row.get("owner_id") if row else survey.get("created_by")
+        if not owner_id:
             raise HTTPException(status_code=503, detail="Судалгааны эзэмшигч олдсонгүй.")
-        metadata = dict(admin.app_metadata or {})
-        metadata["school_surveys"] = surveys
-        supabase.auth.admin.update_user_by_id(admin.id, {"app_metadata": metadata})
-    except HTTPException:
-        raise
-    except Exception as error:
-        raise HTTPException(status_code=503, detail="Судалгааг хадгалж чадсангүй.") from error
+        owner = type("SurveyOwner", (), {"id": owner_id})()
+        save_school_survey(owner, survey)
+    retained = {str(survey.get("id")) for survey in surveys}
+    for survey_id in set(existing) - retained:
+        delete_school_survey(survey_id)

@@ -9,10 +9,11 @@ import { isValidEvaluationRecord } from '../../hooks/notificationData';
 import ApprovalAssetsDialog from './ApprovalAssetsDialog';
 import EvaluationSummary from './EvaluationSummary';
 import PlanReviewList from './PlanReviewList';
-import { ApprovalAssets, GradeBand, SubmittedPlanRecord, TeacherRecords } from './adminReviewTypes';
+import { ApprovalAssets, GradeBand, ManagerApprovalAsset, SubmittedPlanRecord, TeacherRecords } from './adminReviewTypes';
 
 interface Props {
   summaryOnly?: boolean;
+  isPrimaryAdmin?: boolean;
   selectedBand: GradeBand;
   setSelectedBand: (band: GradeBand) => void;
   selectedSubject: string;
@@ -24,6 +25,7 @@ interface Props {
 
 export default function AdminReviewPanel({
   summaryOnly = false,
+  isPrimaryAdmin = false,
   selectedBand,
   setSelectedBand,
   selectedSubject,
@@ -35,8 +37,9 @@ export default function AdminReviewPanel({
   const [records, setRecords] = useState<TeacherRecords[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
-  const [approvalAssets, setApprovalAssets] = useState<ApprovalAssets>({ signature_url: '', stamp_url: '' });
+  const [approvalAssets, setApprovalAssets] = useState<ApprovalAssets>({ signature_url: '', stamp_url: '', composite_url: '' });
   const [approvalAssetsDraft, setApprovalAssetsDraft] = useState(approvalAssets);
+  const [managerApprovalAssets, setManagerApprovalAssets] = useState<ManagerApprovalAsset[]>([]);
   const [approvalAssetsOpen, setApprovalAssetsOpen] = useState(false);
   const [savingApprovalAssets, setSavingApprovalAssets] = useState(false);
   const [reviewingPlan, setReviewingPlan] = useState('');
@@ -85,9 +88,22 @@ export default function AdminReviewPanel({
     }
   };
 
+  const loadManagerApprovalAssets = async () => {
+    if (!isPrimaryAdmin) return;
+    try {
+      const assets = await request('/api/teachers/review/program-plan/approval-assets/managers') as ManagerApprovalAsset[];
+      setManagerApprovalAssets(assets);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Менежерүүдийн гарын үсэг, тамганы зураг уншигдсангүй.');
+    }
+  };
+
   useEffect(() => {
     void loadRecords();
-    if (!summaryOnly) void loadApprovalAssets();
+    if (!summaryOnly) {
+      void loadApprovalAssets();
+      void loadManagerApprovalAssets();
+    }
   }, []);
 
   const saveApprovalAssets = async () => {
@@ -97,7 +113,26 @@ export default function AdminReviewPanel({
     }
     setSavingApprovalAssets(true);
     try {
-      const saved = await request('/api/teachers/review/program-plan/approval-assets', 'PUT', approvalAssetsDraft) as ApprovalAssets;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Дахин нэвтэрнэ үү.');
+      const compositeResponse = await fetchWithAuth(`${backendBaseUrl}/api/teachers/review/program-plan/approval-assets/composite`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          signature_url: approvalAssetsDraft.signature_url,
+          stamp_url: approvalAssetsDraft.stamp_url,
+        }),
+      });
+      if (!compositeResponse.ok) {
+        const result = await compositeResponse.json();
+        throw new Error(result.detail ?? 'Тунгалаг гарын үсэг, тамганы зураг үүсгэсэнгүй.');
+      }
+      const compositeFile = new File([await compositeResponse.blob()], 'approval-signature-stamp.png', { type: 'image/png' });
+      const compositeUrl = (await uploadCloudinaryFile(compositeFile, ['png'])).url;
+      const saved = await request('/api/teachers/review/program-plan/approval-assets', 'PUT', {
+        ...approvalAssetsDraft,
+        composite_url: compositeUrl,
+      }) as ApprovalAssets;
       setApprovalAssets(saved);
       setApprovalAssetsDraft(saved);
       setApprovalAssetsOpen(false);
@@ -110,8 +145,8 @@ export default function AdminReviewPanel({
   };
 
   const reviewPlan = async (userId: string, approved: boolean) => {
-    if (approved && (!approvalAssets.signature_url || !approvalAssets.stamp_url)) {
-      setErrorMessage('Батлахын өмнө хянах хуудасны гарын үсэг, тамганы тохиргоог хадгална уу.');
+    if (approved && (!approvalAssets.signature_url || !approvalAssets.stamp_url || !approvalAssets.composite_url)) {
+      setErrorMessage('Батлахын өмнө гарын үсэг, тамгаа оруулаад “Хадгалах” товчийг дарна уу.');
       return;
     }
     setReviewingPlan(userId);
@@ -122,8 +157,7 @@ export default function AdminReviewPanel({
         if (!session) throw new Error('Дахин нэвтэрнэ үү.');
         const response = await fetchWithAuth(`${backendBaseUrl}/api/teachers/review/${userId}/program-plan/approved-pdf`, {
           method: 'POST',
-          headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify(approvalAssets),
+          headers: { Authorization: `Bearer ${session.access_token}` },
         });
         if (!response.ok) {
           const result = await response.json();
@@ -193,10 +227,28 @@ export default function AdminReviewPanel({
         open={approvalAssetsOpen}
         assets={approvalAssetsDraft}
         saving={savingApprovalAssets}
-        onChange={setApprovalAssetsDraft}
+        onChange={(assets) => setApprovalAssetsDraft({ ...assets, composite_url: '' })}
         onClose={() => setApprovalAssetsOpen(false)}
         onSave={() => void saveApprovalAssets()}
       />}
+      {!summaryOnly && managerApprovalAssets.length > 0 && <details style={{ margin: '0 0 16px', padding: '10px 12px', border: '1px solid #dbeafe', borderRadius: 10, background: '#f8fbff' }}>
+        <summary style={{ color: '#1e40af', fontWeight: 700, cursor: 'pointer' }}>
+          Менежерүүдийн нэгтгэсэн гарын үсэг, тамга ({managerApprovalAssets.length})
+        </summary>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
+          {managerApprovalAssets.map((manager) => (
+            <figure key={manager.user_id} style={{ margin: 0, display: 'grid', alignContent: 'start', justifyItems: 'center', gap: 6, padding: 10, border: '1px solid #e2e8f0', borderRadius: 8, background: '#fff' }}>
+              <figcaption style={{ textAlign: 'center', fontSize: 12, fontWeight: 700, color: '#334155' }}>
+                {manager.name || manager.email}
+                <small style={{ display: 'block', fontWeight: 400 }}>{manager.email}</small>
+              </figcaption>
+              {manager.composite_url
+                ? <img src={manager.composite_url} alt={`${manager.name || manager.email} гарын үсэг, тамганы нийлмэл зураг`} style={{ width: '100%', maxWidth: 240, height: 140, objectFit: 'contain', background: '#fff' }} />
+                : <p style={{ margin: 0, color: '#64748b', fontSize: 12 }}>Одоогоор зураг хадгалаагүй.</p>}
+            </figure>
+          ))}
+        </div>
+      </details>}
       {summaryOnly && <EvaluationSummary
         records={records}
         selectedBand={selectedBand}
@@ -208,7 +260,6 @@ export default function AdminReviewPanel({
       />}
       {!summaryOnly && <PlanReviewList
         records={submittedRecords}
-        approvalAssetsReady={!!approvalAssets.signature_url && !!approvalAssets.stamp_url}
         reviewingPlan={reviewingPlan}
         unreadNotificationKeys={unreadNotificationKeys}
         onPlanViewed={onPlanViewed}

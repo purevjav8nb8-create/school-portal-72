@@ -57,6 +57,11 @@
   background: #fee2e2;
 }
 
+.publicHoliday {
+  color: #b91c1c;
+  background: #fee2e2;
+}
+
 .leave {
   color: #1d4ed8;
   background: #dbeafe;
@@ -78,4 +83,10 @@
   padding: 14px;
   color: #64748b;
   text-align: center;
+}
+
+.error {
+  margin: 0 0 8px;
+  color: #b91c1c;
+  font-size: 13px;
 }

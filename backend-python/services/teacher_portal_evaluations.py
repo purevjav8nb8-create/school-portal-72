@@ -7,7 +7,8 @@ from database import supabase
 from schemas.teacher_records import EvaluationCreate
 from schemas.teachers import AttendanceUpdate, VALID_ATTENDANCE
 from services.mock_school_data import mock_data_enabled, update_mock_teacher_attendance
-from services.teacher_portal_common import save_teacher_attendance, save_teacher_portal_data, teacher_attendance_records, teacher_portal_data, validate_teacher_class
+from services.teacher_portal_common import save_teacher_attendance, teacher_attendance_records, validate_teacher_class
+from services.teacher_portal_storage import get_portal_collection, replace_portal_collection
 
 def add_evaluation(user, evaluation: EvaluationCreate) -> dict[str, Any]:
     validate_teacher_class(user, evaluation.grade, evaluation.section, evaluation.subject)
@@ -16,19 +17,19 @@ def add_evaluation(user, evaluation: EvaluationCreate) -> dict[str, Any]:
         **evaluation.model_dump(mode="json"),
         "createdAt": datetime.now(timezone.utc).isoformat(),
     }
-    portal = teacher_portal_data(user)
-    portal["evaluations"] = [*portal.get("evaluations", []), item]
-    save_teacher_portal_data(user, portal)
+    replace_portal_collection(
+        user,
+        "evaluations",
+        [*get_portal_collection(str(user.id), "evaluations"), item],
+    )
     return item
 
 def delete_evaluation(user, evaluation_id: str) -> None:
-    portal = teacher_portal_data(user)
-    evaluations = portal.get("evaluations", [])
+    evaluations = get_portal_collection(str(user.id), "evaluations")
     updated = [item for item in evaluations if str(item.get("id")) != evaluation_id]
     if len(updated) == len(evaluations):
         raise HTTPException(status_code=404, detail="Үнэлгээ олдсонгүй.")
-    portal["evaluations"] = updated
-    save_teacher_portal_data(user, portal)
+    replace_portal_collection(user, "evaluations", updated)
 
 def update_teacher_attendance(user_id: str, attendance: AttendanceUpdate) -> dict[str, str]:
     if attendance.status not in VALID_ATTENDANCE:

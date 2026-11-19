@@ -47,6 +47,7 @@ export default function ChatBoard({ isAdmin = false, showUnreadCount = false, on
   const [targetUnits, setTargetUnits] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [deletingConversation, setDeletingConversation] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
   const loadConversations = useCallback(async () => {
@@ -191,6 +192,28 @@ export default function ChatBoard({ isAdmin = false, showUnreadCount = false, on
       unread_count: 0,
     } : undefined);
 
+  const deleteConversation = async () => {
+    if (selectedConversation?.kind !== 'private' || !selectedId) return;
+    if (!window.confirm('Энэ хувийн чатын бүх мессежийг хоёр талын түүхээс бүрмөсөн устгах уу?')) return;
+    setDeletingConversation(true);
+    setErrorMessage('');
+    try {
+      await chatRequest<{ deleted: boolean }>(
+        `/api/teachers/chat/conversations?conversation_id=${encodeURIComponent(selectedId)}`,
+        { method: 'DELETE' },
+      );
+      setConversations((current) => current.filter((conversation) => conversation.conversation_id !== selectedId));
+      setSelectedId('');
+      setSelectedUser(null);
+      setMessages([]);
+      await loadConversations();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Хувийн чатыг устгаж чадсангүй.');
+    } finally {
+      setDeletingConversation(false);
+    }
+  };
+
   return (
     <section style={{ display: 'grid', gap: 8, minHeight: 360 }}>
       <header>
@@ -225,9 +248,12 @@ export default function ChatBoard({ isAdmin = false, showUnreadCount = false, on
             draft={draft}
             targetUnits={targetUnits}
             sending={sending}
+            canDeleteConversation={selectedConversation?.kind === 'private' && conversations.some((conversation) => conversation.conversation_id === selectedId)}
+            deletingConversation={deletingConversation}
             onDraftChange={setDraft}
             onTargetUnitsChange={setTargetUnits}
             onSend={(event) => void send(event)}
+            onDeleteConversation={() => void deleteConversation()}
           />
         </div>
       )}

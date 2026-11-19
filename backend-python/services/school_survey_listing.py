@@ -1,21 +1,17 @@
 from typing import Any
 from fastapi import HTTPException
-from database import supabase
 from services.school_announcements import _is_admin
-from services.teacher_portal import teacher_portal_data
-from services.school_surveys_common import _survey_is_open, _survey_owner
+from services.school_surveys_common import _survey_is_open
+from services.teacher_portal_storage import list_school_surveys, list_survey_responses
 
 def list_surveys(current_user) -> list[dict[str, Any]]:
     try:
-        users = supabase.auth.admin.list_users(per_page=1000)
-        admin = _survey_owner(users)
-        if admin is None:
-            return []
+        surveys = [row.get("payload") or {} for row in list_school_surveys()]
     except HTTPException:
         raise
     except Exception as error:
         raise HTTPException(status_code=503, detail="Судалгаа уншигдсангүй.") from error
-    surveys = (admin.app_metadata or {}).get("school_surveys", [])
+    surveys.sort(key=lambda item: item.get("createdAt", ""), reverse=True)
     manageable_survey_ids = {
         str(item.get("id"))
         for item in surveys
@@ -32,28 +28,31 @@ def list_surveys(current_user) -> list[dict[str, Any]]:
             or not item.get("target_units")
             or unit in item["target_units"]
         ]
-    own_responses = {
-        f'{item.get("survey_id")}:{item.get("question_index", 0)}': item.get("option", item.get("answer"))
-        for item in teacher_portal_data(current_user).get("survey_responses", [])
-    }
+    all_responses = list_survey_responses()
+    own_responses = {}
     response_users: dict[str, dict[str, str]] = {}
     response_summary: dict[str, dict[str, dict[str, int]]] = {}
-    if manageable_survey_ids:
-        for user in users:
-            for response in teacher_portal_data(user).get("survey_responses", []):
-                survey_id = str(response.get("survey_id", ""))
-                if survey_id in manageable_survey_ids:
-                    metadata = user.user_metadata or {}
-                    teacher_name = f'{metadata.get("last_name", "")} {metadata.get("first_name", "")}'.strip() or user.email or "Нэргүй багш"
-                    response_users.setdefault(survey_id, {})[str(user.id)] = teacher_name
-                    question_index = str(response.get("question_index", 0))
-                    response_summary.setdefault(survey_id, {}).setdefault(question_index, {})
-                    question_counts = response_summary[survey_id][question_index]
-                    answer = response.get("option", response.get("answer", ""))
-                    answers = answer if isinstance(answer, list) else [answer]
-                    for option in answers:
-                        option = str(option)
-                        question_counts[option] = question_counts.get(option, 0) + 1
+    own_id = str(current_user.id)
+    manageable = {str(item.get("id")) for item in surveys if str(item.get("id")) in manageable_survey_ids}
+    for row in all_responses:
+        response = row.get("payload") or {}
+        survey_id = str(response.get("survey_id", ""))
+        user_id = str(row.get("teacher_id", ""))
+        question_index = str(response.get("question_index", 0))
+        answer = response.get("option", response.get("answer"))
+        if user_id == own_id:
+            own_responses[f"{survey_id}:{question_index}"] = answer
+        if survey_id not in manageable:
+            continue
+        response_users.setdefault(survey_id, {})[user_id] = (
+            row.get("respondent_name") or "Нэргүй багш"
+        )
+        response_summary.setdefault(survey_id, {}).setdefault(question_index, {})
+        question_counts = response_summary[survey_id][question_index]
+        answers = answer if isinstance(answer, list) else [answer]
+        for option in answers:
+            option = str(option)
+            question_counts[option] = question_counts.get(option, 0) + 1
     return [{
         **item,
         "responses": {str(index): option for key, option in own_responses.items() if key.startswith(f'{item["id"]}:') for index in [key.split(":", 1)[1]]},

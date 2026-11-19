@@ -106,10 +106,13 @@ class ProgramPlanReview(BaseModel):
 class ProgramPlanApprovalAssets(BaseModel):
     signature_url: str = Field(min_length=1)
     stamp_url: str = Field(min_length=1)
+    composite_url: str | None = None
 
-    @field_validator("signature_url", "stamp_url")
+    @field_validator("signature_url", "stamp_url", "composite_url")
     @classmethod
-    def require_nonblank_asset_url(cls, value: str) -> str:
+    def require_nonblank_asset_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         value = value.strip()
         if not value:
             raise ValueError("Гарын үсэг, тамганы зураг шаардлагатай.")

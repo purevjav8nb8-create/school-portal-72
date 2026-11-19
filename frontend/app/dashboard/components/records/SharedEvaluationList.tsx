@@ -14,7 +14,7 @@ export default function SharedEvaluationList({ evaluations }: { evaluations: (Ev
     const teachers = [...unique.values()];
     const nameCounts = new Map<string, number>();
     teachers.forEach((teacher) => nameCounts.set(teacher.name, (nameCounts.get(teacher.name) ?? 0) + 1));
-    return teachers.map((teacher) => nameCounts.get(teacher.name) > 1 ? `${teacher.name} (${teacher.email})` : teacher.name);
+    return teachers.map((teacher) => (nameCounts.get(teacher.name) ?? 0) > 1 ? `${teacher.name} (${teacher.email})` : teacher.name);
   }, [evaluations]);
   const summary = useMemo(() => {
     const groups = new Map<string, { grade: number; section: string; subject: string; levels: Record<string, number>; students: number; weightedScore: number; date: string }>();

@@ -9,13 +9,15 @@ interface Props {
   teachers: Teacher[];
   onTeachersAdded: (teachers: Teacher[]) => void;
   onTeacherRemoved: (authId: string) => void;
+  canManagePasswords: boolean;
 }
 
-export default function AdminTeacherTools({ teachers, onTeachersAdded, onTeacherRemoved }: Props) {
+export default function AdminTeacherTools({ teachers, onTeachersAdded, onTeacherRemoved, canManagePasswords }: Props) {
   const tools = useAdminTeacherTools(onTeachersAdded, onTeacherRemoved);
   return <section style={{ display: 'grid', gap: 8, marginTop: 16 }}>
     <AdminTeacherCreationTools
       busy={tools.busy}
+      canManagePasswords={canManagePasswords}
       teacher={tools.teacher}
       setTeacher={tools.setTeacher}
       isManager={tools.isManager}

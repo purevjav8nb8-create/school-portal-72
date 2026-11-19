@@ -78,7 +78,7 @@ export default function Header({
           gap: '16px',
         }}
       >
-        {user && user.role !== 'teacher' && (
+        {user?.role === 'admin' && (
           <button type="button" onClick={() => setPasswordDialog(true)} style={{ border: '1px solid #bfdbfe', borderRadius: 8, padding: '6px 8px', background: '#fff', color: '#1d4ed8', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
             Нууц үг солих
           </button>
@@ -124,7 +124,7 @@ export default function Header({
           Гарах
         </button>
       </div>
-      {user && user.role !== 'teacher' && <ChangePasswordDialog open={passwordDialog} onClose={() => setPasswordDialog(false)} />}
+      {user?.role === 'admin' && <ChangePasswordDialog open={passwordDialog} onClose={() => setPasswordDialog(false)} />}
     </div>
   );
 }

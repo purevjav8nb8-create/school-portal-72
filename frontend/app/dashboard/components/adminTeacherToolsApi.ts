@@ -1,6 +1,7 @@
 import { backendBaseUrl, fetchWithAuth } from '../../../lib/backendApi';
 import { supabase } from '../../../lib/supabaseClient';
 import { Teacher } from '../types';
+import { schoolToday } from '../../../lib/schoolDate';
 
 export interface CreatedTeacher {
   auth_id: string;
@@ -9,7 +10,7 @@ export interface CreatedTeacher {
   email: string;
   unit: Teacher['unit'];
   subject: string;
-  password?: string;
+  invitation_sent?: boolean;
 }
 
 export interface ManagedUser {
@@ -38,7 +39,7 @@ export async function requestAdminJson(path: string, init: RequestInit = {}) {
 }
 
 export function toTeacher(record: CreatedTeacher, id: number): Teacher {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = schoolToday();
   return {
     id,
     auth_id: record.auth_id,

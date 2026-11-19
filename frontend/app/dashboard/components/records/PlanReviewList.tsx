@@ -7,7 +7,6 @@ import { reviewPlanNotificationId } from '../../hooks/notificationData';
 
 interface Props {
   records: SubmittedPlanRecord[];
-  approvalAssetsReady: boolean;
   reviewingPlan: string;
   onReview: (userId: string, approved: boolean) => void;
   onReturn: (userId: string) => void;
@@ -18,7 +17,6 @@ interface Props {
 
 export default function PlanReviewList({
   records,
-  approvalAssetsReady,
   reviewingPlan,
   onReview,
   onReturn,
@@ -52,7 +50,6 @@ export default function PlanReviewList({
                 approved={plan.approved}
                 returned={!!plan.returned}
                 busy={busy}
-                approvalAssetsReady={approvalAssetsReady}
                 onReview={() => { markViewed(); onReview(record.user_id, !plan.approved); }}
                 onReturn={() => { markViewed(); onReturn(record.user_id); }}
                 onDelete={() => { markViewed(); onDelete(record.user_id); }}
@@ -70,7 +67,6 @@ function PlanActions({
   approved,
   returned,
   busy,
-  approvalAssetsReady,
   onReview,
   onReturn,
   onDelete,
@@ -78,7 +74,6 @@ function PlanActions({
   approved: boolean;
   returned: boolean;
   busy: boolean;
-  approvalAssetsReady: boolean;
   onReview: () => void;
   onReturn: () => void;
   onDelete: () => void;
@@ -86,7 +81,7 @@ function PlanActions({
   return (
     <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
       {approved && <strong style={{ color: '#15803d' }}>Батлагдсан</strong>}
-      <button type="button" disabled={busy || (!approved && !approvalAssetsReady)} onClick={onReview} style={actionStyle(approved ? '#64748b' : '#15803d', busy)}>
+      <button type="button" disabled={busy} onClick={onReview} style={actionStyle(approved ? '#64748b' : '#15803d', busy)}>
         {busy ? 'Хадгалж байна...' : approved ? 'Баталгааг цуцлах' : 'Батлах'}
       </button>
       {!approved && !returned && <button type="button" disabled={busy} onClick={onReturn} style={actionStyle('#d97706', busy)}>Багшид буцаах</button>}
