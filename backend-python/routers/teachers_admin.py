@@ -7,7 +7,7 @@ from schemas.teacher_records import ActivityReview, ProgramPlanApprovalAssets, P
 from schemas.teachers import AttendanceUpdate, ManagerCreate, PasswordUpdate, PublicHolidayCreate, TeacherUpdate
 from services.teacher_accounts import create_manager_account, delete_teacher_account, list_manageable_accounts, update_account_password, update_teacher_account
 from services.teacher_auth import get_authenticated_user, require_admin, require_primary_admin
-from services.school_public_holidays import delete_public_holiday, list_public_holidays, save_public_holiday
+from services.school_public_holidays import delete_public_holiday, list_public_holidays, save_public_holiday, save_public_holidays
 from services.teacher_import import import_teacher_file
 from services.teacher_portal import update_teacher_attendance
 from services.mock_school_data import get_mock_teacher_by_email, mock_data_enabled
@@ -36,6 +36,15 @@ def add_public_holiday(
 ):
     user = require_primary_admin(authorization)
     return save_public_holiday(year, holiday, user)
+
+@router.post("/public-holidays/{year}/bulk")
+def add_public_holidays(
+    holidays: list[PublicHolidayCreate],
+    authorization: str | None = Header(default=None),
+    year: int = Path(ge=1900, le=2200),
+):
+    user = require_primary_admin(authorization)
+    return save_public_holidays(year, holidays, user)
 
 @router.delete("/public-holidays/{year}/{holiday_date}")
 def remove_public_holiday(

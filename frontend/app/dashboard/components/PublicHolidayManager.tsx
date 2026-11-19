@@ -2,7 +2,8 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import styles from './TeacherDetailModal.module.css';
-import { listPublicHolidays, PublicHoliday, removePublicHoliday, savePublicHoliday } from './publicHolidaysApi';
+import { listPublicHolidays, PublicHoliday, removePublicHoliday, savePublicHoliday, savePublicHolidays } from './publicHolidaysApi';
+import { parsePublicHolidayText } from './publicHolidayImport';
 
 interface Props {
   initialYear: number;
@@ -14,11 +15,13 @@ export default function PublicHolidayManager({ initialYear, onChanged }: Props) 
   const [yearText, setYearText] = useState(String(initialYear));
   const [holidayDate, setHolidayDate] = useState(`${initialYear}-01-01`);
   const [name, setName] = useState('Бүх нийтийн амралт');
+  const [bulkText, setBulkText] = useState('');
   const [holidays, setHolidays] = useState<PublicHoliday[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deletingDate, setDeletingDate] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const year = Number(yearText);
   const validYear = /^\d{4}$/.test(yearText) && Number.isInteger(year) && year >= 1900 && year <= 2200;
 
@@ -58,10 +61,12 @@ export default function PublicHolidayManager({ initialYear, onChanged }: Props) 
     }
     setSaving(true);
     setErrorMessage('');
+    setSuccessMessage('');
     try {
       const saved = await savePublicHoliday(year, { holiday_date: holidayDate, name });
       setHolidays((current) => [...current.filter((item) => item.date !== saved.date), saved].sort((a, b) => a.date.localeCompare(b.date)));
       setName('Бүх нийтийн амралт');
+      setSuccessMessage('Амралтын өдөр хадгалагдлаа.');
       onChanged?.();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Амралтын өдрийг хадгалж чадсангүй.');
@@ -70,9 +75,44 @@ export default function PublicHolidayManager({ initialYear, onChanged }: Props) 
     }
   };
 
+  const importHolidays = async () => {
+    if (!validYear) {
+      setErrorMessage('Оны утга буруу байна.');
+      return;
+    }
+    let imported: ReturnType<typeof parsePublicHolidayText>;
+    try {
+      imported = parsePublicHolidayText(year, bulkText);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Жагсаалтыг уншиж чадсангүй.');
+      setSuccessMessage('');
+      return;
+    }
+
+    setSaving(true);
+    setErrorMessage('');
+    setSuccessMessage('');
+    try {
+      const saved = await savePublicHolidays(year, imported);
+      setHolidays((current) => {
+        const byDate = new Map(current.map((holiday) => [holiday.date, holiday]));
+        saved.forEach((holiday) => byDate.set(holiday.date, holiday));
+        return [...byDate.values()].sort((first, second) => first.date.localeCompare(second.date));
+      });
+      setBulkText('');
+      setSuccessMessage(`${saved.length} амралтын өдөр хадгалагдлаа.`);
+      onChanged?.();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Жагсаалтыг хадгалж чадсангүй.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const deleteHoliday = async (holiday: PublicHoliday) => {
     setDeletingDate(holiday.date);
     setErrorMessage('');
+    setSuccessMessage('');
     try {
       await removePublicHoliday(year, holiday.date);
       setHolidays((current) => current.filter((item) => item.date !== holiday.date));
@@ -107,6 +147,21 @@ export default function PublicHolidayManager({ initialYear, onChanged }: Props) 
             }}
           />
         </label>
+        <label className={styles.field} style={{ marginBottom: 10 }}>
+          Жилийн амралтын өдрүүдийг жагсаалтаар оруулах
+          <textarea
+            className={styles.input}
+            rows={7}
+            value={bulkText}
+            onChange={(event) => setBulkText(event.target.value)}
+            placeholder={'1-р сарын 1 - Пүрэв гараг\n7-р сарын 10-15 /Үндэсний их баяр наадам/ - Баасан, Бямба, Ням, Даваа, Мягмар, Лхагва гараг'}
+            style={{ resize: 'vertical' }}
+          />
+          <small style={{ fontWeight: 400 }}>Мөр бүрийг жишээний хэлбэрээр оруулна. Жилийг дээрх талбараас авна; `/.../` доторх нэрийг амралтын өдөрт хадгална.</small>
+        </label>
+        <button type="button" className={styles.primaryButton} disabled={!validYear || saving || loading || !bulkText.trim()} onClick={() => void importHolidays()}>
+          {saving ? 'Хадгалж байна...' : 'Жагсаалтыг хадгалах'}
+        </button>
         <form onSubmit={(event) => void addHoliday(event)} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', alignItems: 'end', gap: 10 }}>
           <label className={styles.field}>
             Огноо
@@ -129,6 +184,7 @@ export default function PublicHolidayManager({ initialYear, onChanged }: Props) 
           </button>
         </form>
         {errorMessage && <p role="alert" className={styles.error} style={{ marginTop: 10 }}>{errorMessage}</p>}
+        {successMessage && <p role="status" style={{ margin: '10px 0 0', color: '#15803d', fontSize: 13 }}>{successMessage}</p>}
         {loading ? <p style={{ margin: '12px 0 0', color: '#64748b' }}>Жагсаалт ачаалж байна...</p>
           : !validYear ? null
             : holidays.length === 0 ? <p className={styles.empty} style={{ marginTop: 12 }}>Энэ жил амралтын өдөр бүртгээгүй байна.</p>

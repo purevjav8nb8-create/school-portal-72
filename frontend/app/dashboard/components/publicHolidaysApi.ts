@@ -1,6 +1,7 @@
 import { backendBaseUrl, fetchWithAuth } from '../../../lib/backendApi';
 
 export type PublicHoliday = { date: string; name: string };
+export type PublicHolidayInput = { holiday_date: string; name: string };
 
 async function request<T>(path: string, method = 'GET', body?: object): Promise<T> {
   const response = await fetchWithAuth(`${backendBaseUrl}${path}`, {
@@ -26,8 +27,12 @@ export function listPublicHolidays(year: number) {
   return request<PublicHoliday[]>(`/api/teachers/public-holidays/${year}`);
 }
 
-export function savePublicHoliday(year: number, holiday: Omit<PublicHoliday, 'date'> & { holiday_date: string }) {
+export function savePublicHoliday(year: number, holiday: PublicHolidayInput) {
   return request<PublicHoliday>(`/api/teachers/public-holidays/${year}`, 'POST', holiday);
+}
+
+export function savePublicHolidays(year: number, holidays: PublicHolidayInput[]) {
+  return request<PublicHoliday[]>(`/api/teachers/public-holidays/${year}/bulk`, 'POST', holidays);
 }
 
 export function removePublicHoliday(year: number, holidayDate: string) {
