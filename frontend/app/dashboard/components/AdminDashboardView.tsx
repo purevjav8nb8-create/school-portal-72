@@ -14,6 +14,7 @@ import SurveyBoard from './records/SurveyBoard';
 import TeacherDetailModal from './TeacherDetailModal';
 import AdminTrainingPanel from './AdminTrainingPanel';
 import DataUsagePanel from './DataUsagePanel';
+import AcademicSchedulePanel from './AcademicSchedulePanel';
 import { DashboardCategory, ReportGradeBand, Teacher, UserProfile } from '../types';
 import { NotificationCounts } from '../hooks/useNotifications';
 
@@ -99,7 +100,7 @@ export default function AdminDashboardView({
               setActiveCategory={onCategoryChange ?? setActiveCategory}
               notificationCounts={notificationCounts}
               notificationError={notificationError}
-              categories={['Ирц', 'Хянах', 'Үнэлгээ', 'Мэдээлэл', 'Оролцоо', 'Сургалт', 'Судалгаа', 'Зар', 'Чат']}
+              categories={['Ирц', 'Хуваарь', 'Хянах', 'Үнэлгээ', 'Мэдээлэл', 'Оролцоо', 'Сургалт', 'Судалгаа', 'Зар', 'Чат']}
             />
             <AdminTeacherTools teachers={teachers} onTeachersAdded={onTeachersAdded} onTeacherRemoved={onTeacherRemoved} canManagePasswords={user.role === 'admin'} />
           </div>
@@ -148,6 +149,7 @@ export default function AdminDashboardView({
               unreadNotificationKeys={unreadNotificationKeys}
               onTrainingViewed={(id) => onNotificationItemViewed('Сургалт', id)}
             />}
+            {activeCategory === 'Хуваарь' && <AcademicSchedulePanel />}
             {activeCategory === 'Үнэлгээ' && <AdminReviewPanel
               summaryOnly
               selectedBand={reportGradeBand}

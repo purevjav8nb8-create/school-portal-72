@@ -4,10 +4,11 @@ from fastapi import APIRouter, File, Header, HTTPException, Path, UploadFile
 from pydantic import BaseModel
 from fastapi.responses import Response
 from schemas.teacher_records import ActivityReview, ProgramPlanApprovalAssets, ProgramPlanReview
-from schemas.teachers import AttendanceUpdate, ManagerCreate, PasswordUpdate, PublicHolidayCreate, TeacherUpdate
+from schemas.teachers import AcademicYearUpdate, AttendanceUpdate, ManagerCreate, PasswordUpdate, PublicHolidayCreate, SubstituteHoursUpdate, TeacherUpdate
 from services.teacher_accounts import create_manager_account, delete_teacher_account, list_manageable_accounts, update_account_password, update_teacher_account
 from services.teacher_auth import get_authenticated_user, require_admin, require_primary_admin
 from services.school_public_holidays import delete_public_holiday, list_public_holidays, save_public_holiday, save_public_holidays
+from services.school_schedule import calculate_monthly_overtime, create_schedule_template, get_schedule_status, import_teacher_schedule, list_academic_years, save_academic_year, save_substitute_hours
 from services.teacher_import import import_teacher_file
 from services.teacher_portal import update_teacher_attendance
 from services.mock_school_data import get_mock_teacher_by_email, mock_data_enabled
@@ -19,6 +20,67 @@ router = APIRouter()
 class MockLoginRequest(BaseModel):
     email: str
     password: str
+
+@router.get("/academic-years")
+def get_academic_years(authorization: str | None = Header(default=None)):
+    require_admin(authorization)
+    return list_academic_years()
+
+@router.put("/academic-years")
+def set_academic_year(
+    structure: AcademicYearUpdate,
+    authorization: str | None = Header(default=None),
+):
+    user = require_admin(authorization)
+    return save_academic_year(structure, user)
+
+@router.get("/academic-years/{academic_year}/schedule-template")
+def get_teacher_schedule_template(
+    academic_year: str = Path(pattern=r"^\d{4}-\d{4}$"),
+    authorization: str | None = Header(default=None),
+):
+    require_admin(authorization)
+    return Response(
+        content=create_schedule_template(academic_year),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="teacher_schedule_template.xlsx"'},
+    )
+
+@router.get("/academic-years/{academic_year}/schedule")
+def get_teacher_schedule_status(
+    academic_year: str,
+    authorization: str | None = Header(default=None),
+):
+    require_admin(authorization)
+    return get_schedule_status(academic_year)
+
+@router.post("/academic-years/{academic_year}/schedule")
+def upload_teacher_schedule(
+    academic_year: str,
+    file: UploadFile = File(...),
+    authorization: str | None = Header(default=None),
+):
+    user = require_admin(authorization)
+    return import_teacher_schedule(academic_year, file, user)
+
+@router.get("/academic-years/{academic_year}/overtime")
+def get_monthly_overtime(
+    academic_year: str,
+    month: date,
+    authorization: str | None = Header(default=None),
+):
+    require_admin(authorization)
+    return calculate_monthly_overtime(academic_year, month)
+
+@router.put("/academic-years/{academic_year}/substitute-hours")
+def set_monthly_substitute_hours(
+    academic_year: str,
+    month: date,
+    entries: SubstituteHoursUpdate,
+    authorization: str | None = Header(default=None),
+):
+    user = require_admin(authorization)
+    return save_substitute_hours(academic_year, month, entries, user)
 
 @router.get("/public-holidays/{year}")
 def get_public_holidays(

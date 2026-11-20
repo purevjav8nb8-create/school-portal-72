@@ -3,7 +3,7 @@ from typing import Any
 from uuid import uuid4
 from fastapi import HTTPException
 from schemas.teacher_records import ActivityCreate, AwardCreate, ProfessionalDegreeCreate, ProgramPlanSubmit
-from schemas.teachers import TeachingClassesUpdate, TrainingCreate
+from schemas.teachers import HomeroomClassesUpdate, TrainingCreate
 from services.mock_school_data import get_mock_teacher_by_id, mock_data_enabled, update_mock_teacher_classes, update_mock_teacher_portal
 from services.attendance_automation import school_today
 from services.teacher_portal_common import validate_teacher_class
@@ -23,8 +23,18 @@ def add_my_professional_degree(user, submission: ProfessionalDegreeCreate) -> di
     )
     return item
 
-def update_my_teaching_classes(user, submission: TeachingClassesUpdate) -> list[dict[str, Any]]:
-    classes = [item.model_dump() for item in submission.classes]
+def update_my_teaching_classes(user, submission: HomeroomClassesUpdate) -> list[dict[str, Any]]:
+    classes = [
+        {
+            "grade": item.grade,
+            "section": item.section,
+            "weekly_hours": 0,
+            "homeroom": True,
+        }
+        for item in submission.classes
+    ]
+    for item in submission.classes:
+        validate_teacher_class(user, item.grade, item.section, "")
     if mock_data_enabled():
         try:
             return update_mock_teacher_classes(user.id, classes)

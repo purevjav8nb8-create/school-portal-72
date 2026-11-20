@@ -12,7 +12,9 @@ Run each SQL migration in the Supabase project's SQL Editor before deploying the
 
 `20261121_teacher_portal_records.sql` moves program plans, training, evaluations, activities, awards, professional degrees, teaching classes, survey responses, announcements, surveys, and teacher directory profiles into separate service-role-only PostgreSQL tables. Existing data is backfilled before the large Auth metadata keys are removed.
 
-Back up the Supabase project first. Pause writes briefly, then run `20261119_school_public_holidays.sql`, `20261120_teacher_attendance.sql`, `20261120_program_plan_approval_assets.sql`, and `20261121_teacher_portal_records.sql` in the Supabase SQL Editor, in that order. Deploy/restart the matching backend only after all scripts succeed, then verify public holidays, teacher lists, attendance, plans, announcements, and surveys before resuming normal use.
+`20261122_school_schedule_and_years.sql` stores editable school-year terms, manager-imported teacher schedules, and monthly substitute-hour totals in service-role-only tables.
+
+Back up the Supabase project first. Pause writes briefly, then run `20261119_school_public_holidays.sql`, `20261120_teacher_attendance.sql`, `20261120_program_plan_approval_assets.sql`, `20261121_teacher_portal_records.sql`, and `20261122_school_schedule_and_years.sql` in the Supabase SQL Editor, in that order. Deploy/restart the matching backend only after all scripts succeed, then verify public holidays, teacher lists, attendance, plans, announcements, surveys, and schedules before resuming normal use.
 
 For new teachers created without an explicitly supplied password, configure the Supabase Auth Site URL and allowed redirect URLs so `invite_user_by_email` links return to the portal. The API no longer returns generated passwords.
 

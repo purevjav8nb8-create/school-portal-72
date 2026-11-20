@@ -32,10 +32,7 @@ export default function TeacherDetailModal({ teacher, selectedMonth, onClose, on
   );
   const present = records.filter((record) => record.status === 'Ирсэн').length;
   const rate = records.length ? Math.round((present / records.length) * 100) : 0;
-  const weeklyHours = teacher.weekly_teaching_hours ?? (teacher.teaching_classes ?? []).reduce(
-    (sum, item) => sum + item.weekly_hours,
-    0,
-  );
+  const homeroomClasses = (teacher.teaching_classes ?? []).filter((item) => item.homeroom);
 
   async function saveTeacher(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -102,15 +99,14 @@ export default function TeacherDetailModal({ teacher, selectedMonth, onClose, on
           <div className={styles.stats}>
             <Stat label="Сарын ирц" value={`${rate}%`} />
             <Stat label="Бүртгэлтэй өдөр" value={String(records.length)} />
-            <Stat label="7 хоногийн цаг" value={String(weeklyHours)} />
-            <Stat label="Илүү цаг" value={String(teacher.overtime_hours ?? Math.max(0, weeklyHours - 19))} />
+            <Stat label="7 хоногийн норм" value="19" />
           </div>
 
           <section className={styles.section}>
-            <div className={styles.sectionHeader}><h3 className={styles.sectionTitle}>Заадаг ангиуд</h3></div>
-            {(teacher.teaching_classes ?? []).length === 0 ? <p className={styles.empty}>Анги бүртгэгдээгүй байна.</p> : (
-              <ul className={styles.classList}>{teacher.teaching_classes?.map((item) => (
-                <li className={styles.classItem} key={`${item.grade}-${item.section}`}>{item.grade}-р анги · {item.section} бүлэг · 7 хоногт {item.weekly_hours} цаг</li>
+            <div className={styles.sectionHeader}><h3 className={styles.sectionTitle}>Даасан анги</h3></div>
+            {homeroomClasses.length === 0 ? <p className={styles.empty}>Даасан анги сонгоогүй байна.</p> : (
+              <ul className={styles.classList}>{homeroomClasses.map((item) => (
+                <li className={styles.classItem} key={`${item.grade}-${item.section}`}>{item.grade}-р анги · {item.section} бүлэг</li>
               ))}</ul>
             )}
           </section>
