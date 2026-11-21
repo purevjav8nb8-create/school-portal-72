@@ -62,6 +62,27 @@ class HomeroomClassUpdateTests(unittest.TestCase):
                 ],
             })
 
+    def test_teacher_can_save_no_homeroom_classes(self):
+        user = SimpleNamespace(
+            id="teacher-id",
+            user_metadata={"unit": "БУЗАН"},
+        )
+        submission = HomeroomClassesUpdate.model_validate({"classes": []})
+
+        with (
+            patch("services.teacher_portal_submissions.mock_data_enabled", return_value=False),
+            patch("services.teacher_portal_submissions.replace_portal_collection") as save,
+        ):
+            result = update_my_teaching_classes(user, submission)
+
+        self.assertEqual(result, [])
+        save.assert_called_once_with(
+            user,
+            "teaching_classes",
+            [],
+            updated_at=unittest.mock.ANY,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

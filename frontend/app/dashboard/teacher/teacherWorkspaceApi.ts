@@ -5,12 +5,13 @@ import { TeacherTraining } from '../components/TeacherDashboardView';
 import { TeacherActivity } from '../components/records/ActivityPanel';
 import { EvaluationRecord } from '../components/records/EvaluationPanel';
 import { ProgramPlan } from '../components/records/ProgramPlanPanel';
-import { UserProfile } from '../types';
+import { TeachingScheduleAssignment, UserProfile } from '../types';
 import { AttendanceRecord } from '../utils/attendance';
 
 export type TeacherWorkspace = {
   profile: UserProfile;
   teaching_classes?: NonNullable<UserProfile['teaching_classes']>;
+  teaching_schedule?: TeachingScheduleAssignment[];
   attendance: AttendanceRecord[];
   trainings: TeacherTraining[];
   evaluations: EvaluationRecord[];

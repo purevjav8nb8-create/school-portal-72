@@ -1,7 +1,7 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
+import { FormEvent, useEffect, useState } from 'react';
+import { Eye, EyeOff, LockKeyhole, UserRound } from 'lucide-react';
 import { backendBaseUrl } from '../lib/backendApi';
 import { supabase } from '../lib/supabaseClient';
 
@@ -9,8 +9,17 @@ export default function PasswordLoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [remember, setRemember] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const savedLogin = window.localStorage.getItem('school-portal-remember-login');
+    if (savedLogin) {
+      setEmail(savedLogin);
+      setRemember(true);
+    }
+  }, []);
 
   const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -33,6 +42,8 @@ export default function PasswordLoginForm() {
       : isEmailAddress ? enteredLogin : `${enteredLogin}@moes.edu.mn`;
 
     try {
+      if (remember) window.localStorage.setItem('school-portal-remember-login', enteredLogin);
+      else window.localStorage.removeItem('school-portal-remember-login');
       const { data, error } = await supabase.auth.signInWithPassword({ email: loginEmail, password });
       if (error) {
         const mockResponse = await fetch(`${backendBaseUrl}/api/teachers/mock-login`, {
@@ -66,55 +77,52 @@ export default function PasswordLoginForm() {
   return (
     <>
       {errorMessage && (
-        <p role="alert" style={{ margin: '0 0 16px', padding: 12, borderRadius: 8, background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626' }}>
+        <p role="alert" className="login-error">
           {errorMessage}
         </p>
       )}
-      <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <label style={{ display: 'grid', gap: 6, fontWeight: 600 }}>
-          Нэвтрэх нэр эсвэл И-мэйл:
+      <form onSubmit={handleLogin} className="login-form">
+        <label className="login-field">
+          <UserRound size={22} aria-hidden="true" />
           <input
             type="text"
-            placeholder="Нэвтрэх нэр эсвэл нэр@moes.edu.mn"
+            placeholder="Хэрэглэгчийн нэр"
+            aria-label="Нэвтрэх нэр эсвэл И-мэйл"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             required
             className="login-input"
-            style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
           />
         </label>
-        <label style={{ display: 'grid', gap: 6, fontWeight: 600 }}>
-          Нууц үг:
-          <span style={{ position: 'relative' }}>
-            <input
-              type={showPassword ? 'text' : 'password'}
-              placeholder="••••••••"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-              className="login-input login-password-input"
-              style={{ width: '100%', padding: '12px 48px 12px 12px', borderRadius: 8, border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
-            />
-            <button
-              type="button"
-              aria-label={showPassword ? 'Нууц үг нуух' : 'Нууц үг харах'}
-              onClick={() => setShowPassword((shown) => !shown)}
-              style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 0, cursor: 'pointer' }}
-            >
-              {showPassword ? <EyeOff size={20} color="#64748b" /> : <Eye size={20} color="#64748b" />}
-            </button>
-          </span>
+        <label className="login-field">
+          <LockKeyhole size={21} aria-hidden="true" />
+          <input
+            type={showPassword ? 'text' : 'password'}
+            placeholder="Нууц үг"
+            aria-label="Нууц үг"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            required
+            className="login-input login-password-input"
+          />
+          <button
+            type="button"
+            aria-label={showPassword ? 'Нууц үг нуух' : 'Нууц үг харах'}
+            onClick={() => setShowPassword((shown) => !shown)}
+            className="login-password-toggle"
+          >
+            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+          </button>
         </label>
-        <button
-          type="submit"
-          disabled={loading}
-          style={{ width: '100%', padding: 12, background: '#2563eb', color: '#fff', border: 0, borderRadius: 8, fontWeight: 600, cursor: loading ? 'wait' : 'pointer' }}
-        >
-          {loading ? 'Нэвтэрч байна...' : 'Нэвтрэх'}
+        <div className="login-options">
+          <label>
+            <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
+            <span>Намайг сана</span>
+          </label>
+        </div>
+        <button type="submit" disabled={loading} className="login-submit">
+          <span>{loading ? 'Нэвтэрч байна...' : 'Нэвтрэх'}</span>
         </button>
-        <p style={{ margin: '-6px 0 0', color: '#64748b', fontSize: 13, textAlign: 'center' }}>
-          Нэвтрэх нэр бичвэл @moes.edu.mn автоматаар залгана.
-        </p>
       </form>
     </>
   );

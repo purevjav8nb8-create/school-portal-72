@@ -6,7 +6,7 @@ def _teacher_name(teacher: dict[str, Any]) -> str:
 	last_name = str(teacher.get("last_name", "")).strip()
 	first_name = str(teacher.get("first_name", "")).strip()
 	initial = f"{last_name[0]}." if last_name else ""
-	return " ".join(part for part in (initial, first_name) if part)
+	return " ".join(part for part in (initial, first_name) if part) or str(teacher.get("email", "")).strip()
 
 
 def _attendance_mark(status: Any) -> str:
@@ -28,6 +28,9 @@ def rows_for_teacher(
 	subject: str = "",
 ) -> list[dict[str, Any]]:
 	if category == "Ирц":
+		teacher_name = _teacher_name(teacher)
+		if not teacher_name:
+			return []
 		year = month_number = None
 		try:
 			year, month_number = (int(value) for value in month.split("-", 1))
@@ -45,9 +48,9 @@ def rows_for_teacher(
 			if calendar.weekday(year, month_number, day) < 5
 		] if year is not None and month_number is not None else list(range(1, days_in_month + 1))
 		return [{
-			"Хичээл": teacher.get("subject", ""),
+			"Багш": teacher_name,
+			"Хичээл": str(teacher.get("subject") or "").strip() or "Бүртгээгүй",
 			**{str(day): _attendance_mark(attendance_by_day.get(f"{day:02d}", "")) for day in working_days},
-			"Багш": _teacher_name(teacher),
 		}]
 	if category == "Сургалт":
 		trainings = teacher.get("training_records", [])

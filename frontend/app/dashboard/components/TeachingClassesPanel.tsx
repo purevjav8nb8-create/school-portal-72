@@ -21,6 +21,7 @@ export default function TeachingClassesPanel({ unit, initialClasses }: Props) {
   const [section, setSection] = useState('А');
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
+  const [addingClass, setAddingClass] = useState(false);
 
   const persistClasses = async (nextClasses: TeachingClass[]) => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -41,6 +42,7 @@ export default function TeachingClassesPanel({ unit, initialClasses }: Props) {
     try {
       await persistClasses(nextClasses);
       setClasses(nextClasses);
+      if (nextClasses.length === 0) setAddingClass(false);
       setMessage('');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Даасан анги хадгалагдсангүй.');
@@ -60,6 +62,11 @@ export default function TeachingClassesPanel({ unit, initialClasses }: Props) {
   return (
     <section style={{ display: 'grid', gap: 7, margin: '10px 0', padding: 8, border: '1px solid #cbd5e1', borderRadius: 8, fontSize: 12 }}>
       <strong>Даасан анги</strong>
+      {classes.length === 0 && !addingClass && <>
+        <span>Даасан анги оноогоогүй.</span>
+        <button type="button" disabled={saving} onClick={() => setAddingClass(true)} style={{ padding: 8, border: 0, borderRadius: 6, background: '#2563eb', color: '#fff', cursor: saving ? 'wait' : 'pointer', fontWeight: 700 }}>Даасан анги нэмэх</button>
+      </>}
+      {(classes.length > 0 || addingClass) && <>
       {classes.map((item) => (
         <div key={`${item.grade}-${item.section}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '6px 8px', border: '1px solid #e2e8f0', borderRadius: 7, background: '#f8fafc' }}>
           <span>{romanGrade(item.grade)} анги {item.section}</span>
@@ -67,8 +74,10 @@ export default function TeachingClassesPanel({ unit, initialClasses }: Props) {
         </div>
       ))}
       <label>Анги<select value={grade} onChange={(event) => setGrade(Number(event.target.value))} style={fieldStyle}>{grades.map((item) => <option key={item} value={item}>{romanGrade(item)} анги</option>)}</select></label>
-      <label>Бүлэг<select value={section} onChange={(event) => setSection(event.target.value)} style={fieldStyle}>{['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ё', 'Ж', 'З'].map((item) => <option key={item}>{item}</option>)}</select></label>
-      <button type="button" disabled={saving || classes.length >= 5} onClick={addClass} style={{ padding: 8, border: 0, borderRadius: 6, background: saving ? '#94a3b8' : '#2563eb', color: '#fff', cursor: saving ? 'wait' : 'pointer', fontWeight: 700 }}>Даасан анги нэмэх</button>
+      <label>Бүлэг<select value={section} onChange={(event) => setSection(event.target.value)} style={fieldStyle}>{['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ё', 'Ж', 'З', 'С'].map((item) => <option key={item}>{item}</option>)}</select></label>
+      <button type="button" disabled={saving || classes.length >= 5} onClick={addClass} style={{ padding: 8, border: 0, borderRadius: 6, background: saving ? '#94a3b8' : '#2563eb', color: '#fff', cursor: saving ? 'wait' : 'pointer', fontWeight: 700 }}>{classes.length === 0 ? 'Сонгосон ангийг хадгалах' : 'Даасан анги нэмэх'}</button>
+      {classes.length === 0 && <button type="button" disabled={saving} onClick={() => setAddingClass(false)} style={{ padding: 8, border: '1px solid #cbd5e1', borderRadius: 6, background: '#fff', color: '#334155', cursor: saving ? 'wait' : 'pointer' }}>Болих</button>}
+      </>}
       {message && <small role="alert" style={{ color: '#b91c1c' }}>{message}</small>}
     </section>
   );

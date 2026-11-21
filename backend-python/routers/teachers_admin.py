@@ -8,7 +8,7 @@ from schemas.teachers import AcademicYearUpdate, AttendanceUpdate, ManagerCreate
 from services.teacher_accounts import create_manager_account, delete_teacher_account, list_manageable_accounts, update_account_password, update_teacher_account
 from services.teacher_auth import get_authenticated_user, require_admin, require_primary_admin
 from services.school_public_holidays import delete_public_holiday, list_public_holidays, save_public_holiday, save_public_holidays
-from services.school_schedule import calculate_monthly_overtime, create_schedule_template, get_schedule_status, import_teacher_schedule, list_academic_years, save_academic_year, save_substitute_hours
+from services.school_schedule import calculate_monthly_overtime, create_schedule_template, delete_academic_year, get_schedule_status, import_teacher_schedule, list_academic_years, save_academic_year, save_substitute_hours
 from services.teacher_import import import_teacher_file
 from services.teacher_portal import update_teacher_attendance
 from services.mock_school_data import get_mock_teacher_by_email, mock_data_enabled
@@ -33,6 +33,15 @@ def set_academic_year(
 ):
     user = require_admin(authorization)
     return save_academic_year(structure, user)
+
+@router.delete("/academic-years/{academic_year}")
+def remove_academic_year(
+    academic_year: str = Path(pattern=r"^\d{4}-\d{4}$"),
+    authorization: str | None = Header(default=None),
+):
+    require_admin(authorization)
+    delete_academic_year(academic_year)
+    return {"deleted": True}
 
 @router.get("/academic-years/{academic_year}/schedule-template")
 def get_teacher_schedule_template(

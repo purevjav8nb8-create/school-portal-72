@@ -2,7 +2,7 @@ import os
 from typing import Any
 from fastapi import HTTPException
 from database import supabase
-from services.attendance_automation import ensure_today_attendance, school_today
+from services.attendance_automation import ensure_today_attendance, has_teacher_identity, school_today
 from services.mock_school_data import load_mock_school_data, mock_data_enabled
 from services.teacher_portal_storage import list_teacher_portal_data_by_id, list_teacher_profiles
 
@@ -12,6 +12,8 @@ def list_teacher_accounts() -> list[dict[str, Any]]:
         accounts = []
         today = school_today().isoformat()
         for index, teacher in enumerate(load_mock_school_data()["teachers"], start=1):
+            if not has_teacher_identity(teacher):
+                continue
             attendance_records = teacher.get("attendance", [])
             accounts.append({
                 "id": index,
@@ -46,7 +48,7 @@ def list_teacher_accounts() -> list[dict[str, Any]]:
         return accounts
     if supabase is None:
         raise HTTPException(status_code=503, detail="Supabase backend тохируулагдаагүй байна.")
-    profiles = list_teacher_profiles()
+    profiles = [profile for profile in list_teacher_profiles() if has_teacher_identity(profile)]
     ensure_today_attendance(profiles)
     portal_by_teacher = list_teacher_portal_data_by_id()
     teacher_ids = [

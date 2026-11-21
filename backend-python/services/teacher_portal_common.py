@@ -41,7 +41,7 @@ def validate_teacher_class(user, grade: int, section: str, subject: str) -> None
         valid_grades = range(1, 13)
     if grade not in valid_grades:
         raise HTTPException(status_code=422, detail="Сонгосон анги багшийн нэгжид тохирохгүй байна.")
-    if section not in {"А", "Б", "В", "Г", "Д", "Е", "Ё", "Ж", "З"}:
+    if section not in {"А", "Б", "В", "Г", "Д", "Е", "Ё", "Ж", "З", "С"}:
         raise HTTPException(status_code=422, detail="Бүлгийн сонголт буруу байна.")
 
 def save_teacher_portal_data(user, portal_data: dict[str, Any]):

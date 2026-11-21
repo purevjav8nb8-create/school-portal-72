@@ -3,6 +3,7 @@
 interface Props {
   unit: string;
   subjects: string[];
+  allowedClasses?: { grade: number; section: string; subject: string }[];
   grade: number;
   section: string;
   subject: string;
@@ -58,30 +59,51 @@ export function romanGrade(grade: number) {
 }
 
 export default function ClassFields({
-  unit, subjects, grade, section, subject,
+  unit, subjects, allowedClasses, grade, section, subject,
   onGradeChange, onSectionChange, onSubjectChange,
   evaluationSubjects = false,
 }: Props) {
-  const grades = gradesForUnit(unit);
+  const grades = allowedClasses
+    ? [...new Set(allowedClasses.map((item) => item.grade))].sort((first, second) => first - second)
+    : gradesForUnit(unit);
+  const availableSections = allowedClasses
+    ? [...new Set(allowedClasses.filter((item) => item.grade === grade).map((item) => item.section))]
+      .sort((first, second) => first.localeCompare(second))
+    : sections;
   const ownSubjects = subjects.map((item) => item.trim()).filter(Boolean);
   const subjectOptions = [...new Set([
-    ...ownSubjects,
-    ...(evaluationSubjects ? evaluationSubjectsForUnit(unit) : subjectsForUnit(unit)),
+    ...(allowedClasses
+      ? allowedClasses
+        .filter((item) => item.grade === grade && item.section === section)
+        .map((item) => item.subject)
+      : [
+        ...ownSubjects,
+        ...(evaluationSubjects ? evaluationSubjectsForUnit(unit) : subjectsForUnit(unit)),
+      ]),
   ])];
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
       <label style={{ display: 'grid', gap: 5, color: '#475569', fontSize: 13, fontWeight: 600 }}>
         Анги
-        <select required value={grade || ''} onChange={(event) => onGradeChange(Number(event.target.value))} style={fieldStyle}>
+        <select required value={grade || ''} onChange={(event) => {
+          onGradeChange(Number(event.target.value));
+          if (allowedClasses) {
+            onSectionChange('');
+            onSubjectChange('');
+          }
+        }} style={fieldStyle}>
           <option value="" disabled>Анги сонгох</option>
           {grades.map((item) => <option key={item} value={item}>{item}-р анги</option>)}
         </select>
       </label>
       <label style={{ display: 'grid', gap: 5, color: '#475569', fontSize: 13, fontWeight: 600 }}>
         Бүлэг
-        <select required value={section} onChange={(event) => onSectionChange(event.target.value)} style={fieldStyle}>
+        <select required value={section} onChange={(event) => {
+          onSectionChange(event.target.value);
+          if (allowedClasses) onSubjectChange('');
+        }} style={fieldStyle}>
           <option value="" disabled>Бүлэг сонгох</option>
-          {sections.map((item) => <option key={item}>{item}</option>)}
+          {availableSections.map((item) => <option key={item}>{item}</option>)}
         </select>
       </label>
       <label style={{ display: 'grid', gap: 5, color: '#475569', fontSize: 13, fontWeight: 600 }}>

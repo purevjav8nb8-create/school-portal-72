@@ -1,12 +1,13 @@
 'use client';
 
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import ClassFields from './ClassFields';
 import FloatingComposer from './FloatingComposer';
 import EvaluationTable, { EvaluationClassSummary } from './EvaluationTable';
 import SharedEvaluationList from './SharedEvaluationList';
 import { EVALUATION_LEVELS } from './evaluationTypes';
 import type { EvaluationRecord } from './evaluationTypes';
+import type { TeachingScheduleAssignment } from '../../types';
 import { schoolToday } from '../../../../lib/schoolDate';
 export { EVALUATION_LEVELS } from './evaluationTypes';
 export type { EvaluationRecord } from './evaluationTypes';
@@ -14,6 +15,7 @@ export type { EvaluationRecord } from './evaluationTypes';
 interface Props {
   unit: string;
   subjects: string[];
+  teachingSchedule: TeachingScheduleAssignment[];
   evaluations: EvaluationRecord[];
   onSubmit: (evaluation: Omit<EvaluationRecord, 'id' | 'createdAt'>) => Promise<void>;
   onDelete: (evaluationId: string) => Promise<void>;
@@ -22,7 +24,7 @@ interface Props {
 
 const inputStyle = { width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: 8, boxSizing: 'border-box' as const };
 
-export default function EvaluationPanel({ unit, subjects, evaluations, onSubmit, onDelete, sharedEvaluations = [] }: Props) {
+export default function EvaluationPanel({ unit, subjects, teachingSchedule, evaluations, onSubmit, onDelete, sharedEvaluations = [] }: Props) {
   const [grade, setGrade] = useState(0);
   const [section, setSection] = useState('');
   const [subject, setSubject] = useState('');
@@ -33,6 +35,45 @@ export default function EvaluationPanel({ unit, subjects, evaluations, onSubmit,
   const [evaluationDate, setEvaluationDate] = useState(schoolToday);
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  const availableClasses = useMemo(() => {
+    const classes = new Map<string, { grade: number; section: string; subject: string }>();
+    for (const assignment of teachingSchedule) {
+      if (evaluationDate < assignment.start_date || evaluationDate > assignment.end_date) continue;
+      const key = `${assignment.grade}-${assignment.section}-${assignment.subject}`;
+      classes.set(key, {
+        grade: assignment.grade,
+        section: assignment.section,
+        subject: assignment.subject,
+      });
+    }
+    return [...classes.values()];
+  }, [evaluationDate, teachingSchedule]);
+
+  useEffect(() => {
+    if (!availableClasses.length) {
+      if (grade || section || subject) {
+        setGrade(0);
+        setSection('');
+        setSubject('');
+      }
+      return;
+    }
+    if (grade && !availableClasses.some((item) => item.grade === grade)) {
+      setGrade(0);
+      setSection('');
+      setSubject('');
+      return;
+    }
+    if (section && !availableClasses.some((item) => item.grade === grade && item.section === section)) {
+      setSection('');
+      setSubject('');
+      return;
+    }
+    if (subject && !availableClasses.some((item) => item.grade === grade && item.section === section && item.subject === subject)) {
+      setSubject('');
+    }
+  }, [availableClasses, grade, section, subject]);
 
   const classes = useMemo<EvaluationClassSummary[]>(() => {
     const grouped = new Map<string, EvaluationRecord[]>();
@@ -63,6 +104,11 @@ export default function EvaluationPanel({ unit, subjects, evaluations, onSubmit,
     setBusy(true);
     setErrorMessage('');
     try {
+      if (!availableClasses.some((item) => (
+        item.grade === grade && item.section === section && item.subject === subject
+      ))) {
+        throw new Error('Сонгосон огноо, анги, хичээл таны хуваарьт байхгүй байна.');
+      }
       const entries = EVALUATION_LEVELS
         .map((item) => ({ level: item, students_count: Number(levelCounts[item] || 0) }))
         .filter((item) => item.students_count > 0);
@@ -98,9 +144,12 @@ export default function EvaluationPanel({ unit, subjects, evaluations, onSubmit,
       <SharedEvaluationList evaluations={sharedEvaluations} />
       <FloatingComposer title="Үнэлгээ оруулах" label="Үнэлгээ оруулах">
         {(close) => <form onSubmit={async (event) => { if (await submit(event)) close(); }} style={{ display: 'grid', gap: 12, padding: 16, border: '1px solid #e2e8f0', borderRadius: 8 }}>
+        {!teachingSchedule.length && <p role="status" style={{ color: '#b45309', margin: 0 }}>Таны хуваарьт хичээл бүртгэгдээгүй байна. Үнэлгээ оруулахын өмнө хуваарийг шинэчлүүлнэ үү.</p>}
+        {teachingSchedule.length > 0 && !availableClasses.length && <p role="status" style={{ color: '#b45309', margin: 0 }}>Сонгосон огноонд таны хуваарьт хичээл алга.</p>}
         <ClassFields
           unit={unit}
           subjects={subjects}
+          allowedClasses={availableClasses}
           grade={grade}
           section={section}
           subject={subject}

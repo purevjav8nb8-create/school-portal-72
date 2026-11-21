@@ -39,7 +39,7 @@ export default function TeachingClassDialog({
         {dialog === 'edit' && <>
           <h3 style={{ margin: '0 0 12px', fontSize: 16 }}>Анги засах</h3>
           <label>Анги<select value={draft.grade} onChange={(event) => onDraftChange({ ...draft, grade: Number(event.target.value) })} style={fieldStyle}>{grades.map((grade) => <option key={grade} value={grade}>{romanGrade(grade)} анги</option>)}</select></label>
-          <label>Бүлэг<select value={draft.section} onChange={(event) => onDraftChange({ ...draft, section: event.target.value })} style={fieldStyle}>{['А', 'Б', 'В', 'Г', 'Д', 'Е'].map((section) => <option key={section}>{section}</option>)}</select></label>
+          <label>Бүлэг<select value={draft.section} onChange={(event) => onDraftChange({ ...draft, section: event.target.value })} style={fieldStyle}>{['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ё', 'Ж', 'З', 'С'].map((section) => <option key={section}>{section}</option>)}</select></label>
           <label>7 хоногийн цаг<input type="number" min={1} value={draft.weekly_hours} onChange={(event) => onDraftChange({ ...draft, weekly_hours: Math.max(1, Number(event.target.value)) })} style={fieldStyle} /></label>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
             <button type="button" onClick={onSave} style={dialogButton('#16a34a')}>Хадгалах</button>

@@ -10,6 +10,15 @@ export interface UserProfile {
   lms_username?: string;
 }
 
+export interface TeachingScheduleAssignment {
+  academic_year: string;
+  start_date: string;
+  end_date: string;
+  grade: number;
+  section: string;
+  subject: string;
+}
+
 export interface DailyAttendance {
   day: number; // 1-31
   status: 'Ирсэн' | 'Хоцорсон' | 'Чөлөөтэй' | 'Өвчтэй' | 'Тасалсан' | 'Амралтын өдөр';

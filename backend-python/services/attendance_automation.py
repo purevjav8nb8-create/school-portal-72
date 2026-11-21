@@ -32,11 +32,27 @@ def _is_teacher(user: Any, admin_email: str) -> bool:
     )
 
 
+def has_teacher_identity(user: Any) -> bool:
+    if isinstance(user, dict):
+        metadata = user
+        email = user.get("email")
+    else:
+        metadata = user.user_metadata or {}
+        email = user.email
+    return any(str(value or "").strip() for value in (
+        email,
+        metadata.get("last_name"),
+        metadata.get("first_name"),
+    ))
+
+
 def ensure_today_attendance(users: list[Any] | None = None) -> list[Any] | None:
     today = school_today().isoformat()
     if mock_data_enabled():
         try:
             for teacher in load_mock_school_data()["teachers"]:
+                if not has_teacher_identity(teacher):
+                    continue
                 records = teacher.get("attendance", [])
                 if not any(item.get("date") == today for item in records):
                     update_mock_teacher_attendance(
@@ -59,9 +75,11 @@ def ensure_today_attendance(users: list[Any] | None = None) -> list[Any] | None:
     admin_email = os.getenv("ADMIN_EMAIL", "admin@moes.edu.mn").lower()
     teacher_ids = []
     for user in users:
-        if not _is_teacher(user, admin_email):
+        if not _is_teacher(user, admin_email) or not has_teacher_identity(user):
             continue
-        teacher_ids.append(str(user["user_id"] if isinstance(user, dict) else user.id))
+        teacher_id = str(user.get("user_id") or user.get("id") or "") if isinstance(user, dict) else str(user.id)
+        if teacher_id:
+            teacher_ids.append(teacher_id)
     if not teacher_ids:
         return users
     try:

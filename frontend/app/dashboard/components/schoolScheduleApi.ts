@@ -74,6 +74,12 @@ export function saveAcademicYear(structure: AcademicYear) {
   });
 }
 
+export function deleteAcademicYear(academicYear: string) {
+  return request<{ deleted: boolean }>(`/api/teachers/academic-years/${encodeURIComponent(academicYear)}`, {
+    method: 'DELETE',
+  });
+}
+
 export function getScheduleStatus(academicYear: string) {
   return request<ScheduleStatus>(`/api/teachers/academic-years/${encodeURIComponent(academicYear)}/schedule`);
 }
@@ -81,7 +87,12 @@ export function getScheduleStatus(academicYear: string) {
 export function importSchedule(academicYear: string, file: File) {
   const body = new FormData();
   body.set('file', file);
-  return request<{ imported_lessons: number; teachers: number }>(
+  return request<{
+    imported_lessons: number;
+    teachers: number;
+    homeroom_teachers: number;
+    homeroom_classes: number;
+  }>(
     `/api/teachers/academic-years/${encodeURIComponent(academicYear)}/schedule`,
     { method: 'POST', body },
   );

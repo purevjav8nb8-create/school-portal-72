@@ -3,6 +3,7 @@ from fastapi import HTTPException
 from services.mock_school_data import get_mock_teacher_by_id, load_mock_school_data, mock_data_enabled
 from services.teacher_portal_common import teacher_attendance_records, teacher_portal_data
 from services.teacher_portal_storage import list_portal_records
+from services.school_schedule import get_teacher_schedule_assignments
 
 def homeroom_evaluations(user) -> list[dict[str, Any]]:
     metadata = user.user_metadata or {}
@@ -37,8 +38,6 @@ def homeroom_evaluations(user) -> list[dict[str, Any]]:
 
     received = []
     for source_id, source_metadata, source_data, source_email in sources:
-        if source_id == str(user.id):
-            continue
         portal = source_data if mock_data_enabled() else {"evaluations": [source_data.get("payload", {})]}
         for evaluation in portal.get("evaluations", []):
             class_key = (evaluation.get("grade"), evaluation.get("section"))
@@ -76,6 +75,7 @@ def get_my_teacher_data(user) -> dict[str, Any]:
                 "role": "teacher",
                 "teaching_classes": teacher.get("teaching_classes", []),
             },
+            "teaching_schedule": get_teacher_schedule_assignments(str(user.id)),
             "attendance": teacher.get("attendance", []),
             "trainings": teacher.get("trainings", []),
             "evaluations": teacher.get("evaluations", []),
@@ -129,5 +129,6 @@ def get_my_teacher_data(user) -> dict[str, Any]:
         "awards": portal.get("awards", []),
         "professional_degrees": portal.get("professional_degrees", []),
         "teaching_classes": portal.get("teaching_classes", []),
+        "teaching_schedule": get_teacher_schedule_assignments(str(user.id)),
         "homeroom_evaluations": homeroom_evaluations(user),
     }

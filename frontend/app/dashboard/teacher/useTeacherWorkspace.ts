@@ -6,6 +6,7 @@ import { TeacherActivity } from '../components/records/ActivityPanel';
 import { EvaluationRecord } from '../components/records/EvaluationPanel';
 import { ProgramPlan } from '../components/records/ProgramPlanPanel';
 import { UserProfile } from '../types';
+import type { TeachingScheduleAssignment } from '../types';
 import { AttendanceRecord } from '../utils/attendance';
 import { loadTeacherProgramPlan, loadTeacherWorkspace, TeacherWorkspace } from './teacherWorkspaceApi';
 
@@ -19,6 +20,7 @@ export default function useTeacherWorkspace() {
   const [awards, setAwards] = useState<TeacherWorkspace['awards']>([]);
   const [degrees, setDegrees] = useState<TeacherWorkspace['professional_degrees']>([]);
   const [homeroomEvaluations, setHomeroomEvaluations] = useState<NonNullable<TeacherWorkspace['homeroom_evaluations']>>([]);
+  const [teachingSchedule, setTeachingSchedule] = useState<TeachingScheduleAssignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -42,6 +44,7 @@ export default function useTeacherWorkspace() {
         setAwards(workspace.awards ?? []);
         setDegrees(workspace.professional_degrees ?? []);
         setHomeroomEvaluations(workspace.homeroom_evaluations ?? []);
+        setTeachingSchedule(workspace.teaching_schedule ?? []);
       }
       if (result.fallbackUser) setUser(result.fallbackUser);
       if (result.errorMessage) setErrorMessage(result.errorMessage);
@@ -81,6 +84,7 @@ export default function useTeacherWorkspace() {
   return {
     user, attendance, trainings, setTrainings, evaluations, setEvaluations, programPlan, setProgramPlan,
     activities, setActivities, awards, setAwards, degrees, setDegrees, homeroomEvaluations,
+    teachingSchedule,
     loading, errorMessage, setErrorMessage,
   };
 }

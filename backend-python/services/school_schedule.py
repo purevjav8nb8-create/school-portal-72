@@ -4,6 +4,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from io import BytesIO
 import re
+from types import SimpleNamespace
 from typing import Any
 
 from fastapi import HTTPException, UploadFile
@@ -14,7 +15,8 @@ from openpyxl.utils import get_column_letter
 
 from database import supabase
 from schemas.teachers import AcademicYearUpdate, SubstituteHoursUpdate
-from services.teacher_portal_storage import list_teacher_profiles
+from services.teacher_portal_storage import list_teacher_profiles, replace_portal_collection
+from services.mock_school_data import get_mock_teacher_by_id, mock_data_enabled
 
 
 _YEAR_TABLE = "school_academic_years"
@@ -37,13 +39,24 @@ _COLUMN_ALIASES = {
     "teacher_email": {"teacheremail", "email", "moesemail", "багшийнmoesимэйл", "багшийнмэйл", "имэйл"},
     "grade": {"grade", "анги", "ангийндугаар"},
     "section": {"section", "бүлэг"},
-    "subject": {"subject", "хичээл", "судлагдахуун"},
+    "subject": {"subject", "хичээл", "судлагдахуун", "мэргэжил"},
     "weekday": {"weekday", "day", "гараг", "өдөр"},
     "week_type": {"weektype", "parity", "долоохоногийнтөрөл", "7хоногийнтөрөл"},
     "lesson_number": {"lessonnumber", "period", "periodnumber", "цагийндугаар", "хичээлийнцаг"},
 }
+_TEACHER_NAME_HEADERS = {"teachername", "fullname", "багш", "багшнарыннэр"}
+_HOMEROOM_HEADERS = {"homeroom", "даасанг", "даасананги"}
+_MATRIX_DAY_HEADERS = {
+    "даваа": 1,
+    "мягмар": 2,
+    "лхагва": 3,
+    "пүрэв": 4,
+    "баасан": 5,
+}
 _REQUIRED_COLUMNS = set(_COLUMN_ALIASES)
-_VALID_SECTIONS = {"А", "Б", "В", "Г", "Д", "Е", "Ё", "Ж", "З"}
+_VALID_SECTIONS = {"А", "Б", "В", "Г", "Д", "Е", "Ё", "Ж", "З", "С"}
+_TIMETABLE_PERIODS_PER_SHIFT = 7
+_TIMETABLE_SHIFTS = 2
 
 
 def _client():
@@ -105,6 +118,14 @@ def save_academic_year(structure: AcademicYearUpdate, user: Any) -> dict[str, An
     return record
 
 
+def delete_academic_year(academic_year: str) -> None:
+    _get_academic_year(academic_year)
+    _execute(
+        _client().table(_YEAR_TABLE).delete().eq("academic_year", academic_year),
+        "Хичээлийн жилийг устгаж чадсангүй.",
+    )
+
+
 def create_schedule_template(academic_year: str | None = None) -> bytes:
     workbook = Workbook()
     sheet = workbook.active
@@ -144,7 +165,7 @@ def create_schedule_template(academic_year: str | None = None) -> bytes:
     guide.append(["Хичээл", "Заах хичээлийн нэр."])
     guide.append(["Гараг", "Даваа, Мягмар, Лхагва, Пүрэв эсвэл Баасан."])
     guide.append(["Долоо хоногийн төрөл", "Бүх (тогтмол), Тэгш эсвэл Сондгой. Эхний хичээлийн долоо хоног Сондгойгоос эхэлнэ."])
-    guide.append(["Цагийн дугаар", "Тухайн өдрийн 1-12 дахь цаг. Нэг багш нэг цагт давхар хуваарьтай байж болохгүй."])
+    guide.append(["Цагийн дугаар", "Тухайн өдрийн 1-14 дэх цаг. Нэг багш нэг цагт давхар хуваарьтай байж болохгүй."])
     guide.append(["Норм", "Багш бүрийн долоо хоногийн норм 19 цаг. Нормын баганыг бөглөх шаардлагагүй."])
     output = BytesIO()
     workbook.save(output)
@@ -163,21 +184,10 @@ def _as_integer(value: Any, label: str, row_number: int, minimum: int, maximum: 
     return int(number)
 
 
-def _parse_schedule_rows(file: UploadFile, profiles: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    suffix = (file.filename or "").lower().rsplit(".", 1)[-1]
-    if suffix != "xlsx":
-        raise HTTPException(status_code=415, detail="Багшийн хуваарийг XLSX файлаар оруулна уу.")
-    try:
-        content = file.file.read(_MAX_UPLOAD_BYTES + 1)
-        if len(content) > _MAX_UPLOAD_BYTES:
-            raise HTTPException(status_code=413, detail="Хуваарийн файл 10 MB-аас бага байна.")
-        workbook = load_workbook(BytesIO(content), data_only=True, read_only=True)
-        sheet = workbook[workbook.sheetnames[0]]
-    except HTTPException:
-        raise
-    except Exception as error:
-        raise HTTPException(status_code=400, detail="XLSX файлыг уншиж чадсангүй.") from error
-
+def _parse_normalized_schedule_rows(
+    sheet,
+    profiles: list[dict[str, Any]],
+) -> list[dict[str, Any]] | None:
     header_row = None
     column_map: dict[str, int] = {}
     for row_number, row in enumerate(sheet.iter_rows(min_row=1, max_row=10, values_only=True), start=1):
@@ -191,10 +201,7 @@ def _parse_schedule_rows(file: UploadFile, profiles: list[dict[str, Any]]) -> li
             column_map = {field: int(index) for field, index in found.items() if index is not None}
             break
     if header_row is None:
-        raise HTTPException(
-            status_code=422,
-            detail="XLSX-ийн эхний хуудсанд имэйл, анги, бүлэг, хичээл, гараг, долоо хоногийн төрөл, цагийн дугаар гэсэн баганууд шаардлагатай.",
-        )
+        return None
 
     teacher_by_email = {
         str(profile.get("email", "")).strip().casefold(): profile
@@ -234,7 +241,7 @@ def _parse_schedule_rows(file: UploadFile, profiles: list[dict[str, Any]]) -> li
             week_type = _WEEK_TYPES.get(week_key)
             if week_type is None:
                 raise ValueError("Долоо хоногийн төрөл Бүх, Тэгш эсвэл Сондгой байна.")
-            lesson_number = _as_integer(values["lesson_number"], "Цагийн дугаар", row_number, 1, 12)
+            lesson_number = _as_integer(values["lesson_number"], "Цагийн дугаар", row_number, 1, 14)
             teacher_id = str(teacher["user_id"])
             slot_key = (teacher_id, weekday, lesson_number)
             existing_types = occupied_slots[slot_key]
@@ -268,10 +275,274 @@ def _parse_schedule_rows(file: UploadFile, profiles: list[dict[str, Any]]) -> li
     return lessons
 
 
+def _teacher_name_key(value: Any) -> str:
+    return re.sub(r"[\W_]+", "", str(value or "").strip().casefold(), flags=re.UNICODE)
+
+
+def _teacher_name_index(profiles: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    index: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for profile in profiles:
+        if profile.get("role") != "teacher":
+            continue
+        last_name = str(profile.get("last_name") or "").strip()
+        first_name = str(profile.get("first_name") or "").strip()
+        variants = {
+            f"{last_name} {first_name}",
+            f"{last_name[:1]} {first_name}" if last_name else "",
+            f"{first_name} {last_name}",
+        }
+        for variant in variants:
+            key = _teacher_name_key(variant)
+            if key and profile not in index[key]:
+                index[key].append(profile)
+    return index
+
+
+def _find_timetable_header(
+    sheet,
+) -> tuple[int, int, int, int, int, list[tuple[int, int]]] | None:
+    for row_number, row in enumerate(sheet.iter_rows(min_row=1, max_row=10, values_only=True), start=1):
+        headers = {_normalized_header(value): index for index, value in enumerate(row)}
+        subject_column = next(
+            (headers[alias] for alias in _COLUMN_ALIASES["subject"] if alias in headers),
+            None,
+        )
+        teacher_column = next(
+            (headers[alias] for alias in _TEACHER_NAME_HEADERS if alias in headers),
+            None,
+        )
+        homeroom_column = next(
+            (headers[alias] for alias in _HOMEROOM_HEADERS if alias in headers),
+            None,
+        )
+        row_number_column = next(
+            (
+                index for index, value in enumerate(row)
+                if str(value or "").strip() == "№"
+                or _normalized_header(value) in {"no", "number", "дугаар"}
+            ),
+            None,
+        )
+        day_columns: dict[int, int] = {}
+        for column, value in enumerate(row):
+            weekday = _MATRIX_DAY_HEADERS.get(_normalized_header(value))
+            if weekday and weekday not in day_columns:
+                day_columns[weekday] = column
+        if (
+            subject_column is None
+            or teacher_column is None
+            or homeroom_column is None
+            or row_number_column is None
+            or sorted(day_columns) != [1, 2, 3, 4, 5]
+        ):
+            continue
+        ordered_days = sorted(day_columns.items())
+        period_count = _TIMETABLE_PERIODS_PER_SHIFT * _TIMETABLE_SHIFTS
+        if any(
+            ordered_days[index + 1][1] - start != period_count
+            for index, (_, start) in enumerate(ordered_days[:-1])
+        ):
+            continue
+        return (
+            row_number,
+            int(subject_column),
+            int(teacher_column),
+            int(homeroom_column),
+            int(row_number_column),
+            ordered_days,
+        )
+    return None
+
+
+def _parse_timetable_class(value: Any, allow_combined_sections: bool = False) -> tuple[int, str]:
+    match = re.fullmatch(r"\s*(1[0-2]|[1-9])\s*([А-ЯӨҮЁ]+)\s*", str(value or "").strip().upper())
+    if not match:
+        raise ValueError("Анги, бүлгийн утга буруу байна.")
+    grade = int(match.group(1))
+    section = match.group(2)
+    if any(letter not in _VALID_SECTIONS for letter in section):
+        raise ValueError("Бүлгийн утга буруу байна.")
+    if not allow_combined_sections and len(section) != 1:
+        raise ValueError("Даасан ангийн бүлэг нэг үсэг байна.")
+    return grade, section
+
+
+def _parse_timetable_sheet(
+    sheet,
+    profiles: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    header = _find_timetable_header(sheet)
+    if header is None:
+        return None
+    header_row, subject_column, teacher_column, homeroom_column, row_number_column, day_columns = header
+    teacher_index = _teacher_name_index(profiles)
+    failures: list[str] = []
+    lessons: list[dict[str, Any]] = []
+    homerooms: dict[str, list[dict[str, Any]]] = {}
+    teacher_profiles: dict[str, dict[str, Any]] = {}
+    occupied_slots: set[tuple[str, int, int]] = set()
+    previous_subject = ""
+    record_count = 0
+    first_data_row = header_row + 3
+
+    for row_number, row in enumerate(sheet.iter_rows(min_row=first_data_row, values_only=True), start=first_data_row):
+        raw_row_number = row[row_number_column] if row_number_column < len(row) else None
+        if raw_row_number is None or not str(raw_row_number).strip():
+            break
+        try:
+            _as_integer(raw_row_number, "Дугаар", row_number, 1, 10000)
+        except ValueError:
+            break
+        raw_name = row[teacher_column] if teacher_column < len(row) else None
+        teacher_name = str(raw_name or "").strip()
+        raw_subject = row[subject_column] if subject_column < len(row) else None
+        if raw_subject is not None and str(raw_subject).strip():
+            previous_subject = str(raw_subject).strip()
+        raw_homeroom = row[homeroom_column] if homeroom_column < len(row) else None
+        slot_values = [
+            (weekday, period_index + 1, row[start + period_index])
+            for weekday, start in day_columns
+            for period_index in range(_TIMETABLE_PERIODS_PER_SHIFT * _TIMETABLE_SHIFTS)
+            if start + period_index < len(row)
+            and row[start + period_index] is not None
+            and str(row[start + period_index]).strip()
+        ]
+        if not teacher_name and not slot_values and not (raw_homeroom and str(raw_homeroom).strip()):
+            continue
+        record_count += 1
+        if not teacher_name:
+            failures.append(f"{row_number}-р мөр: багшийн нэр хоосон байна.")
+            if len(failures) >= 30:
+                failures.append("Алдааны эхний 30 мөрийг харуулав.")
+                break
+            continue
+
+        candidates = teacher_index.get(_teacher_name_key(teacher_name), [])
+        unique_candidates = {str(item.get("user_id") or ""): item for item in candidates}
+        if len(unique_candidates) != 1 or not next(iter(unique_candidates), ""):
+            detail = (
+                "багшийн нэр хэд хэдэн бүртгэлтэй таарлаа."
+                if unique_candidates
+                else "багшийн нэр бүртгэлтэй багштай таарахгүй байна."
+            )
+            failures.append(f"{row_number}-р мөр: {detail}")
+            if len(failures) >= 30:
+                failures.append("Алдааны эхний 30 мөрийг харуулав.")
+                break
+            continue
+
+        teacher_id, teacher = next(iter(unique_candidates.items()))
+        teacher_profiles[teacher_id] = teacher
+        homerooms.setdefault(teacher_id, [])
+        if raw_homeroom is not None and str(raw_homeroom).strip():
+            try:
+                grade, section = _parse_timetable_class(raw_homeroom)
+                homeroom = {"grade": grade, "section": section, "weekly_hours": 0, "homeroom": True}
+                if homeroom not in homerooms[teacher_id]:
+                    homerooms[teacher_id].append(homeroom)
+                if len(homerooms[teacher_id]) > 5:
+                    raise ValueError("Даасан анги 5-аас их байж болохгүй.")
+            except Exception as error:
+                failures.append(f"{row_number}-р мөр: {error}")
+                continue
+
+        subject = previous_subject
+        if slot_values and (not subject or len(subject) > 120):
+            failures.append(f"{row_number}-р мөр: багшийн заах хичээл тодорхойгүй байна.")
+            continue
+        for weekday, lesson_number, class_value in slot_values:
+            try:
+                grade, section = _parse_timetable_class(class_value, allow_combined_sections=True)
+                slot_key = (teacher_id, weekday, lesson_number)
+                if slot_key in occupied_slots:
+                    raise ValueError("Багш нэг цагт давхар хуваарьтай байна.")
+                occupied_slots.add(slot_key)
+                lessons.append({
+                    "teacher_id": teacher_id,
+                    "teacher_email": str(teacher.get("email") or "").strip().casefold(),
+                    "teacher_name": " ".join(
+                        part for part in (
+                            str(teacher.get("last_name") or "").strip(),
+                            str(teacher.get("first_name") or "").strip(),
+                        ) if part
+                    ),
+                    "grade": grade,
+                    "section": section,
+                    "subject": subject,
+                    "weekday": weekday,
+                    "week_type": "all",
+                    "lesson_number": lesson_number,
+                })
+            except Exception as error:
+                failures.append(f"{row_number}-р мөр: {error}")
+                if len(failures) >= 30:
+                    failures.append("Алдааны эхний 30 мөрийг харуулав.")
+                    break
+        if len(failures) >= 30:
+            break
+
+    return {
+        "record_count": record_count,
+        "lessons": lessons,
+        "homerooms": homerooms,
+        "teacher_profiles": teacher_profiles,
+        "failures": failures,
+    }
+
+
+def _load_schedule_workbook(file: UploadFile):
+    suffix = (file.filename or "").lower().rsplit(".", 1)[-1]
+    if suffix != "xlsx":
+        raise HTTPException(status_code=415, detail="Багшийн хуваарийг XLSX файлаар оруулна уу.")
+    try:
+        file.file.seek(0)
+        content = file.file.read(_MAX_UPLOAD_BYTES + 1)
+        if len(content) > _MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="Хуваарийн файл 10 MB-аас бага байна.")
+        return load_workbook(BytesIO(content), data_only=True, read_only=True)
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(status_code=400, detail="XLSX файлыг уншиж чадсангүй.") from error
+
+
+def _parse_schedule_file(
+    file: UploadFile,
+    profiles: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, list[dict[str, Any]]] | None, dict[str, dict[str, Any]]]:
+    workbook = _load_schedule_workbook(file)
+    for sheet in workbook.worksheets:
+        lessons = _parse_normalized_schedule_rows(sheet, profiles)
+        if lessons is not None:
+            return lessons, None, {}
+
+    candidates = []
+    for sheet in workbook.worksheets:
+        result = _parse_timetable_sheet(sheet, profiles)
+        if result is not None:
+            candidates.append(result)
+    if not candidates:
+        raise HTTPException(
+            status_code=422,
+            detail="XLSX-д стандарт хуваарийн баганууд эсвэл багшийн нэр, мэргэжил, даасан анги бүхий долоо хоногийн хуваарь олдсонгүй.",
+        )
+    selected = max(candidates, key=lambda item: (item["record_count"], len(item["lessons"])))
+    if selected["failures"]:
+        raise HTTPException(status_code=422, detail="\n".join(selected["failures"]))
+    if not selected["lessons"]:
+        raise HTTPException(status_code=422, detail="Файлд импортлох хуваарийн мөр алга.")
+    return selected["lessons"], selected["homerooms"], selected["teacher_profiles"]
+
+
+def _parse_schedule_rows(file: UploadFile, profiles: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return _parse_schedule_file(file, profiles)[0]
+
+
 def import_teacher_schedule(academic_year: str, file: UploadFile, user: Any) -> dict[str, Any]:
     _get_academic_year(academic_year)
-    lessons = _parse_schedule_rows(file, list_teacher_profiles())
-    result = _execute(
+    profiles = list_teacher_profiles()
+    lessons, homerooms, matched_profiles = _parse_schedule_file(file, profiles)
+    _execute(
         _client().table(_SCHEDULE_TABLE).upsert(
             {
                 "academic_year": academic_year,
@@ -283,7 +554,31 @@ def import_teacher_schedule(academic_year: str, file: UploadFile, user: Any) -> 
         ),
         "Хуваарийг хадгалж чадсангүй.",
     )
-    return {"imported_lessons": len(lessons), "teachers": len({item["teacher_id"] for item in lessons})}
+    if homerooms is not None:
+        now = datetime.now(timezone.utc).isoformat()
+        for teacher_id, classes in homerooms.items():
+            profile = matched_profiles[teacher_id]
+            teacher_user = SimpleNamespace(
+                id=teacher_id,
+                email=profile.get("email") or "",
+                user_metadata={
+                    "last_name": profile.get("last_name") or "",
+                    "first_name": profile.get("first_name") or "",
+                    "unit": profile.get("unit") or "",
+                },
+            )
+            replace_portal_collection(
+                teacher_user,
+                "teaching_classes",
+                classes,
+                updated_at=now,
+            )
+    return {
+        "imported_lessons": len(lessons),
+        "teachers": len({item["teacher_id"] for item in lessons}),
+        "homeroom_teachers": len(homerooms or {}),
+        "homeroom_classes": sum(len(items) for items in (homerooms or {}).values()),
+    }
 
 
 def get_schedule_status(academic_year: str) -> dict[str, Any]:
@@ -304,6 +599,81 @@ def get_schedule_status(academic_year: str) -> dict[str, Any]:
         "teachers": len({item.get("teacher_id") for item in lessons}),
         "updated_at": rows[0].get("updated_at"),
     }
+
+
+def get_teacher_schedule_assignments(teacher_id: str) -> list[dict[str, Any]]:
+    if mock_data_enabled():
+        teacher = get_mock_teacher_by_id(str(teacher_id))
+        return list((teacher or {}).get("teaching_schedule") or [])
+
+    client = _client()
+    years_result = _execute(
+        client.table(_YEAR_TABLE).select("academic_year,start_date,end_date"),
+        "Хичээлийн жилийн жагсаалтыг уншиж чадсангүй.",
+    )
+    schedules_result = _execute(
+        client.table(_SCHEDULE_TABLE).select("academic_year,lessons"),
+        "Багшийн хуваарь уншигдсангүй.",
+    )
+    years = years_result.data or []
+    schedules = schedules_result.data or []
+    year_by_id = {str(item["academic_year"]): item for item in years}
+    assignments: dict[tuple[str, int, str, str], dict[str, Any]] = {}
+    for schedule in schedules:
+        academic_year = str(schedule.get("academic_year") or "")
+        year = year_by_id.get(academic_year)
+        if not year:
+            continue
+        lessons = schedule.get("lessons") or []
+        if not isinstance(lessons, list):
+            raise HTTPException(status_code=503, detail="Хуваарийн өгөгдлийн формат буруу байна.")
+        start_date = str(year.get("start_date") or "")[:10]
+        end_date = str(year.get("end_date") or "")[:10]
+        for lesson in lessons:
+            if not isinstance(lesson, dict) or str(lesson.get("teacher_id") or "") != str(teacher_id):
+                continue
+            try:
+                grade = int(lesson["grade"])
+            except (KeyError, TypeError, ValueError) as error:
+                raise HTTPException(status_code=503, detail="Хуваарийн ангийн өгөгдөл буруу байна.") from error
+            subject = str(lesson.get("subject") or "").strip()
+            section_value = str(lesson.get("section") or "").strip().upper()
+            if not subject or not section_value or any(section not in _VALID_SECTIONS for section in section_value):
+                raise HTTPException(status_code=503, detail="Хуваарийн анги, хичээлийн өгөгдөл буруу байна.")
+            for section in section_value:
+                assignment = {
+                    "academic_year": academic_year,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "grade": grade,
+                    "section": section,
+                    "subject": subject,
+                }
+                key = (academic_year, grade, section, subject)
+                assignments[key] = assignment
+    return list(assignments.values())
+
+
+def validate_teacher_schedule_assignment(
+    teacher_id: str,
+    evaluation_date: date,
+    grade: int,
+    section: str,
+    subject: str,
+) -> None:
+    normalized_subject = subject.strip().casefold()
+    for assignment in get_teacher_schedule_assignments(teacher_id):
+        if (
+            assignment["start_date"] <= evaluation_date.isoformat() <= assignment["end_date"]
+            and assignment["grade"] == grade
+            and assignment["section"] == section
+            and assignment["subject"].strip().casefold() == normalized_subject
+        ):
+            return
+    raise HTTPException(
+        status_code=422,
+        detail="Сонгосон огноо, анги, хичээл таны хуваарьт байхгүй байна.",
+    )
 
 
 def _month_start(month: date) -> date:

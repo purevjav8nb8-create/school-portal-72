@@ -72,6 +72,7 @@ export default function TeacherDashboardPage() {
     teacher={teacher}
     trainings={workspace.trainings}
     evaluations={workspace.evaluations}
+    teachingSchedule={workspace.teachingSchedule}
     programPlan={workspace.programPlan}
     activities={workspace.activities}
     awards={workspace.awards}

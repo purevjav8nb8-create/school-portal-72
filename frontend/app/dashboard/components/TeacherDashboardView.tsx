@@ -19,6 +19,7 @@ import TeachingClassesPanel from './TeachingClassesPanel';
 import { DashboardCategory, Teacher, UserProfile } from '../types';
 import { NotificationCounts } from '../hooks/useNotifications';
 import { returnedPlanNotificationId } from '../hooks/notificationData';
+import type { TeachingScheduleAssignment } from '../types';
 
 export type TeacherTraining = {
   id: string;
@@ -36,6 +37,7 @@ interface Props {
   teacher: Teacher;
   trainings: TeacherTraining[];
   evaluations: EvaluationRecord[];
+  teachingSchedule: TeachingScheduleAssignment[];
   programPlan?: ProgramPlan;
   activities: TeacherActivity[];
   awards: { id: string; name: string; certificate_number: string; certificate_url: string; organization: string; awarded_date?: string; note: string }[];
@@ -65,7 +67,7 @@ interface Props {
 }
 
 export default function TeacherDashboardView({
-  user, teacher, trainings, evaluations, programPlan, activities, awards, degrees, homeroomEvaluations,
+  user, teacher, trainings, evaluations, teachingSchedule, programPlan, activities, awards, degrees, homeroomEvaluations,
   activeCategory, selectedMonth, setSelectedMonth, busy, errorMessage,
   successMessage, onCategoryChange,   onLogout, onTraining, onProgramPlan, onDeleteProgramPlan, onActivity, onEvaluation, onDeleteEvaluation, onProfessionalSave,
   notificationCounts = {}, notificationError = '', unreadNotificationKeys,
@@ -86,7 +88,7 @@ export default function TeacherDashboardView({
     <main className="dashboard-compact" style={{ height: '100vh', overflow: 'hidden', backgroundColor: '#f8fafc', padding: 6 }}>
       <Header user={user} onLogout={onLogout} />
       <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '150px minmax(0, 1fr) 180px', gap: 8, marginTop: 7, height: 'calc(100vh - 100px)', alignItems: 'start' }}>
-        <aside style={{ overflow: 'hidden' }}>
+        <aside style={{ height: '100%', minHeight: 0, overflowY: 'auto', overflowX: 'hidden', paddingRight: 4 }}>
           <SideMenu activeCategory={activeCategory} setActiveCategory={handleCategoryChange} categories={categories} notificationCounts={notificationCounts} notificationError={notificationError} />
           <TeachingClassesPanel unit={teacher.unit} initialClasses={teacher.teaching_classes ?? []} />
         </aside>
@@ -132,7 +134,7 @@ export default function TeacherDashboardView({
               </section>
             )}
             {activeCategory === 'Үнэлгээ' && (
-              <EvaluationPanel unit={user.unit} subjects={user.subjects ?? (user.subject ? [user.subject] : [])} evaluations={evaluations} sharedEvaluations={homeroomEvaluations} onSubmit={onEvaluation} onDelete={onDeleteEvaluation} />
+              <EvaluationPanel unit={user.unit} subjects={user.subjects ?? (user.subject ? [user.subject] : [])} teachingSchedule={teachingSchedule} evaluations={evaluations} sharedEvaluations={homeroomEvaluations} onSubmit={onEvaluation} onDelete={onDeleteEvaluation} />
             )}
             {activeCategory === 'Хөтөлбөр' && <ProgramPlanPanel
               programPlan={programPlan}

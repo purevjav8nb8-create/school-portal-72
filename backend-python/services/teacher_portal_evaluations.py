@@ -7,11 +7,18 @@ from database import supabase
 from schemas.teacher_records import EvaluationCreate
 from schemas.teachers import AttendanceUpdate, VALID_ATTENDANCE
 from services.mock_school_data import mock_data_enabled, update_mock_teacher_attendance
-from services.teacher_portal_common import save_teacher_attendance, teacher_attendance_records, validate_teacher_class
+from services.teacher_portal_common import save_teacher_attendance, teacher_attendance_records
 from services.teacher_portal_storage import get_portal_collection, replace_portal_collection
+from services.school_schedule import validate_teacher_schedule_assignment
 
 def add_evaluation(user, evaluation: EvaluationCreate) -> dict[str, Any]:
-    validate_teacher_class(user, evaluation.grade, evaluation.section, evaluation.subject)
+    validate_teacher_schedule_assignment(
+        str(user.id),
+        evaluation.evaluation_date,
+        evaluation.grade,
+        evaluation.section,
+        evaluation.subject,
+    )
     item = {
         "id": str(uuid4()),
         **evaluation.model_dump(mode="json"),
