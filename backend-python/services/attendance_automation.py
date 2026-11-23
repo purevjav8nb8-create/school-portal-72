@@ -1,5 +1,5 @@
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -46,18 +46,36 @@ def has_teacher_identity(user: Any) -> bool:
     ))
 
 
+def _default_workdays(start: date, end: date, public_holidays: set[date]) -> list[date]:
+    if end < start:
+        return []
+    return [
+        start + timedelta(days=offset)
+        for offset in range((end - start).days + 1)
+        if (start + timedelta(days=offset)).weekday() < 5
+        and (start + timedelta(days=offset)) not in public_holidays
+    ]
+
+
 def ensure_today_attendance(users: list[Any] | None = None) -> list[Any] | None:
-    today = school_today().isoformat()
+    today = school_today()
+    today_text = today.isoformat()
+    month_start = today.replace(day=1)
     if mock_data_enabled():
         try:
+            public_holidays: set[date] = set()
+            workdays = _default_workdays(month_start, today, public_holidays)
             for teacher in load_mock_school_data()["teachers"]:
                 if not has_teacher_identity(teacher):
                     continue
                 records = teacher.get("attendance", [])
-                if not any(item.get("date") == today for item in records):
-                    update_mock_teacher_attendance(
-                        teacher["auth_id"], {"date": today, "status": "Ирсэн"}
-                    )
+                recorded_dates = {str(item.get("date") or "")[:10] for item in records}
+                for workday in workdays:
+                    if workday.isoformat() not in recorded_dates:
+                        update_mock_teacher_attendance(
+                            teacher["auth_id"],
+                            {"date": workday.isoformat(), "status": "Ирсэн"},
+                        )
         except (KeyError, RuntimeError) as error:
             raise HTTPException(status_code=503, detail="Өнөөдрийн ирцийн бүртгэл үүсгэсэнгүй.") from error
         return None
@@ -83,18 +101,53 @@ def ensure_today_attendance(users: list[Any] | None = None) -> list[Any] | None:
     if not teacher_ids:
         return users
     try:
+        year_result = (
+            supabase.table("school_academic_years")
+            .select("start_date,end_date")
+            .lte("start_date", today_text)
+            .gte("end_date", today_text)
+            .order("start_date", desc=True)
+            .execute()
+        )
+        year_rows = year_result.data or []
+        if year_rows:
+            range_start = date.fromisoformat(str(year_rows[0]["start_date"])[:10])
+        else:
+            range_start = month_start
+
+        holiday_result = (
+            supabase.table("school_public_holidays")
+            .select("holiday_date")
+            .gte("holiday_date", range_start.isoformat())
+            .lte("holiday_date", today_text)
+            .execute()
+        )
+        public_holidays = {
+            date.fromisoformat(str(item["holiday_date"])[:10])
+            for item in (holiday_result.data or [])
+        }
+        workdays = _default_workdays(range_start, today, public_holidays)
         existing = (
             supabase.table("teacher_attendance")
-            .select("teacher_id")
-            .eq("attendance_date", today)
+            .select("teacher_id,attendance_date,status")
+            .gte("attendance_date", range_start.isoformat())
+            .lte("attendance_date", today_text)
             .in_("teacher_id", teacher_ids)
             .execute()
         )
-        already_recorded = {item["teacher_id"] for item in (existing.data or [])}
+        already_recorded = {
+            (str(item["teacher_id"]), str(item["attendance_date"])[:10])
+            for item in (existing.data or [])
+        }
         rows = [
-            {"teacher_id": teacher_id, "attendance_date": today, "status": "Ирсэн"}
+            {
+                "teacher_id": teacher_id,
+                "attendance_date": workday.isoformat(),
+                "status": "Ирсэн",
+            }
             for teacher_id in teacher_ids
-            if teacher_id not in already_recorded
+            for workday in workdays
+            if (teacher_id, workday.isoformat()) not in already_recorded
         ]
         if rows:
             supabase.table("teacher_attendance").upsert(
