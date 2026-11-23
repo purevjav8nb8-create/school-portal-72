@@ -15,6 +15,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="mn">
+      <head>
+        <link rel="preload" href="/login-background.webp" as="image" type="image/webp" fetchPriority="high" />
+      </head>
       <body>
         {children}
         <Analytics />
