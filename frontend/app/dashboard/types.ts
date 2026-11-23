@@ -9,6 +9,12 @@ export interface UserProfile {
   teaching_classes?: Array<{ grade: number; section: string; weekly_hours: number; homeroom?: boolean }>;
   role: 'admin' | 'manager' | 'teacher';
   lms_username?: string;
+  weekly_teaching_hours?: number;
+  scheduled_hours?: number;
+  substitute_hours?: number;
+  actual_hours?: number;
+  norm_hours?: number;
+  overtime_hours?: number;
 }
 
 export interface TeachingScheduleAssignment {

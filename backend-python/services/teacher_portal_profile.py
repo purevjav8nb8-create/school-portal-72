@@ -1,9 +1,10 @@
+from datetime import date
 from typing import Any
 from fastapi import HTTPException
 from services.mock_school_data import get_mock_teacher_by_id, load_mock_school_data, mock_data_enabled
 from services.teacher_portal_common import teacher_attendance_records, teacher_portal_data
 from services.teacher_portal_storage import list_portal_records
-from services.school_schedule import get_teacher_schedule_assignments
+from services.school_schedule import calculate_my_monthly_overtime, get_teacher_schedule_assignments
 
 def homeroom_evaluations(user) -> list[dict[str, Any]]:
     metadata = user.user_metadata or {}
@@ -59,7 +60,32 @@ def get_my_program_plan(user) -> dict[str, Any] | None:
         return teacher.get("program_plan")
     return teacher_portal_data(user).get("program_plan")
 
+
+def _my_schedule_metrics(user) -> dict[str, Any]:
+    try:
+        report = calculate_my_monthly_overtime(user, date.today().replace(day=1))
+        own = (report.get("teachers") or [None])[0]
+        if not own:
+            return {}
+        return {
+            "weekly_teaching_hours": (
+                own.get("weekly_base_hours", 0)
+                + own.get("weekly_even_hours", 0)
+                + own.get("weekly_odd_hours", 0)
+            ),
+            "scheduled_hours": own.get("scheduled_hours", 0),
+            "substitute_hours": own.get("substitute_hours", 0),
+            "actual_hours": own.get("actual_hours", 0),
+            "norm_hours": own.get("norm_hours", 0),
+            "overtime_hours": own.get("overtime_hours", 0),
+        }
+    except HTTPException:
+        return {}
+    except Exception:
+        return {}
+
 def get_my_teacher_data(user) -> dict[str, Any]:
+    schedule_metrics = _my_schedule_metrics(user)
     if mock_data_enabled():
         teacher = get_mock_teacher_by_id(user.id)
         if teacher is None:
@@ -76,6 +102,7 @@ def get_my_teacher_data(user) -> dict[str, Any]:
                 "subjects": [teacher["subject"]],
                 "role": "teacher",
                 "teaching_classes": teacher.get("teaching_classes", []),
+                **schedule_metrics,
             },
             "teaching_schedule": get_teacher_schedule_assignments(str(user.id)),
             "attendance": teacher.get("attendance", []),
@@ -122,6 +149,7 @@ def get_my_teacher_data(user) -> dict[str, Any]:
             "subject": metadata.get("subject") or "Мэргэжил бүртгэгдээгүй",
             "subjects": metadata.get("subjects") or ([metadata["subject"]] if metadata.get("subject") else []),
             "lms_username": metadata.get("lms_username", ""),
+            **schedule_metrics,
         },
         "attendance": teacher_attendance_records(user),
         "trainings": portal.get("trainings", []),

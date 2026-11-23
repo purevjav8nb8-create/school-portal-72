@@ -51,10 +51,12 @@ export default function TeacherDashboardPage() {
   const unit: Teacher['unit'] = ['БАЗАН', 'БУЗАН', 'НУЗАН'].includes(user.unit) ? user.unit as Teacher['unit'] : 'БАЗАН';
   const monthRecords = workspace.attendance.filter((record) => record.date.startsWith(selectedMonth));
   const latestRecord = [...workspace.attendance].sort((a, b) => b.date.localeCompare(a.date))[0];
-  const weeklyTeachingHours = (user.teaching_classes ?? []).reduce(
-    (total, item) => total + Number(item.weekly_hours || 0),
-    0,
-  );
+  const weeklyTeachingHours =
+    user.weekly_teaching_hours
+      ?? (user.teaching_classes ?? []).reduce(
+        (total, item) => total + Number(item.weekly_hours || 0),
+        0,
+      );
   const teacher: Teacher = {
     id: 1,
     auth_id: user.user_id,
@@ -70,7 +72,10 @@ export default function TeacherDashboardPage() {
     monthly_login_count: 0,
     teaching_classes: user.teaching_classes ?? [],
     weekly_teaching_hours: weeklyTeachingHours,
-    overtime_hours: Math.max(0, weeklyTeachingHours - 19),
+    scheduled_hours: user.scheduled_hours,
+    substitute_hours: user.substitute_hours,
+    norm_hours: user.norm_hours,
+    overtime_hours: user.overtime_hours ?? Math.max(0, weeklyTeachingHours - 19),
     daily_records: workspace.attendance,
   };
 
