@@ -515,7 +515,7 @@ body {
 .login-page {
   position: relative;
   display: block;
-  background: #edf5ff url('/login-background.png') center center / cover no-repeat;
+  background: #edf5ff;
   overflow: hidden;
 }
 
@@ -828,7 +828,7 @@ body {
   display: grid;
   grid-template-columns: minmax(0, 58%) minmax(380px, 42%);
   min-height: 100vh;
-  background: #edf5ff url('/login-background.png') center center / cover no-repeat;
+  background: #edf5ff;
   overflow: hidden;
 }
 
@@ -954,7 +954,7 @@ body {
 
 /* Final login card appearance: compact and fully transparent. */
 .login-page {
-  background: #edf5ff url('/login-background.png') center center / cover no-repeat !important;
+  background: #edf5ff !important;
 }
 
 .login-panel {
