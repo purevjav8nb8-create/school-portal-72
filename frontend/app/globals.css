@@ -957,6 +957,23 @@ body {
   background: #edf5ff url('/login-background.webp') center center / cover no-repeat !important;
 }
 
+.login-page::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: rgba(36, 74, 145, .14);
+  -webkit-backdrop-filter: blur(1.25px);
+  backdrop-filter: blur(1.25px);
+  pointer-events: none;
+}
+
+.login-page .login-panel,
+.login-page .login-brand {
+  position: relative;
+  z-index: 1;
+}
+
 .login-panel {
   background: transparent !important;
 }
@@ -965,55 +982,52 @@ body {
   width: 390px !important;
   min-height: 420px !important;
   padding: 34px 38px 30px !important;
-  border: 1px solid rgba(255, 255, 255, .58) !important;
+  border: 1px solid rgba(255, 255, 255, .88) !important;
   border-radius: 32px !important;
-  background: rgba(255, 255, 255, .36) !important;
-  -webkit-backdrop-filter: blur(16px) !important;
-  backdrop-filter: blur(16px) !important;
+  background: rgba(255, 255, 255, .82) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  backdrop-filter: blur(10px) !important;
   box-shadow:
-    12px 18px 38px rgba(68, 92, 126, .18),
-    -8px -8px 24px rgba(255, 255, 255, .38),
-    inset 1px 1px 1px rgba(255, 255, 255, .72) !important;
+    12px 18px 38px rgba(31, 55, 94, .28),
+    -8px -8px 24px rgba(255, 255, 255, .64),
+    inset 1px 1px 1px rgba(255, 255, 255, .92) !important;
 }
 
 .login-3d-card > h1,
 .login-3d-card > h2 {
-  color: #4a5d80 !important;
-  text-shadow: 1px 2px 3px rgba(255, 255, 255, .86) !important;
+  color: #1e3a8a !important;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, .96) !important;
 }
 
 .login-3d-card .login-field {
   height: 58px !important;
-  border: 1px solid rgba(255, 255, 255, .66) !important;
-  background: rgba(255, 255, 255, .58) !important;
+  border: 1px solid rgba(203, 213, 225, .92) !important;
+  background: rgba(255, 255, 255, .92) !important;
   -webkit-backdrop-filter: blur(8px) !important;
   backdrop-filter: blur(8px) !important;
   box-shadow:
-    5px 7px 14px rgba(90, 112, 145, .14),
-    -4px -4px 10px rgba(255, 255, 255, .42),
-    inset 1px 1px 1px rgba(255, 255, 255, .68) !important;
+    4px 6px 12px rgba(71, 85, 105, .12),
+    inset 1px 1px 1px rgba(255, 255, 255, .96) !important;
 }
 
 .login-3d-card .login-field input,
 .login-3d-card .login-field input::placeholder,
 .login-3d-card .login-options,
 .login-3d-card .login-password-toggle {
-  color: #53617b !important;
+  color: #1e293b !important;
   opacity: 1 !important;
-  text-shadow: 0 1px 1px rgba(255, 255, 255, .72) !important;
+  text-shadow: none !important;
 }
 
 .login-3d-card .login-submit {
   width: 210px !important;
   height: 54px !important;
-  border: 1px solid rgba(255, 255, 255, .58) !important;
-  background: rgba(255, 255, 255, .52) !important;
-  color: #53617b !important;
-  -webkit-backdrop-filter: blur(8px) !important;
-  backdrop-filter: blur(8px) !important;
+  border: 1px solid #1d4ed8 !important;
+  background: #2563eb !important;
+  color: #fff !important;
   box-shadow:
-    7px 8px 14px rgba(90, 112, 145, .18),
-    -6px -6px 12px rgba(255, 255, 255, .54) !important;
+    7px 8px 14px rgba(37, 99, 235, .28),
+    -4px -4px 10px rgba(255, 255, 255, .38) !important;
 }
 
 /* Login labels: half the previous text size. */
