@@ -66,6 +66,8 @@ def get_my_teacher_data(user) -> dict[str, Any]:
             raise HTTPException(status_code=404, detail="Загвар багш олдсонгүй.")
         return {
             "profile": {
+                "user_id": str(user.id),
+                "user_id": str(user.id),
                 "last_name": teacher["last_name"],
                 "first_name": teacher["first_name"],
                 "email": teacher["email"],

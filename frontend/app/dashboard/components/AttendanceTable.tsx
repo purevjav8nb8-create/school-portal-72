@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Teacher } from '../types';
+import { getMyOvertimeReport, getOvertimeReport, listAcademicYears, OvertimeTeacher } from './schoolScheduleApi';
 import AttendanceSummaryBar from './AttendanceSummaryBar';
 import TeacherAttendanceDialog from './TeacherAttendanceDialog';
 
@@ -27,6 +28,41 @@ export default function AttendanceTable({
   canManagePublicHolidays = false,
 }: Props) {
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
+  const [overtimeByTeacher, setOvertimeByTeacher] = useState<Record<string, OvertimeTeacher>>({});
+  useEffect(() => {
+    let active = true;
+    setOvertimeByTeacher({});
+    if (readOnly) {
+      void getMyOvertimeReport(selectedMonth)
+        .then((report) => {
+          if (!active) return;
+          setOvertimeByTeacher(Object.fromEntries(
+            report.teachers.map((item) => [item.teacher_id, item]),
+          ));
+        })
+        .catch(() => {
+          if (active) setOvertimeByTeacher({});
+        });
+      return () => { active = false; };
+    }
+    void listAcademicYears()
+      .then(async (years) => {
+        const monthStart = `${selectedMonth}-01`;
+        const year = years.find((item) =>
+          monthStart >= item.start_date && monthStart <= item.end_date,
+        );
+        if (!year) return;
+        const report = await getOvertimeReport(year.academic_year, selectedMonth);
+        if (!active) return;
+        setOvertimeByTeacher(Object.fromEntries(
+          report.teachers.map((item) => [item.teacher_id, item]),
+        ));
+      })
+      .catch(() => {
+        if (active) setOvertimeByTeacher({});
+      });
+    return () => { active = false; };
+  }, [selectedMonth, readOnly]);
   const monthRecords = teachers.flatMap((teacher) => (teacher.daily_records ?? []).filter((record) => record.date.startsWith(selectedMonth)));
   const statuses = readOnly ? monthRecords.map((record) => record.status) : teachers.map((teacher) => teacher.attendance);
   const presentCount = statuses.filter(status => status === 'Ирсэн').length;
@@ -59,6 +95,7 @@ export default function AttendanceTable({
               <th style={{ padding: '5px 8px' }}>Нэгдэл</th>
               <th style={{ padding: '5px 8px' }}>Мэргэжил</th>
               <th style={{ padding: '5px 8px' }}>7 хоногийн цаг</th>
+              <th style={{ padding: '5px 8px' }}>Орлон заасан цаг</th>
               <th style={{ padding: '5px 8px' }}>Илүү цаг</th>
               <th style={{ padding: '5px 8px' }}>Сарын ирц (%)</th>
               <th style={{ padding: '5px 8px' }}>Өнөөдрийн Ирц</th>
@@ -72,6 +109,12 @@ export default function AttendanceTable({
                   const rate = records.length
                     ? Math.round((records.filter((record) => record.status === 'Ирсэн').length / records.length) * 100)
                     : 0;
+                  const overtime = t.auth_id ? overtimeByTeacher[t.auth_id] : undefined;
+                  const weeklyHours = overtime
+                    ? overtime.weekly_base_hours + overtime.weekly_even_hours + overtime.weekly_odd_hours
+                    : (t.weekly_teaching_hours ?? 0);
+                  const overtimeHours = overtime?.overtime_hours ?? (t.overtime_hours ?? Math.max(0, (t.weekly_teaching_hours ?? 0) - 19));
+                  const substituteHours = overtime?.substitute_hours ?? t.substitute_hours ?? 0;
                   return (
                     <>
                 <td
@@ -85,9 +128,10 @@ export default function AttendanceTable({
                 </td>
                 <td style={{ padding: '5px 8px' }}>{t.unit}</td>
                 <td style={{ padding: '5px 8px' }}>{t.subject}</td>
-                <td style={{ padding: '5px 8px' }}>{t.weekly_teaching_hours ?? 0}</td>
+                <td style={{ padding: '5px 8px' }}>{weeklyHours}</td>
+                <td style={{ padding: '5px 8px', color: '#2563eb', fontWeight: 'bold' }}>{substituteHours}</td>
                 <td style={{ padding: '5px 8px', color: '#0f172a', fontWeight: 'bold' }}>
-                  {t.overtime_hours ?? Math.max(0, (t.weekly_teaching_hours ?? 0) - 19)}
+                  {overtimeHours}
                 </td>
                 <td style={{ padding: '5px 8px' }}>
                   <span style={{ padding: '3px 6px', borderRadius: '4px', fontSize: '11px', backgroundColor: '#dcfce7', color: '#15803d', fontWeight: 'bold' }}>

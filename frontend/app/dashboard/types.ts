@@ -1,4 +1,5 @@
 export interface UserProfile {
+  user_id?: string;
   last_name: string;
   first_name: string;
   email: string;
@@ -40,6 +41,9 @@ export interface Teacher {
   teaching_classes?: Array<{ grade: number; section: string; weekly_hours: number; homeroom?: boolean }>;
   weekly_teaching_hours?: number;
   overtime_hours?: number;
+  scheduled_hours?: number;
+  substitute_hours?: number;
+  norm_hours?: number;
   daily_records?: Array<{ date: string; status: DailyAttendance['status'] }>;
   training_records?: Array<{
     id: string;

@@ -1,12 +1,18 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { backendBaseUrl, fetchWithAuth } from '../../../lib/backendApi';
 import { supabase } from '../../../lib/supabaseClient';
 import { Teacher } from '../types';
 import { subjectsForUnit } from './records/ClassFields';
 import AttendanceMonthGrid from './AttendanceMonthGrid';
 import styles from './TeacherDetailModal.module.css';
+import {
+  getOvertimeReport,
+  listAcademicYears,
+  OvertimeReport,
+  saveTeacherSubstituteHours,
+} from './schoolScheduleApi';
 
 interface Props {
   teacher: Teacher | null;
@@ -19,12 +25,45 @@ export default function TeacherDetailModal({ teacher, selectedMonth, onClose, on
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [overtimeReport, setOvertimeReport] = useState<OvertimeReport | null>(null);
+  const [academicYear, setAcademicYear] = useState('');
+  const [substituteDraft, setSubstituteDraft] = useState(0);
+  const [savingSubstitute, setSavingSubstitute] = useState(false);
   const [form, setForm] = useState(() => teacher ? {
     first_name: teacher.first_name,
     last_name: teacher.last_name,
     unit: teacher.unit,
     subject: teacher.subject,
   } : null);
+
+  useEffect(() => {
+    if (!teacher?.auth_id) {
+      setOvertimeReport(null);
+      setAcademicYear('');
+      setSubstituteDraft(0);
+      return;
+    }
+    let active = true;
+    setOvertimeReport(null);
+    void listAcademicYears()
+      .then(async (years) => {
+        const monthStart = `${selectedMonth}-01`;
+        const year = years.find((item) =>
+          monthStart >= item.start_date && monthStart <= item.end_date,
+        );
+        if (!year) return;
+        if (active) setAcademicYear(year.academic_year);
+        const report = await getOvertimeReport(year.academic_year, selectedMonth);
+        if (!active) return;
+        setOvertimeReport(report);
+        const own = report.teachers.find((item) => item.teacher_id === teacher.auth_id);
+        setSubstituteDraft(own?.substitute_hours ?? 0);
+      })
+      .catch(() => {
+        if (active) setOvertimeReport(null);
+      });
+    return () => { active = false; };
+  }, [teacher?.auth_id, selectedMonth]);
 
   if (!teacher) return null;
   const records = (teacher.daily_records ?? []).filter((record) =>
@@ -33,6 +72,7 @@ export default function TeacherDetailModal({ teacher, selectedMonth, onClose, on
   const present = records.filter((record) => record.status === 'Ирсэн').length;
   const rate = records.length ? Math.round((present / records.length) * 100) : 0;
   const homeroomClasses = (teacher.teaching_classes ?? []).filter((item) => item.homeroom);
+  const overtimeTeacher = overtimeReport?.teachers.find((item) => item.teacher_id === teacher.auth_id);
 
   async function saveTeacher(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -55,6 +95,45 @@ export default function TeacherDetailModal({ teacher, selectedMonth, onClose, on
       setErrorMessage(error instanceof Error ? error.message : 'Мэдээлэл шинэчлэгдсэнгүй.');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function saveSubstitute() {
+    if (!teacher?.auth_id || !academicYear) return;
+    setSavingSubstitute(true);
+    setErrorMessage('');
+    try {
+      await saveTeacherSubstituteHours(
+        academicYear,
+        selectedMonth,
+        teacher.auth_id,
+        substituteDraft,
+      );
+      try {
+        const refreshed = await getOvertimeReport(academicYear, selectedMonth);
+        setOvertimeReport(refreshed);
+        const own = refreshed.teachers.find((item) => item.teacher_id === teacher.auth_id);
+        if (own) {
+          setSubstituteDraft(own.substitute_hours);
+          onTeacherUpdated({
+            ...teacher,
+            weekly_teaching_hours: own.weekly_base_hours + own.weekly_even_hours + own.weekly_odd_hours,
+            scheduled_hours: own.scheduled_hours,
+            substitute_hours: own.substitute_hours,
+            norm_hours: own.norm_hours,
+            overtime_hours: own.overtime_hours,
+          });
+        }
+      } catch {
+        onTeacherUpdated({
+          ...teacher,
+          substitute_hours: substituteDraft,
+        });
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Орлон заасан цаг хадгалагдсангүй.');
+    } finally {
+      setSavingSubstitute(false);
     }
   }
 
@@ -100,7 +179,39 @@ export default function TeacherDetailModal({ teacher, selectedMonth, onClose, on
             <Stat label="Сарын ирц" value={`${rate}%`} />
             <Stat label="Бүртгэлтэй өдөр" value={String(records.length)} />
             <Stat label="7 хоногийн норм" value="19" />
+            <Stat label="Хуваарийн/илүү цаг" value={`${overtimeTeacher?.scheduled_hours ?? 0} / ${overtimeTeacher?.overtime_hours ?? teacher.overtime_hours ?? 0}`} />
           </div>
+
+          {academicYear && (
+            <section className={styles.section}>
+              <div className={styles.sectionHeader}>
+                <h3 className={styles.sectionTitle}>Орлон заасан цаг</h3>
+                <span className={styles.monthBadge}>{selectedMonth}</span>
+              </div>
+              <div className={styles.formActions}>
+                <label className={styles.field} style={{ width: 180 }}>
+                  Орлон заасан цаг
+                  <input
+                    className={styles.input}
+                    type="number"
+                    min={0}
+                    max={400}
+                    step={0.5}
+                    value={substituteDraft}
+                    onChange={(event) => setSubstituteDraft(Math.max(0, Number(event.target.value)))}
+                  />
+                </label>
+                <button className={styles.primaryButton} type="button" disabled={savingSubstitute} onClick={() => void saveSubstitute()}>
+                  {savingSubstitute ? 'Хадгалж байна...' : 'Орлон цаг нэмэх'}
+                </button>
+              </div>
+              {overtimeTeacher && (
+                <p className={styles.empty} style={{ marginTop: 10 }}>
+                  Бодит цаг: {overtimeTeacher.actual_hours} · Норм: {overtimeTeacher.norm_hours} · Илүү цаг: {overtimeTeacher.overtime_hours}
+                </p>
+              )}
+            </section>
+          )}
 
           <section className={styles.section}>
             <div className={styles.sectionHeader}><h3 className={styles.sectionTitle}>Даасан анги</h3></div>

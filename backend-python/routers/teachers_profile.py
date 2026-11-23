@@ -1,8 +1,10 @@
+from datetime import date
 from fastapi import APIRouter, Header
 from schemas.teacher_records import ActivityCreate, AwardCreate, EvaluationCreate, ProfessionalDegreeCreate, ProgramPlanSubmit
 from schemas.teachers import HomeroomClassesUpdate, TrainingCreate
 from services.teacher_auth import require_teacher
 from services.teacher_portal import add_evaluation, add_my_activity, add_my_award, add_my_professional_degree, add_my_training, delete_evaluation, delete_my_program_plan, get_my_program_plan, get_my_teacher_data, submit_program_plan, update_my_teaching_classes
+from services.school_schedule import calculate_my_monthly_overtime
 
 router = APIRouter()
 
@@ -10,6 +12,14 @@ router = APIRouter()
 def get_my_profile(authorization: str | None = Header(default=None)):
     user = require_teacher(authorization)
     return get_my_teacher_data(user)
+
+@router.get("/me/schedule-overtime")
+def get_my_schedule_overtime(
+    month: date,
+    authorization: str | None = Header(default=None),
+):
+    user = require_teacher(authorization)
+    return calculate_my_monthly_overtime(user, month)
 
 @router.get("/me/program-plan")
 def get_my_program_plan_status(authorization: str | None = Header(default=None)):

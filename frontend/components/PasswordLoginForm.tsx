@@ -86,6 +86,8 @@ export default function PasswordLoginForm() {
           <UserRound size={22} aria-hidden="true" />
           <input
             type="text"
+            name="username"
+            autoComplete="username"
             placeholder="Хэрэглэгчийн нэр"
             aria-label="Нэвтрэх нэр эсвэл И-мэйл"
             value={email}
@@ -98,6 +100,8 @@ export default function PasswordLoginForm() {
           <LockKeyhole size={21} aria-hidden="true" />
           <input
             type={showPassword ? 'text' : 'password'}
+            name="password"
+            autoComplete="current-password"
             placeholder="Нууц үг"
             aria-label="Нууц үг"
             value={password}

@@ -53,6 +53,7 @@ export default function TeacherDashboardPage() {
   const latestRecord = [...workspace.attendance].sort((a, b) => b.date.localeCompare(a.date))[0];
   const teacher: Teacher = {
     id: 1,
+    auth_id: user.user_id,
     last_name: user.last_name,
     first_name: user.first_name,
     email: user.email,

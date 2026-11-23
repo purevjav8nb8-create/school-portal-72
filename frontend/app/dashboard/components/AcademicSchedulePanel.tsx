@@ -1,6 +1,7 @@
 'use client';
 
 import { ChangeEvent, useEffect, useMemo, useState } from 'react';
+import { Trash2 } from 'lucide-react';
 import { schoolMonth } from '../../../lib/schoolDate';
 import {
   AcademicTerm,
@@ -8,6 +9,7 @@ import {
   OvertimeReport,
   ScheduleStatus,
   downloadScheduleTemplate,
+  downloadSavedSchedule as downloadSavedScheduleFile,
   deleteAcademicYear,
   getOvertimeReport,
   getScheduleStatus,
@@ -97,6 +99,7 @@ export default function AcademicSchedulePanel() {
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [scheduleFeedback, setScheduleFeedback] = useState<ScheduleFeedback | null>(null);
+  const [selectedTermId, setSelectedTermId] = useState('');
 
   const savedYear = years.find((item) => item.academic_year === draft.academic_year);
   const yearChoices = useMemo(() => {
@@ -132,13 +135,17 @@ export default function AcademicSchedulePanel() {
       return;
     }
     let active = true;
+    if (!selectedTermId && draft.terms.length) {
+      setSelectedTermId(draft.terms[0].id);
+    }
     setScheduleStatus(null);
     setReport(null);
-    void getScheduleStatus(draft.academic_year)
+    const termId = selectedTermId || draft.terms[0]?.id;
+    void getScheduleStatus(draft.academic_year, termId)
       .then((result) => { if (active) setScheduleStatus(result); })
       .catch((error: unknown) => { if (active) setErrorMessage(errorText(error, 'Хуваарийн төлөв уншигдсангүй.')); });
     return () => { active = false; };
-  }, [draft.academic_year, savedYear]);
+  }, [draft.academic_year, draft.terms, savedYear, selectedTermId]);
 
   useEffect(() => {
     const firstMonth = draft.start_date.slice(0, 7);
@@ -153,6 +160,8 @@ export default function AcademicSchedulePanel() {
     const existing = years.find((item) => item.academic_year === academicYear);
     const next = existing ?? createDefaultYear(Number(academicYear.split('-')[0]));
     setDraft(next);
+    setSelectedTermId(next.terms[0]?.id ?? '');
+    setSelectedTermId(next.terms[0]?.id ?? '');
     setScopeDraft({});
     setYearText(academicYear.split('-')[0]);
     setErrorMessage('');
@@ -205,6 +214,7 @@ export default function AcademicSchedulePanel() {
         saved,
       ].sort((first, second) => second.start_date.localeCompare(first.start_date)));
       setDraft(saved);
+      setSelectedTermId((current) => saved.terms.some((term) => term.id === current) ? current : saved.terms[0]?.id ?? '');
       setScopeDraft({});
       setSuccessMessage(`${saved.academic_year} оны хичээлийн жилийн бүтэц хадгалагдлаа.`);
     } catch (error) {
@@ -259,16 +269,36 @@ export default function AcademicSchedulePanel() {
     }
   };
 
-  const uploadSchedule = async (event: ChangeEvent<HTMLInputElement>) => {
+  const downloadSavedSchedule = async (termId?: string) => {
+    setDownloading(true);
+    setErrorMessage('');
+    try {
+      const blob = await downloadSavedScheduleFile(draft.academic_year, termId);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `${draft.academic_year}_teacher_schedule.xlsx`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setErrorMessage(errorText(error, 'Хадгалагдсан хуваарийг татаж чадсангүй.'));
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const uploadSchedule = async (event: ChangeEvent<HTMLInputElement>, termId?: string) => {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file || !savedYear) return;
+    const targetTermId = termId || selectedTermId || undefined;
+    if (targetTermId) setSelectedTermId(targetTermId);
     setUploading(true);
     setErrorMessage('');
     setSuccessMessage('');
     setScheduleFeedback(null);
     try {
-      const result = await importSchedule(draft.academic_year, file);
+      const result = await importSchedule(draft.academic_year, file, targetTermId);
       setScheduleStatus({
         uploaded: true,
         imported_lessons: result.imported_lessons,
@@ -282,7 +312,7 @@ export default function AcademicSchedulePanel() {
       setSuccessMessage(importedMessage);
       setScheduleFeedback({ kind: 'success', message: `Хуваарь хадгалагдлаа. ${importedMessage}` });
       try {
-        setScheduleStatus(await getScheduleStatus(draft.academic_year));
+        setScheduleStatus(await getScheduleStatus(draft.academic_year, targetTermId));
       } catch (error) {
         const detail = errorText(error, 'Хуваарийн төлөв шинэчлэгдсэнгүй.');
         setErrorMessage(detail);
@@ -293,7 +323,7 @@ export default function AcademicSchedulePanel() {
       const detail = errorText(error, 'Хуваарийн файл импортлогдсонгүй.');
       setErrorMessage(detail);
       try {
-        const status = await getScheduleStatus(draft.academic_year);
+        const status = await getScheduleStatus(draft.academic_year, targetTermId);
         setScheduleStatus(status);
         setScheduleFeedback({
           kind: 'error',
@@ -383,6 +413,9 @@ export default function AcademicSchedulePanel() {
           {savedYear && <button type="button" disabled={savingYear || deletingYear} onClick={() => void removeYear()} style={buttonStyle('#dc2626')}>
             {deletingYear ? 'Устгаж байна...' : 'Сонгосон жилийг устгах'}
           </button>}
+          {savedYear && <button type="button" disabled={downloading} onClick={() => void downloadTemplate()} style={buttonStyle('#475569')}>
+            {downloading ? 'Татаж байна...' : 'Загвар татах'}
+          </button>}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 9, marginTop: 10 }}>
           <label style={fieldStyle}>Хичээлийн жилийн эхлэх өдөр
@@ -413,14 +446,59 @@ export default function AcademicSchedulePanel() {
                   <option value="online">Цахим</option>
                 </select>
               </label>
-              <button type="button" disabled={draft.terms.length <= 1} aria-label={`${term.name || `Улирал ${index + 1}`} хасах`} onClick={() => {
-                setDraft((current) => ({ ...current, terms: current.terms.filter((item) => item.id !== term.id) }));
-                setScopeDraft((current) => {
-                  const next = { ...current };
-                  delete next[term.id];
-                  return next;
-                });
-              }} style={buttonStyle('#dc2626')}>Хасах</button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <label style={{
+                  ...buttonStyle('#2563eb'),
+                  cursor: !savedYear || uploading ? 'not-allowed' : 'pointer',
+                  opacity: !savedYear || uploading ? 0.6 : 1,
+                  textAlign: 'center',
+                }}>
+                  Хуваарь оруулах
+                  <input
+                    type="file"
+                    accept=".xlsx"
+                    disabled={!savedYear || uploading}
+                    onChange={(event) => void uploadSchedule(event, term.id)}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  disabled={!savedYear || downloading}
+                  onClick={() => void downloadSavedSchedule(term.id)}
+                  style={buttonStyle('#475569')}
+                >Хуваарийг татах</button>
+                <button
+                  type="button"
+                  disabled={draft.terms.length <= 1}
+                  aria-label={`${term.name || `Улирал ${index + 1}`} хасах`}
+                  title={`${term.name || `Улирал ${index + 1}`} хасах`}
+                  onClick={() => {
+                    setDraft((current) => ({ ...current, terms: current.terms.filter((item) => item.id !== term.id) }));
+                    setScopeDraft((current) => {
+                      const next = { ...current };
+                      delete next[term.id];
+                      return next;
+                    });
+                    if (selectedTermId === term.id) {
+                      setSelectedTermId(draft.terms.find((item) => item.id !== term.id)?.id ?? '');
+                    }
+                  }}
+                  style={{
+                    width: 30,
+                    height: 30,
+                    padding: 0,
+                    border: 'none',
+                    borderRadius: 7,
+                    background: '#fecaca',
+                    color: '#b91c1c',
+                    fontWeight: 900,
+                    lineHeight: 1,
+                    cursor: draft.terms.length <= 1 ? 'not-allowed' : 'pointer',
+                    opacity: draft.terms.length <= 1 ? 0.45 : 1,
+                  }}
+                ><Trash2 size={15} aria-hidden="true" /></button>
+              </div>
             </div>
           ))}
         </div>
@@ -449,11 +527,18 @@ export default function AcademicSchedulePanel() {
         <h3 style={sectionTitle}>Багшийн хуваарь импортлох</h3>
         {!savedYear && <p style={{ color: '#b45309' }}>Эхлээд хичээлийн жилийн бүтцийг хадгална уу.</p>}
         <p style={{ margin: '0 0 9px', color: '#475569', fontSize: 13 }}>
-          XLSX-ийн мөр бүр нэг хичээлийн цаг байна. Стандарт загвар эсвэл багшийн нэр, мэргэжил, өдөр/ээлж/цагийн хүснэгтийг оруулж болно. Хүснэгтэн файлаас даасан ангийг мөн шинэчилнэ; хоосон даасан ангитай багшийн өмнөх даасан анги арилна. Импорт хийхэд тухайн жилийн өмнөх хуваарь бүхэлдээ солигдоно.
+          XLSX-ийн мөр бүр нэг хичээлийн цаг байна. Стандарт загвар эсвэл багшийн нэр, мэргэжил, өдөр/ээлж/цагийн хүснэгтийг оруулж болно. Хүснэгтэн файлаас даасан ангийг мөн шинэчилнэ; хоосон даасан ангитай багшийн өмнөх даасан анги арилна. Хуваарийг тухайн сонгосон улиралд оруулна. Хуваарь оруулаагүй улирал өмнөх улирлын хуваарийг ашиглана.
         </p>
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 9 }}>
+          {draft.terms.length > 0 && (
+            <label style={fieldStyle}>Улирал
+              <select value={selectedTermId} onChange={(event) => setSelectedTermId(event.target.value)} style={inputStyle}>
+                {draft.terms.map((term) => <option key={term.id} value={term.id}>{term.name}</option>)}
+              </select>
+            </label>
+          )}
           <button type="button" disabled={downloading} onClick={() => void downloadTemplate()} style={buttonStyle('#475569')}>
-            {downloading ? 'Татаж байна...' : 'XLSX загвар татах'}
+            {downloading ? 'Татаж байна...' : 'Загвар татах'}
           </button>
           <label style={{ ...buttonStyle('#2563eb'), cursor: !savedYear || uploading ? 'not-allowed' : 'pointer', opacity: !savedYear || uploading ? 0.6 : 1 }}>
             {!savedYear
@@ -463,7 +548,11 @@ export default function AcademicSchedulePanel() {
               : scheduleStatus?.uploaded ? 'Хуваарийн XLSX шинэчлэх' : 'Хуваарийн XLSX оруулах'}
             <input type="file" accept=".xlsx" disabled={!savedYear || uploading} onChange={(event) => void uploadSchedule(event)} style={{ display: 'none' }} />
           </label>
-          {scheduleStatus?.uploaded && <span style={{ color: '#15803d', fontSize: 13 }}>Хадгалсан: {scheduleStatus.teachers} багш · {scheduleStatus.imported_lessons} цаг · {scheduleStatus.updated_at?.slice(0, 10)}</span>}
+          {scheduleStatus?.uploaded && <span style={{ color: '#15803d', fontSize: 13 }}>
+            {scheduleStatus.source_term_id && scheduleStatus.source_term_id !== selectedTermId
+              ? `Өмнөх улирлын хуваариар тооцогдоно`
+              : `Хадгалсан: ${scheduleStatus.teachers} багш · ${scheduleStatus.imported_lessons} цаг · ${scheduleStatus.updated_at?.slice(0, 10)}`}
+          </span>}
           {scheduleStatus && !scheduleStatus.uploaded && <span style={{ color: '#b91c1c', fontSize: 13 }}>Төлөв: энэ жилд хадгалсан хуваарь алга.</span>}
           {!scheduleStatus && savedYear && <span style={{ color: '#475569', fontSize: 13 }}>Хуваарийн төлөв шалгаж байна...</span>}
           {!savedYear && <span style={{ color: '#b45309', fontSize: 13 }}>Төлөв тодорхойгүй: хичээлийн жилийн бүтцийг эхлээд хадгална уу.</span>}

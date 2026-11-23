@@ -101,8 +101,15 @@ def _get_academic_year(academic_year: str) -> dict[str, Any]:
     return rows[0]
 
 
+
 def save_academic_year(structure: AcademicYearUpdate, user: Any) -> dict[str, Any]:
     now = datetime.now(timezone.utc).isoformat()
+    previous_result = _execute(
+        _client().table(_YEAR_TABLE).select("terms")
+        .eq("academic_year", structure.academic_year),
+        "Өмнөх хичээлийн жилийн бүтцийг уншиж чадсангүй.",
+    )
+    previous_terms = (previous_result.data or [{}])[0].get("terms") or []
     record = {
         "academic_year": structure.academic_year,
         "start_date": structure.start_date.isoformat(),
@@ -115,6 +122,35 @@ def save_academic_year(structure: AcademicYearUpdate, user: Any) -> dict[str, An
         _client().table(_YEAR_TABLE).upsert(record, on_conflict="academic_year"),
         "Хичээлийн жилийн бүтцийг хадгалж чадсангүй.",
     )
+    removed_term_ids = {
+        str(term.get("id") or "")
+        for term in previous_terms
+        if str(term.get("id") or "") not in {str(item.id) for item in structure.terms}
+    }
+    if removed_term_ids:
+        schedule_result = _execute(
+            _client().table(_SCHEDULE_TABLE).select("lessons")
+            .eq("academic_year", structure.academic_year),
+            "Хасагдсан улирлын хуваарийг уншиж чадсангүй.",
+        )
+        schedule_rows = schedule_result.data or []
+        if schedule_rows:
+            remaining_lessons = [
+                lesson for lesson in (schedule_rows[0].get("lessons") or [])
+                if isinstance(lesson, dict) and str(lesson.get("term_id") or "") not in removed_term_ids
+            ]
+            _execute(
+                _client().table(_SCHEDULE_TABLE).upsert(
+                    {
+                        "academic_year": structure.academic_year,
+                        "lessons": remaining_lessons,
+                        "uploaded_by": str(user.id),
+                        "updated_at": now,
+                    },
+                    on_conflict="academic_year",
+                ),
+                "Хасагдсан улирлын хуваарийг цэвэрлэж чадсангүй.",
+            )
     return record
 
 
@@ -167,6 +203,120 @@ def create_schedule_template(academic_year: str | None = None) -> bytes:
     guide.append(["Долоо хоногийн төрөл", "Бүх (тогтмол), Тэгш эсвэл Сондгой. Эхний хичээлийн долоо хоног Сондгойгоос эхэлнэ."])
     guide.append(["Цагийн дугаар", "Тухайн өдрийн 1-14 дэх цаг. Нэг багш нэг цагт давхар хуваарьтай байж болохгүй."])
     guide.append(["Норм", "Багш бүрийн долоо хоногийн норм 19 цаг. Нормын баганыг бөглөх шаардлагагүй."])
+    output = BytesIO()
+    workbook.save(output)
+    return output.getvalue()
+
+
+def create_saved_schedule_export(academic_year: str, term_id: str | None = None) -> bytes:
+    school_year = _get_academic_year(academic_year)
+    schedule_result = _execute(
+        _client().table(_SCHEDULE_TABLE).select("lessons")
+        .eq("academic_year", academic_year),
+        "Хадгалагдсан хуваарийг уншиж чадсангүй.",
+    )
+    schedule_rows = schedule_result.data or []
+    lessons = (schedule_rows[0].get("lessons") or []) if schedule_rows else []
+
+    if term_id:
+        tagged = [
+            item for item in lessons
+            if isinstance(item, dict) and item.get("term_id") == term_id
+        ]
+        legacy = [
+            item for item in lessons
+            if isinstance(item, dict) and not item.get("term_id")
+        ]
+        lessons = tagged or legacy
+        if not lessons:
+            terms = sorted(
+                school_year.get("terms") or [],
+                key=lambda term: str(term.get("start_date") or ""),
+            )
+            term_index = next(
+                (index for index, term in enumerate(terms) if str(term.get("id") or "") == term_id),
+                -1,
+            )
+            for previous_term in reversed(terms[:term_index]):
+                previous_id = str(previous_term.get("id") or "")
+                lessons = [
+                    item for item in lessons
+                    if isinstance(item, dict) and item.get("term_id") == previous_id
+                ]
+                if lessons:
+                    break
+            if not lessons:
+                for previous_term in reversed(terms[:term_index]):
+                    previous_id = str(previous_term.get("id") or "")
+                    lessons = [
+                        item for item in (schedule_rows[0].get("lessons") or [])
+                        if isinstance(item, dict) and item.get("term_id") == previous_id
+                    ]
+                    if lessons:
+                        break
+
+    email_by_teacher = {
+        str(profile.get("user_id") or ""): str(profile.get("email") or "")
+        for profile in list_teacher_profiles()
+        if profile.get("role") == "teacher"
+    }
+    weekday_names = {
+        1: "Даваа",
+        2: "Мягмар",
+        3: "Лхагва",
+        4: "Пүрэв",
+        5: "Баасан",
+    }
+    week_type_names = {
+        "all": "Бүх",
+        "even": "Тэгш",
+        "odd": "Сондгой",
+    }
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Хуваарь"
+    sheet["A1"] = "БАГШИЙН ХИЧЭЭЛИЙН ХУВААРЬ"
+    sheet["A2"] = f"Хичээлийн жил: {academic_year}"
+    if term_id:
+        term = next(
+            (item for item in (school_year.get("terms") or []) if str(item.get("id") or "") == term_id),
+            None,
+        )
+        if term:
+            sheet["A3"] = f"Улирал: {term.get('name') or ''}"
+    headers = [
+        "Багшийн MOES имэйл",
+        "Анги",
+        "Бүлэг",
+        "Хичээл",
+        "Гараг",
+        "Долоо хоногийн төрөл",
+        "Цагийн дугаар",
+    ]
+    for column, header in enumerate(headers, start=1):
+        sheet.cell(row=4, column=column, value=header)
+        sheet.cell(row=4, column=column).font = Font(bold=True)
+    for row_number, lesson in enumerate(sorted(
+        (item for item in lessons if isinstance(item, dict)),
+        key=lambda item: (
+            str(email_by_teacher.get(str(item.get("teacher_id") or ""), "")),
+            int(item.get("grade") or 0),
+            str(item.get("section") or ""),
+            int(item.get("weekday") or 0),
+            int(item.get("lesson_number") or 0),
+        ),
+    ), start=5):
+        sheet.cell(row=row_number, column=1, value=email_by_teacher.get(str(lesson.get("teacher_id") or ""), ""))
+        sheet.cell(row=row_number, column=2, value=lesson.get("grade"))
+        sheet.cell(row=row_number, column=3, value=lesson.get("section"))
+        sheet.cell(row=row_number, column=4, value=lesson.get("subject"))
+        sheet.cell(row=row_number, column=5, value=weekday_names.get(int(lesson.get("weekday") or 0), ""))
+        sheet.cell(row=row_number, column=6, value=week_type_names.get(str(lesson.get("week_type") or "all"), "Бүх"))
+        sheet.cell(row=row_number, column=7, value=lesson.get("lesson_number"))
+    sheet.freeze_panes = "A5"
+    sheet.auto_filter.ref = f"A4:G{max(4, sheet.max_row)}"
+    for column, width in enumerate([32, 12, 12, 22, 16, 24, 16], start=1):
+        sheet.column_dimensions[get_column_letter(column)].width = width
     output = BytesIO()
     workbook.save(output)
     return output.getvalue()
@@ -538,10 +688,30 @@ def _parse_schedule_rows(file: UploadFile, profiles: list[dict[str, Any]]) -> li
     return _parse_schedule_file(file, profiles)[0]
 
 
-def import_teacher_schedule(academic_year: str, file: UploadFile, user: Any) -> dict[str, Any]:
-    _get_academic_year(academic_year)
+def import_teacher_schedule(academic_year: str, file: UploadFile, user: Any, term_id: str | None = None) -> dict[str, Any]:
+    school_year = _get_academic_year(academic_year)
     profiles = list_teacher_profiles()
     lessons, homerooms, matched_profiles = _parse_schedule_file(file, profiles)
+    if term_id:
+        term_ids = {str(term.get("id") or "") for term in (school_year.get("terms") or [])}
+        if term_id not in term_ids:
+            raise HTTPException(status_code=422, detail="Сонгосон улирал хичээлийн жилд байхгүй байна.")
+        for lesson in lessons:
+            lesson["term_id"] = term_id
+
+    if term_id:
+        existing_result = _execute(
+            _client().table(_SCHEDULE_TABLE).select("lessons")
+            .eq("academic_year", academic_year),
+            "Хадгалсан хуваарийг уншиж чадсангүй.",
+        )
+        existing_rows = existing_result.data or []
+        existing_lessons = (existing_rows[0].get("lessons") or []) if existing_rows else []
+        remaining_lessons = [
+            item for item in existing_lessons
+            if isinstance(item, dict) and item.get("term_id") not in (term_id, None)
+        ]
+        lessons = remaining_lessons + lessons
     _execute(
         _client().table(_SCHEDULE_TABLE).upsert(
             {
@@ -581,8 +751,8 @@ def import_teacher_schedule(academic_year: str, file: UploadFile, user: Any) -> 
     }
 
 
-def get_schedule_status(academic_year: str) -> dict[str, Any]:
-    _get_academic_year(academic_year)
+def get_schedule_status(academic_year: str, term_id: str | None = None) -> dict[str, Any]:
+    school_year = _get_academic_year(academic_year)
     result = _execute(
         _client().table(_SCHEDULE_TABLE).select(
             "lessons,updated_at"
@@ -593,11 +763,31 @@ def get_schedule_status(academic_year: str) -> dict[str, Any]:
     if not rows:
         return {"uploaded": False, "imported_lessons": 0, "teachers": 0, "updated_at": None}
     lessons = rows[0].get("lessons") or []
+    source_term_id = term_id
+    if term_id:
+        tagged = [item for item in lessons if isinstance(item, dict) and item.get("term_id") == term_id]
+        legacy = [item for item in lessons if isinstance(item, dict) and not item.get("term_id")]
+        selected = tagged or legacy
+        if not tagged:
+            terms = sorted(
+                (term for term in (school_year.get("terms") or []) if str(term.get("id") or "")),
+                key=lambda term: str(term.get("start_date") or ""),
+            )
+            term_index = next((index for index, term in enumerate(terms) if str(term.get("id")) == term_id), -1)
+            for term in reversed(terms[:term_index]):
+                previous_id = str(term.get("id") or "")
+                previous = [item for item in lessons if isinstance(item, dict) and item.get("term_id") == previous_id]
+                if previous:
+                    selected = previous
+                    source_term_id = previous_id
+                    break
+        lessons = selected
     return {
-        "uploaded": True,
+        "uploaded": bool(lessons),
         "imported_lessons": len(lessons),
         "teachers": len({item.get("teacher_id") for item in lessons}),
         "updated_at": rows[0].get("updated_at"),
+        "source_term_id": source_term_id,
     }
 
 
@@ -608,7 +798,7 @@ def get_teacher_schedule_assignments(teacher_id: str) -> list[dict[str, Any]]:
 
     client = _client()
     years_result = _execute(
-        client.table(_YEAR_TABLE).select("academic_year,start_date,end_date"),
+        client.table(_YEAR_TABLE).select("academic_year,start_date,end_date,terms"),
         "Хичээлийн жилийн жагсаалтыг уншиж чадсангүй.",
     )
     schedules_result = _execute(
@@ -619,38 +809,75 @@ def get_teacher_schedule_assignments(teacher_id: str) -> list[dict[str, Any]]:
     schedules = schedules_result.data or []
     year_by_id = {str(item["academic_year"]): item for item in years}
     assignments: dict[tuple[str, int, str, str], dict[str, Any]] = {}
-    for schedule in schedules:
-        academic_year = str(schedule.get("academic_year") or "")
-        year = year_by_id.get(academic_year)
-        if not year:
+    schedule_by_year = {
+        str(schedule.get("academic_year") or ""): schedule
+        for schedule in schedules
+        if schedule.get("academic_year")
+    }
+    for academic_year, year in year_by_id.items():
+        schedule = schedule_by_year.get(academic_year)
+        if not schedule:
             continue
         lessons = schedule.get("lessons") or []
         if not isinstance(lessons, list):
             raise HTTPException(status_code=503, detail="Хуваарийн өгөгдлийн формат буруу байна.")
-        start_date = str(year.get("start_date") or "")[:10]
-        end_date = str(year.get("end_date") or "")[:10]
-        for lesson in lessons:
-            if not isinstance(lesson, dict) or str(lesson.get("teacher_id") or "") != str(teacher_id):
-                continue
-            try:
-                grade = int(lesson["grade"])
-            except (KeyError, TypeError, ValueError) as error:
-                raise HTTPException(status_code=503, detail="Хуваарийн ангийн өгөгдөл буруу байна.") from error
-            subject = str(lesson.get("subject") or "").strip()
-            section_value = str(lesson.get("section") or "").strip().upper()
-            if not subject or not section_value or any(section not in _VALID_SECTIONS for section in section_value):
-                raise HTTPException(status_code=503, detail="Хуваарийн анги, хичээлийн өгөгдөл буруу байна.")
-            for section in section_value:
-                assignment = {
-                    "academic_year": academic_year,
-                    "start_date": start_date,
-                    "end_date": end_date,
-                    "grade": grade,
-                    "section": section,
-                    "subject": subject,
-                }
-                key = (academic_year, grade, section, subject)
-                assignments[key] = assignment
+        terms = sorted(year.get("terms") or [], key=lambda term: str(term.get("start_date") or ""))
+        term_scopes: list[tuple[str, str, list[Any]]] = []
+        if terms:
+            for term_index, term in enumerate(terms):
+                term_id = str(term.get("id") or "")
+                term_lessons = [
+                    item for item in lessons
+                    if isinstance(item, dict) and item.get("term_id") == term_id
+                ]
+                if not term_lessons:
+                    term_lessons = [
+                        item for item in lessons
+                        if isinstance(item, dict) and not item.get("term_id")
+                    ]
+                if not term_lessons:
+                    for previous_term in reversed(terms[:term_index]):
+                        previous_id = str(previous_term.get("id") or "")
+                        term_lessons = [
+                            item for item in lessons
+                            if isinstance(item, dict) and item.get("term_id") == previous_id
+                        ]
+                        if term_lessons:
+                            break
+                term_scopes.append((
+                    str(term.get("start_date") or "")[:10],
+                    str(term.get("end_date") or "")[:10],
+                    term_lessons,
+                ))
+        else:
+            term_scopes.append((
+                str(year.get("start_date") or "")[:10],
+                str(year.get("end_date") or "")[:10],
+                lessons,
+            ))
+        for start_date, end_date, scoped_lessons in term_scopes:
+            for lesson in scoped_lessons:
+                if not isinstance(lesson, dict) or str(lesson.get("teacher_id") or "") != str(teacher_id):
+                    continue
+                try:
+                    grade = int(lesson["grade"])
+                except (KeyError, TypeError, ValueError) as error:
+                    raise HTTPException(status_code=503, detail="Хуваарийн ангийн өгөгдөл буруу байна.") from error
+                subject = str(lesson.get("subject") or "").strip()
+                section_value = str(lesson.get("section") or "").strip().upper()
+                if not subject or not section_value or any(section not in _VALID_SECTIONS for section in section_value):
+                    raise HTTPException(status_code=503, detail="Хуваарийн анги, хичээлийн өгөгдөл буруу байна.")
+                for section in section_value:
+                    assignment = {
+                        "academic_year": academic_year,
+                        "start_date": start_date,
+                        "end_date": end_date,
+                        "grade": grade,
+                        "section": section,
+                        "subject": subject,
+                    }
+                    key = (academic_year, start_date, end_date, grade, section, subject)
+                    assignments[key] = assignment
     return list(assignments.values())
 
 
@@ -787,6 +1014,39 @@ def _calculate_teacher_month(
     }
 
 
+def calculate_my_monthly_overtime(user: Any, month: date) -> dict[str, Any]:
+    month = _month_start(month)
+    year_result = _execute(
+        _client().table(_YEAR_TABLE).select(
+            "academic_year,start_date,end_date"
+        ).lte("start_date", month.isoformat())
+        .gte("end_date", month.isoformat())
+        .order("start_date", desc=True),
+        "Хичээлийн жилийг уншиж чадсангүй.",
+    )
+    years = year_result.data or []
+    if not years:
+        raise HTTPException(status_code=409, detail="Сонгосон сар хичээлийн жилд бүртгэгдээгүй байна.")
+    report = calculate_monthly_overtime(str(years[0]["academic_year"]), month)
+    own = next(
+        (item for item in report["teachers"] if item["teacher_id"] == str(user.id)),
+        None,
+    )
+    if own is None:
+        return {
+            "academic_year": report["academic_year"],
+            "month": report["month"],
+            "first_week_type": "odd",
+            "teachers": [],
+        }
+    return {
+        "academic_year": report["academic_year"],
+        "month": report["month"],
+        "first_week_type": "odd",
+        "teachers": [own],
+    }
+
+
 def calculate_monthly_overtime(academic_year: str, month: date) -> dict[str, Any]:
     month = _month_start(month)
     school_year = _get_academic_year(academic_year)
@@ -804,8 +1064,41 @@ def calculate_monthly_overtime(academic_year: str, month: date) -> dict[str, Any
     schedule_rows = schedule_result.data or []
     if not schedule_rows:
         raise HTTPException(status_code=409, detail="Энэ хичээлийн жилийн хуваарийг эхлээд XLSX-ээр оруулна уу.")
-    lessons = schedule_rows[0].get("lessons") or []
+    all_lessons = schedule_rows[0].get("lessons") or []
+    lessons = all_lessons
     terms = school_year.get("terms") or []
+
+    target_term = next(
+        (
+            term for term in terms
+            if date.fromisoformat(str(term["start_date"])[:10]) <= month
+            <= date.fromisoformat(str(term["end_date"])[:10])
+        ),
+        None,
+    )
+    if target_term:
+        target_term_id = str(target_term.get("id") or "")
+        tagged = [item for item in lessons if isinstance(item, dict) and item.get("term_id") == target_term_id]
+        legacy = [item for item in lessons if isinstance(item, dict) and not item.get("term_id")]
+        lessons = tagged or legacy
+        if not lessons:
+            ordered_terms = sorted(
+                terms,
+                key=lambda term: str(term.get("start_date") or ""),
+            )
+            term_index = next(
+                (index for index, term in enumerate(ordered_terms) if str(term.get("id") or "") == target_term_id),
+                -1,
+            )
+            for previous_term in reversed(ordered_terms[:term_index]):
+                previous_id = str(previous_term.get("id") or "")
+                previous_lessons = [
+                    item for item in all_lessons
+                    if isinstance(item, dict) and item.get("term_id") == previous_id
+                ]
+                if previous_lessons:
+                    lessons = previous_lessons
+                    break
 
     holiday_result = _execute(
         _client().table("school_public_holidays").select("holiday_date")
