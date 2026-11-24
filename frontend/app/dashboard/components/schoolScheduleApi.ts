@@ -23,6 +23,18 @@ export interface ScheduleStatus {
   teachers: number;
   updated_at: string | null;
   source_term_id?: string;
+  preview_lessons?: SchedulePreviewLesson[];
+}
+
+export interface SchedulePreviewLesson {
+  grade: number;
+  section: string;
+  subject: string;
+  weekday: number;
+  week_type: 'all' | 'even' | 'odd';
+  lesson_number: number;
+  teacher_name: string;
+  teacher_email: string;
 }
 
 export interface OvertimeTeacher {

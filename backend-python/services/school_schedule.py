@@ -101,6 +101,39 @@ def _get_academic_year(academic_year: str) -> dict[str, Any]:
     return rows[0]
 
 
+def _lessons_for_term(
+    lessons: list[Any],
+    terms: list[dict[str, Any]],
+    term_index: int,
+) -> tuple[list[dict[str, Any]], str | None]:
+    term_id = str(terms[term_index].get("id") or "")
+    selected = [
+        item for item in lessons
+        if isinstance(item, dict) and item.get("term_id") == term_id
+    ]
+    if selected:
+        return selected, term_id
+    legacy_term_index = 1 if len(terms) > 1 else 0
+    if term_index < legacy_term_index:
+        return [], None
+    for previous_term in reversed(terms[:term_index]):
+        previous_id = str(previous_term.get("id") or "")
+        selected = [
+            item for item in lessons
+            if isinstance(item, dict) and item.get("term_id") == previous_id
+        ]
+        if selected:
+            return selected, previous_id
+
+    legacy = [
+        item for item in lessons
+        if isinstance(item, dict) and not item.get("term_id")
+    ]
+    if legacy:
+        return legacy, str(terms[legacy_term_index].get("id") or "")
+    return [], None
+
+
 
 def save_academic_year(structure: AcademicYearUpdate, user: Any) -> dict[str, Any]:
     now = datetime.now(timezone.utc).isoformat()
@@ -167,42 +200,44 @@ def create_schedule_template(academic_year: str | None = None) -> bytes:
     sheet = workbook.active
     sheet.title = "Хуваарь"
     sheet["A1"] = "БАГШИЙН ХИЧЭЭЛИЙН ХУВААРЬ"
-    sheet["A2"] = "Нэг мөрөнд нэг хичээлийг бүртгэнэ. Багшийн MOES имэйлээр танина. Долоо хоногт 19 цагийн нормыг автоматаар ашиглана."
+    sheet["A2"] = "Нэг багшийн нэг хичээлийг нэг мөрөнд байрлуулна. Даваа-Баасан гарагийн 1-14-р цагийн нүдэнд анги, бүлгийг оруулна."
     if academic_year:
         sheet["A3"] = f"Хичээлийн жил: {academic_year}"
-    headers = [
-        "Багшийн MOES имэйл",
-        "Анги",
-        "Бүлэг",
-        "Хичээл",
-        "Гараг",
-        "Долоо хоногийн төрөл",
-        "Цагийн дугаар",
-    ]
-    for column, header in enumerate(headers, start=1):
-        sheet.cell(row=4, column=column, value=header)
-        sheet.cell(row=4, column=column).font = Font(bold=True)
-    sheet.freeze_panes = "A5"
-    sheet.auto_filter.ref = "A4:G4"
-    for column, width in enumerate([32, 12, 12, 22, 16, 24, 16], start=1):
-        sheet.column_dimensions[get_column_letter(column)].width = width
-    weekday_validation = DataValidation(type="list", formula1='"Даваа,Мягмар,Лхагва,Пүрэв,Баасан"', allow_blank=True)
-    week_validation = DataValidation(type="list", formula1='"Бүх,Тэгш,Сондгой"', allow_blank=True)
-    sheet.add_data_validation(weekday_validation)
-    sheet.add_data_validation(week_validation)
-    weekday_validation.add("E5:E1004")
-    week_validation.add("F5:F1004")
+    day_starts = [8, 22, 36, 50, 64]
+    weekday_names = ["Даваа", "Мягмар", "Лхагва", "Пүрэв", "Баасан"]
+    sheet["B5"] = "№"
+    sheet["C5"] = "Мэргэжил"
+    sheet["D5"] = "Багш нарын нэр"
+    sheet["G5"] = "Даасан анги"
+    for start, weekday_name in zip(day_starts, weekday_names):
+        sheet.cell(row=5, column=start, value=weekday_name)
+        sheet.merge_cells(start_row=6, start_column=start, end_row=6, end_column=start + 6)
+        sheet.merge_cells(start_row=6, start_column=start + 7, end_row=6, end_column=start + 13)
+        sheet.cell(row=6, column=start, value="I ээлж")
+        sheet.cell(row=6, column=start + 7, value="II ээлж")
+        for period in range(1, 15):
+            display_period = period if period <= 7 else period - 7
+            sheet.cell(row=7, column=start + period - 1, value=display_period)
+    for column in range(1, 78):
+        sheet.cell(row=5, column=column).font = Font(bold=True)
+        sheet.cell(row=7, column=column).font = Font(bold=True)
+    sheet.freeze_panes = "H8"
+    for column in range(1, 78):
+        sheet.column_dimensions[get_column_letter(column)].width = 6
+    sheet.column_dimensions["B"].width = 5
+    sheet.column_dimensions["C"].width = 22
+    sheet.column_dimensions["D"].width = 22
+    sheet.column_dimensions["G"].width = 14
+    sheet.row_dimensions[5].height = 24
+    sheet.row_dimensions[7].height = 22
 
     guide = workbook.create_sheet("Заавар")
     guide.append(["БАГАНА", "УТГА"])
-    guide.append(["Багшийн MOES имэйл", "Системд бүртгэлтэй багшийн нэвтрэх имэйлтэй яг тааруулна."])
-    guide.append(["Анги", "1-12 бүхэл тоо."])
-    guide.append(["Бүлэг", "А, Б, В, Г, Д, Е, Ё, Ж эсвэл З."])
-    guide.append(["Хичээл", "Заах хичээлийн нэр."])
-    guide.append(["Гараг", "Даваа, Мягмар, Лхагва, Пүрэв эсвэл Баасан."])
-    guide.append(["Долоо хоногийн төрөл", "Бүх (тогтмол), Тэгш эсвэл Сондгой. Эхний хичээлийн долоо хоног Сондгойгоос эхэлнэ."])
-    guide.append(["Цагийн дугаар", "Тухайн өдрийн 1-14 дэх цаг. Нэг багш нэг цагт давхар хуваарьтай байж болохгүй."])
-    guide.append(["Норм", "Багш бүрийн долоо хоногийн норм 19 цаг. Нормын баганыг бөглөх шаардлагагүй."])
+    guide.append(["Мэргэжил", "Заах хичээлийн нэр."])
+    guide.append(["Багш нарын нэр", "Системд бүртгэлтэй овог, нэртэй тааруулах нэр."])
+    guide.append(["Даасан анги", "Жишээ: 6А. Нэг багш олон даасан анги байж болно."])
+    guide.append(["Гарагууд", "Даваа, Мягмар, Лхагва, Пүрэв, Баасан тус тусын 14 цагийн баганад анги, бүлгийг оруулна."])
+    guide.append(["Анги, бүлэг", "Жишээ: 6А, 7БА, 10Г. Нэг багш нэг цагт давхар хуваарьтай байж болохгүй."])
     output = BytesIO()
     workbook.save(output)
     return output.getvalue()
@@ -219,58 +254,22 @@ def create_saved_schedule_export(academic_year: str, term_id: str | None = None)
     lessons = (schedule_rows[0].get("lessons") or []) if schedule_rows else []
 
     if term_id:
-        tagged = [
-            item for item in lessons
-            if isinstance(item, dict) and item.get("term_id") == term_id
-        ]
-        legacy = [
-            item for item in lessons
-            if isinstance(item, dict) and not item.get("term_id")
-        ]
-        lessons = tagged or legacy
-        if not lessons:
-            terms = sorted(
-                school_year.get("terms") or [],
-                key=lambda term: str(term.get("start_date") or ""),
-            )
-            term_index = next(
-                (index for index, term in enumerate(terms) if str(term.get("id") or "") == term_id),
-                -1,
-            )
-            for previous_term in reversed(terms[:term_index]):
-                previous_id = str(previous_term.get("id") or "")
-                lessons = [
-                    item for item in lessons
-                    if isinstance(item, dict) and item.get("term_id") == previous_id
-                ]
-                if lessons:
-                    break
-            if not lessons:
-                for previous_term in reversed(terms[:term_index]):
-                    previous_id = str(previous_term.get("id") or "")
-                    lessons = [
-                        item for item in (schedule_rows[0].get("lessons") or [])
-                        if isinstance(item, dict) and item.get("term_id") == previous_id
-                    ]
-                    if lessons:
-                        break
+        terms = sorted(
+            school_year.get("terms") or [],
+            key=lambda term: str(term.get("start_date") or ""),
+        )
+        term_index = next(
+            (index for index, term in enumerate(terms) if str(term.get("id") or "") == term_id),
+            -1,
+        )
+        if term_index >= 0:
+            lessons, _ = _lessons_for_term(lessons, terms, term_index)
 
-    email_by_teacher = {
-        str(profile.get("user_id") or ""): str(profile.get("email") or "")
-        for profile in list_teacher_profiles()
+    profiles = list_teacher_profiles()
+    profile_by_id = {
+        str(profile.get("user_id") or ""): profile
+        for profile in profiles
         if profile.get("role") == "teacher"
-    }
-    weekday_names = {
-        1: "Даваа",
-        2: "Мягмар",
-        3: "Лхагва",
-        4: "Пүрэв",
-        5: "Баасан",
-    }
-    week_type_names = {
-        "all": "Бүх",
-        "even": "Тэгш",
-        "odd": "Сондгой",
     }
     workbook = Workbook()
     sheet = workbook.active
@@ -284,39 +283,89 @@ def create_saved_schedule_export(academic_year: str, term_id: str | None = None)
         )
         if term:
             sheet["A3"] = f"Улирал: {term.get('name') or ''}"
-    headers = [
-        "Багшийн MOES имэйл",
-        "Анги",
-        "Бүлэг",
-        "Хичээл",
-        "Гараг",
-        "Долоо хоногийн төрөл",
-        "Цагийн дугаар",
-    ]
-    for column, header in enumerate(headers, start=1):
-        sheet.cell(row=4, column=column, value=header)
-        sheet.cell(row=4, column=column).font = Font(bold=True)
-    for row_number, lesson in enumerate(sorted(
-        (item for item in lessons if isinstance(item, dict)),
-        key=lambda item: (
-            str(email_by_teacher.get(str(item.get("teacher_id") or ""), "")),
-            int(item.get("grade") or 0),
-            str(item.get("section") or ""),
-            int(item.get("weekday") or 0),
-            int(item.get("lesson_number") or 0),
-        ),
-    ), start=5):
-        sheet.cell(row=row_number, column=1, value=email_by_teacher.get(str(lesson.get("teacher_id") or ""), ""))
-        sheet.cell(row=row_number, column=2, value=lesson.get("grade"))
-        sheet.cell(row=row_number, column=3, value=lesson.get("section"))
-        sheet.cell(row=row_number, column=4, value=lesson.get("subject"))
-        sheet.cell(row=row_number, column=5, value=weekday_names.get(int(lesson.get("weekday") or 0), ""))
-        sheet.cell(row=row_number, column=6, value=week_type_names.get(str(lesson.get("week_type") or "all"), "Бүх"))
-        sheet.cell(row=row_number, column=7, value=lesson.get("lesson_number"))
-    sheet.freeze_panes = "A5"
-    sheet.auto_filter.ref = f"A4:G{max(4, sheet.max_row)}"
-    for column, width in enumerate([32, 12, 12, 22, 16, 24, 16], start=1):
-        sheet.column_dimensions[get_column_letter(column)].width = width
+    day_starts = [8, 22, 36, 50, 64]
+    weekday_names = ["Даваа", "Мягмар", "Лхагва", "Пүрэв", "Баасан"]
+    sheet["B5"] = "№"
+    sheet["C5"] = "Мэргэжил"
+    sheet["D5"] = "Багш нарын нэр"
+    sheet["G5"] = "Даасан анги"
+    for start, weekday_name in zip(day_starts, weekday_names):
+        sheet.cell(row=5, column=start, value=weekday_name)
+        sheet.merge_cells(start_row=6, start_column=start, end_row=6, end_column=start + 6)
+        sheet.merge_cells(start_row=6, start_column=start + 7, end_row=6, end_column=start + 13)
+        sheet.cell(row=6, column=start, value="I ээлж")
+        sheet.cell(row=6, column=start + 7, value="II ээлж")
+        for period in range(1, 15):
+            display_period = period if period <= 7 else period - 7
+            sheet.cell(row=7, column=start + period - 1, value=display_period)
+    for column in range(1, 78):
+        sheet.cell(row=5, column=column).font = Font(bold=True)
+        sheet.cell(row=7, column=column).font = Font(bold=True)
+
+    grouped: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+    for lesson in lessons:
+        if not isinstance(lesson, dict):
+            continue
+        teacher_id = str(lesson.get("teacher_id") or "")
+        subject = str(lesson.get("subject") or "").strip()
+        if not subject:
+            continue
+        profile = profile_by_id.get(teacher_id, {})
+        teacher_name = " ".join(part for part in (
+            str(profile.get("last_name") or lesson.get("teacher_name") or "").strip(),
+            str(profile.get("first_name") or "").strip(),
+        ) if part)
+        if not teacher_name:
+            teacher_name = str(lesson.get("teacher_name") or "").strip()
+        if not teacher_name:
+            teacher_name = str(profile.get("email") or lesson.get("teacher_email") or "").strip()
+        grouped[(subject, teacher_name)].append(lesson)
+
+    previous_subject = ""
+    row_number = 8
+    for (subject, teacher_name), teacher_lessons in sorted(
+        grouped.items(),
+        key=lambda item: (item[0][0], item[0][1]),
+    ):
+        sheet.cell(row=row_number, column=2, value=row_number - 7)
+        sheet.cell(row=row_number, column=3, value=subject if subject != previous_subject else "")
+        sheet.cell(row=row_number, column=4, value=teacher_name)
+        previous_subject = subject
+        slot_values: dict[tuple[int, int], list[str]] = defaultdict(list)
+        for lesson in teacher_lessons:
+            try:
+                weekday = int(lesson["weekday"])
+                lesson_number = int(lesson["lesson_number"])
+                grade = int(lesson["grade"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if weekday < 1 or weekday > 5 or lesson_number < 1 or lesson_number > 14:
+                continue
+            section = str(lesson.get("section") or "").strip().upper()
+            value = f"{grade}{section}"
+            if value not in slot_values[(weekday, lesson_number)]:
+                slot_values[(weekday, lesson_number)].append(value)
+        for (weekday, lesson_number), values in slot_values.items():
+            column = day_starts[weekday - 1] + lesson_number - 1
+            sheet.cell(row=row_number, column=column, value=" ".join(values))
+        row_number += 1
+
+    sheet.freeze_panes = "H8"
+    sheet.auto_filter.ref = f"B5:BL{max(7, row_number - 1)}"
+    for column in range(1, 78):
+        header = sheet.cell(row=5, column=column).value
+        header_width = len(str(header or "").strip()) if header else 0
+        content_width = max(
+            (len(str(sheet.cell(row=row, column=column).value or "").strip()) for row in range(7, row_number)),
+            default=0,
+        )
+        sheet.column_dimensions[get_column_letter(column)].width = max(4, header_width, content_width)
+    sheet.column_dimensions["B"].width = 5
+    sheet.column_dimensions["C"].width = 22
+    sheet.column_dimensions["D"].width = 22
+    sheet.column_dimensions["G"].width = 14
+    sheet.row_dimensions[5].height = 24
+    sheet.row_dimensions[7].height = 22
     output = BytesIO()
     workbook.save(output)
     return output.getvalue()
@@ -752,7 +801,6 @@ def import_teacher_schedule(academic_year: str, file: UploadFile, user: Any, ter
 
 
 def get_schedule_status(academic_year: str, term_id: str | None = None) -> dict[str, Any]:
-    school_year = _get_academic_year(academic_year)
     result = _execute(
         _client().table(_SCHEDULE_TABLE).select(
             "lessons,updated_at"
@@ -765,29 +813,54 @@ def get_schedule_status(academic_year: str, term_id: str | None = None) -> dict[
     lessons = rows[0].get("lessons") or []
     source_term_id = term_id
     if term_id:
-        tagged = [item for item in lessons if isinstance(item, dict) and item.get("term_id") == term_id]
-        legacy = [item for item in lessons if isinstance(item, dict) and not item.get("term_id")]
-        selected = tagged or legacy
-        if not tagged:
-            terms = sorted(
-                (term for term in (school_year.get("terms") or []) if str(term.get("id") or "")),
+        exact = [
+            item for item in lessons
+            if isinstance(item, dict) and item.get("term_id") == term_id
+        ]
+        if exact:
+            lessons = exact
+            source_term_id = term_id
+        else:
+            legacy = [
+                item for item in lessons
+                if isinstance(item, dict) and not item.get("term_id")
+            ]
+            school_year = _get_academic_year(academic_year)
+            ordered_terms = sorted(
+                school_year.get("terms") or [],
                 key=lambda term: str(term.get("start_date") or ""),
             )
-            term_index = next((index for index, term in enumerate(terms) if str(term.get("id")) == term_id), -1)
-            for term in reversed(terms[:term_index]):
-                previous_id = str(term.get("id") or "")
-                previous = [item for item in lessons if isinstance(item, dict) and item.get("term_id") == previous_id]
-                if previous:
-                    selected = previous
-                    source_term_id = previous_id
-                    break
-        lessons = selected
+            legacy_term_index = 1 if len(ordered_terms) > 1 else 0
+            legacy_term_id = str(
+                ordered_terms[legacy_term_index].get("id") or ""
+            ) if ordered_terms else ""
+            if legacy and term_id == legacy_term_id:
+                lessons = legacy
+                source_term_id = legacy_term_id
+            else:
+                lessons = []
+                source_term_id = None
+    preview_lessons = [
+        {
+            "grade": item.get("grade"),
+            "section": item.get("section"),
+            "subject": item.get("subject"),
+            "weekday": item.get("weekday"),
+            "week_type": item.get("week_type", "all"),
+            "lesson_number": item.get("lesson_number"),
+            "teacher_name": item.get("teacher_name", ""),
+            "teacher_email": item.get("teacher_email", ""),
+        }
+        for item in lessons
+        if isinstance(item, dict)
+    ] if term_id else []
     return {
         "uploaded": bool(lessons),
         "imported_lessons": len(lessons),
         "teachers": len({item.get("teacher_id") for item in lessons}),
         "updated_at": rows[0].get("updated_at"),
         "source_term_id": source_term_id,
+        "preview_lessons": preview_lessons,
     }
 
 
@@ -808,7 +881,7 @@ def get_teacher_schedule_assignments(teacher_id: str) -> list[dict[str, Any]]:
     years = years_result.data or []
     schedules = schedules_result.data or []
     year_by_id = {str(item["academic_year"]): item for item in years}
-    assignments: dict[tuple[str, int, str, str], dict[str, Any]] = {}
+    assignments: dict[tuple[Any, ...], dict[str, Any]] = {}
     schedule_by_year = {
         str(schedule.get("academic_year") or ""): schedule
         for schedule in schedules
@@ -825,25 +898,7 @@ def get_teacher_schedule_assignments(teacher_id: str) -> list[dict[str, Any]]:
         term_scopes: list[tuple[str, str, list[Any]]] = []
         if terms:
             for term_index, term in enumerate(terms):
-                term_id = str(term.get("id") or "")
-                term_lessons = [
-                    item for item in lessons
-                    if isinstance(item, dict) and item.get("term_id") == term_id
-                ]
-                if not term_lessons:
-                    term_lessons = [
-                        item for item in lessons
-                        if isinstance(item, dict) and not item.get("term_id")
-                    ]
-                if not term_lessons:
-                    for previous_term in reversed(terms[:term_index]):
-                        previous_id = str(previous_term.get("id") or "")
-                        term_lessons = [
-                            item for item in lessons
-                            if isinstance(item, dict) and item.get("term_id") == previous_id
-                        ]
-                        if term_lessons:
-                            break
+                term_lessons, _ = _lessons_for_term(lessons, terms, term_index)
                 term_scopes.append((
                     str(term.get("start_date") or "")[:10],
                     str(term.get("end_date") or "")[:10],
@@ -870,13 +925,27 @@ def get_teacher_schedule_assignments(teacher_id: str) -> list[dict[str, Any]]:
                 for section in section_value:
                     assignment = {
                         "academic_year": academic_year,
+                        "academic_year_start_date": str(year.get("start_date") or "")[:10],
                         "start_date": start_date,
                         "end_date": end_date,
                         "grade": grade,
                         "section": section,
                         "subject": subject,
+                        "weekday": lesson.get("weekday"),
+                        "week_type": lesson.get("week_type", "all"),
+                        "lesson_number": lesson.get("lesson_number"),
                     }
-                    key = (academic_year, start_date, end_date, grade, section, subject)
+                    key = (
+                        academic_year,
+                        start_date,
+                        end_date,
+                        grade,
+                        section,
+                        subject,
+                        assignment["weekday"],
+                        assignment["week_type"],
+                        assignment["lesson_number"],
+                    )
                     assignments[key] = assignment
     return list(assignments.values())
 
@@ -1077,28 +1146,13 @@ def calculate_monthly_overtime(academic_year: str, month: date) -> dict[str, Any
         None,
     )
     if target_term:
-        target_term_id = str(target_term.get("id") or "")
-        tagged = [item for item in lessons if isinstance(item, dict) and item.get("term_id") == target_term_id]
-        legacy = [item for item in lessons if isinstance(item, dict) and not item.get("term_id")]
-        lessons = tagged or legacy
-        if not lessons:
-            ordered_terms = sorted(
-                terms,
-                key=lambda term: str(term.get("start_date") or ""),
-            )
-            term_index = next(
-                (index for index, term in enumerate(ordered_terms) if str(term.get("id") or "") == target_term_id),
-                -1,
-            )
-            for previous_term in reversed(ordered_terms[:term_index]):
-                previous_id = str(previous_term.get("id") or "")
-                previous_lessons = [
-                    item for item in all_lessons
-                    if isinstance(item, dict) and item.get("term_id") == previous_id
-                ]
-                if previous_lessons:
-                    lessons = previous_lessons
-                    break
+        ordered_terms = sorted(terms, key=lambda term: str(term.get("start_date") or ""))
+        term_index = next(
+            (index for index, term in enumerate(ordered_terms) if term is target_term),
+            -1,
+        )
+        if term_index >= 0:
+            lessons, _ = _lessons_for_term(all_lessons, ordered_terms, term_index)
 
     holiday_result = _execute(
         _client().table("school_public_holidays").select("holiday_date")

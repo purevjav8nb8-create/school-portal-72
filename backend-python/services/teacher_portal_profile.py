@@ -93,7 +93,6 @@ def get_my_teacher_data(user) -> dict[str, Any]:
         return {
             "profile": {
                 "user_id": str(user.id),
-                "user_id": str(user.id),
                 "last_name": teacher["last_name"],
                 "first_name": teacher["first_name"],
                 "email": teacher["email"],

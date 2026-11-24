@@ -23,12 +23,15 @@ class TeacherAccountListingTests(unittest.TestCase):
         query = Mock()
         query.select.return_value = query
         query.eq.return_value = query
+        query.gte.return_value = query
+        query.lte.return_value = query
         query.in_.return_value = query
         query.order.return_value = query
         query.upsert.return_value = query
         query.execute.side_effect = [
+            SimpleNamespace(data=[{"start_date": "2026-11-15", "end_date": "2027-06-30"}]),
             SimpleNamespace(data=[]),
-            SimpleNamespace(data=None),
+            SimpleNamespace(data=[]),
             SimpleNamespace(data=[{
                 "teacher_id": profile["user_id"],
                 "attendance_date": "2026-11-15",

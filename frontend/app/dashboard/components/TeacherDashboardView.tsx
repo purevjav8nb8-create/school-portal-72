@@ -16,6 +16,7 @@ import RecordFeedCard from './records/RecordFeedCard';
 import ProgramPlanPanel, { ProgramPlan } from './records/ProgramPlanPanel';
 import EvaluationPanel, { EvaluationRecord } from './records/EvaluationPanel';
 import TeachingClassesPanel from './TeachingClassesPanel';
+import TeachingSchedulePanel from './TeachingSchedulePanel';
 import { DashboardCategory, Teacher, UserProfile } from '../types';
 import { NotificationCounts } from '../hooks/useNotifications';
 import { returnedPlanNotificationId } from '../hooks/notificationData';
@@ -73,7 +74,7 @@ export default function TeacherDashboardView({
   notificationCounts = {}, notificationError = '', unreadNotificationKeys,
   onNotificationCategoryChange, onNotificationItemViewed, onReturnedPlanViewed,
 }: Props) {
-  const categories: DashboardCategory[] = ['Ирц', 'Хөтөлбөр', 'Мэдээлэл', 'Оролцоо', 'Сургалт', 'Судалгаа', 'Үнэлгээ', 'Зар', 'Чат', 'Зэрэг', 'Шагнал'];
+  const categories: DashboardCategory[] = ['Ирц', 'Хуваарь', 'Хөтөлбөр', 'Мэдээлэл', 'Оролцоо', 'Сургалт', 'Судалгаа', 'Үнэлгээ', 'Зар', 'Чат', 'Зэрэг', 'Шагнал'];
   const handleCategoryChange = (category: DashboardCategory) => {
     (onNotificationCategoryChange ?? onCategoryChange)(category);
     if (category === 'Хөтөлбөр' && (programPlan?.returned || programPlan?.review_status === 'returned')) {
@@ -109,6 +110,7 @@ export default function TeacherDashboardView({
                 />
               </>
             )}
+            {activeCategory === 'Хуваарь' && <TeachingSchedulePanel teachingSchedule={teachingSchedule} />}
             {activeCategory === 'Сургалт' && (
               <section>
                 <h2 style={{ marginTop: 0 }}>Миний сургалт</h2>

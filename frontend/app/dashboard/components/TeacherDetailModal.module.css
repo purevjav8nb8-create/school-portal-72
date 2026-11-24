@@ -42,6 +42,8 @@
 }
 .input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px #3b82f626; }
 .formActions { display: flex; grid-column: 1 / -1; gap: 9px; padding-top: 2px; }
+.substituteActions { align-items: flex-end; }
+.substituteButton { min-height: 42px; }
 .error { grid-column: 1 / -1; margin: 0; color: #b91c1c; font-size: 13px; }
 .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 24px; }
 .stat {

@@ -188,7 +188,7 @@ export default function TeacherDetailModal({ teacher, selectedMonth, onClose, on
                 <h3 className={styles.sectionTitle}>Орлон заасан цаг</h3>
                 <span className={styles.monthBadge}>{selectedMonth}</span>
               </div>
-              <div className={styles.formActions}>
+              <div className={`${styles.formActions} ${styles.substituteActions}`}>
                 <label className={styles.field} style={{ width: 180 }}>
                   Орлон заасан цаг
                   <input
@@ -201,7 +201,7 @@ export default function TeacherDetailModal({ teacher, selectedMonth, onClose, on
                     onChange={(event) => setSubstituteDraft(Math.max(0, Number(event.target.value)))}
                   />
                 </label>
-                <button className={styles.primaryButton} type="button" disabled={savingSubstitute} onClick={() => void saveSubstitute()}>
+                <button className={`${styles.primaryButton} ${styles.substituteButton}`} type="button" disabled={savingSubstitute} onClick={() => void saveSubstitute()}>
                   {savingSubstitute ? 'Хадгалж байна...' : 'Орлон цаг нэмэх'}
                 </button>
               </div>

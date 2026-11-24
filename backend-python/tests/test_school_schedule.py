@@ -9,17 +9,75 @@ from openpyxl import Workbook, load_workbook
 from schemas.teachers import AcademicTerm, AcademicYearUpdate
 from services.school_schedule import (
     _calculate_teacher_month,
+    _lessons_for_term,
     delete_academic_year,
+    get_schedule_status,
     _parse_schedule_file,
     _parse_schedule_rows,
     get_teacher_schedule_assignments,
     import_teacher_schedule,
     validate_teacher_schedule_assignment,
     create_schedule_template,
+    create_saved_schedule_export,
 )
 
 
 class SchoolScheduleTests(unittest.TestCase):
+    def test_schedule_status_only_matches_the_exact_uploaded_term(self):
+        table = Mock()
+        table.select.return_value.eq.return_value.execute.return_value = SimpleNamespace(data=[{
+            "lessons": [
+                {
+                    "term_id": "term-2",
+                    "teacher_id": "teacher-1",
+                    "teacher_name": "Багш Нэр",
+                    "teacher_email": "teacher1@moes.edu.mn",
+                    "grade": 7,
+                    "section": "А",
+                    "subject": "Математик",
+                    "weekday": 2,
+                    "week_type": "all",
+                    "lesson_number": 8,
+                },
+            ],
+            "updated_at": "2026-11-24T01:00:00+00:00",
+        }])
+        table.select.return_value.eq.return_value = table.select.return_value.eq.return_value
+        client = Mock()
+        client.table.return_value = table
+
+        with (
+            patch("services.school_schedule._get_academic_year", return_value={"terms": [
+                {"id": "term-1"},
+                {"id": "term-2"},
+            ]}),
+            patch("services.school_schedule._client", return_value=client),
+        ):
+            first = get_schedule_status("2026-2027", "term-1")
+            second = get_schedule_status("2026-2027", "term-2")
+
+        self.assertFalse(first["uploaded"])
+        self.assertIsNone(first["source_term_id"])
+        self.assertTrue(second["uploaded"])
+        self.assertEqual(second["source_term_id"], "term-2")
+        self.assertEqual(second["preview_lessons"][0]["subject"], "Математик")
+        self.assertEqual(second["preview_lessons"][0]["lesson_number"], 8)
+
+    def test_legacy_schedule_belongs_to_second_term_only(self):
+        terms = [
+            {"id": "term-1", "start_date": "2026-09-01", "end_date": "2026-10-30"},
+            {"id": "term-2", "start_date": "2026-11-09", "end_date": "2026-12-25"},
+        ]
+        lessons = [{"subject": "Математик", "teacher_id": "teacher-1"}]
+
+        first, first_source = _lessons_for_term(lessons, terms, 0)
+        second, second_source = _lessons_for_term(lessons, terms, 1)
+
+        self.assertEqual(first, [])
+        self.assertIsNone(first_source)
+        self.assertEqual(second, lessons)
+        self.assertEqual(second_source, "term-2")
+
     def test_delete_academic_year_removes_selected_year(self):
         table = Mock()
         table.select.return_value.eq.return_value.execute.return_value = SimpleNamespace(data=[
@@ -53,14 +111,89 @@ class SchoolScheduleTests(unittest.TestCase):
 
         self.assertIsNone(sheet["A3"].value)
         self.assertEqual(
-            [sheet.cell(4, column).value for column in range(1, 8)],
-            ["Багшийн MOES имэйл", "Анги", "Бүлэг", "Хичээл", "Гараг", "Долоо хоногийн төрөл", "Цагийн дугаар"],
+            [sheet["B5"].value, sheet["C5"].value, sheet["D5"].value, sheet["G5"].value],
+            ["№", "Мэргэжил", "Багш нарын нэр", "Даасан анги"],
         )
+        self.assertEqual(sheet["H5"].value, "Даваа")
+        self.assertEqual(sheet["V5"].value, "Мягмар")
+        self.assertEqual(sheet["H6"].value, "I ээлж")
+        self.assertEqual(sheet["O6"].value, "II ээлж")
+        self.assertEqual(
+            [sheet.cell(7, column).value for column in range(8, 22)],
+            [1, 2, 3, 4, 5, 6, 7, 1, 2, 3, 4, 5, 6, 7],
+        )
+        self.assertIn("Заавар", workbook.sheetnames)
 
     def test_schedule_template_is_labeled_for_the_selected_academic_year(self):
         workbook = load_workbook(BytesIO(create_schedule_template("2026-2027")), data_only=True)
 
         self.assertEqual(workbook["Хуваарь"]["A3"].value, "Хичээлийн жил: 2026-2027")
+
+    def test_saved_schedule_export_matches_the_upload_template_format(self):
+        table = Mock()
+        table.select.return_value.eq.return_value.execute.side_effect = [
+            SimpleNamespace(data=[{
+                "academic_year": "2026-2027",
+                "start_date": "2026-09-01",
+                "end_date": "2027-06-30",
+                "terms": [{
+                    "id": "term-2",
+                    "name": "II улирал",
+                    "start_date": "2026-11-09",
+                    "end_date": "2026-12-25",
+                }],
+            }]),
+            SimpleNamespace(data=[{
+                "lessons": [{
+                    "term_id": "term-2",
+                    "teacher_id": "teacher-1",
+                    "grade": 7,
+                    "section": "А",
+                    "subject": "Математик",
+                    "weekday": 2,
+                    "week_type": "all",
+                    "lesson_number": 8,
+                }, {
+                    "term_id": "term-2",
+                    "teacher_id": "teacher-1",
+                    "grade": 7,
+                    "section": "Б",
+                    "subject": "Математик",
+                    "weekday": 2,
+                    "week_type": "all",
+                    "lesson_number": 8,
+                }],
+            }]),
+        ]
+        table.select.return_value.eq.return_value = table.select.return_value.eq.return_value
+        client = Mock()
+        client.table.return_value = table
+        profiles = [{
+            "user_id": "teacher-1",
+            "email": "teacher1@moes.edu.mn",
+            "role": "teacher",
+        }]
+
+        with (
+            patch("services.school_schedule._client", return_value=client),
+            patch("services.school_schedule.list_teacher_profiles", return_value=profiles),
+        ):
+            workbook = load_workbook(
+                BytesIO(create_saved_schedule_export("2026-2027", "term-2")),
+                data_only=True,
+            )
+
+        sheet = workbook["Хуваарь"]
+        self.assertEqual(
+            [sheet["B5"].value, sheet["C5"].value, sheet["D5"].value, sheet["G5"].value],
+            ["№", "Мэргэжил", "Багш нарын нэр", "Даасан анги"],
+        )
+        self.assertEqual(sheet["H5"].value, "Даваа")
+        self.assertEqual(sheet["V5"].value, "Мягмар")
+        self.assertEqual(sheet["A3"].value, "Улирал: II улирал")
+        self.assertEqual(sheet["C8"].value, "Математик")
+        self.assertEqual(sheet["D8"].value, "teacher1@moes.edu.mn")
+        self.assertEqual(sheet["AC8"].value, "7А 7Б")
 
     def _schedule_file(self, rows):
         workbook = Workbook()
@@ -182,11 +315,29 @@ class SchoolScheduleTests(unittest.TestCase):
             "academic_year": "2026-2027",
             "start_date": "2026-09-01",
             "end_date": "2027-06-30",
+            "terms": [],
         }]
         schedules = [{
             "academic_year": "2026-2027",
             "lessons": [
-                {"teacher_id": "teacher-1", "grade": 10, "section": "АБ", "subject": "Математик"},
+                {
+                    "teacher_id": "teacher-1",
+                    "grade": 10,
+                    "section": "АБ",
+                    "subject": "Математик",
+                    "weekday": 1,
+                    "week_type": "odd",
+                    "lesson_number": 2,
+                },
+                {
+                    "teacher_id": "teacher-1",
+                    "grade": 10,
+                    "section": "АБ",
+                    "subject": "Математик",
+                    "weekday": 1,
+                    "week_type": "odd",
+                    "lesson_number": 3,
+                },
                 {"teacher_id": "teacher-2", "grade": 10, "section": "В", "subject": "Физик"},
             ],
         }]
@@ -208,6 +359,86 @@ class SchoolScheduleTests(unittest.TestCase):
             {(10, "А", "Математик"), (10, "Б", "Математик")},
         )
         self.assertTrue(all(item["start_date"] == "2026-09-01" for item in assignments))
+        self.assertEqual(len(assignments), 4)
+        self.assertEqual({item["lesson_number"] for item in assignments}, {2, 3})
+        self.assertTrue(all(item["weekday"] == 1 and item["week_type"] == "odd" for item in assignments))
+        self.assertTrue(all(item["academic_year_start_date"] == "2026-09-01" for item in assignments))
+
+    def test_schedule_term_resolution_prefers_exact_then_previous_then_legacy(self):
+        terms = [
+            {"id": "first"},
+            {"id": "second"},
+            {"id": "third"},
+        ]
+        lessons = [
+            {"term_id": "first", "subject": "Өмнөх улирал"},
+            {"term_id": "third", "subject": "Идэвхтэй улирал"},
+            {"subject": "Хуучин хуваарь"},
+        ]
+
+        selected, source_term = _lessons_for_term(lessons, terms, 2)
+
+        self.assertEqual([item["subject"] for item in selected], ["Идэвхтэй улирал"])
+        self.assertEqual(source_term, "third")
+        selected, source_term = _lessons_for_term(lessons[:1] + lessons[2:], terms, 2)
+        self.assertEqual([item["subject"] for item in selected], ["Өмнөх улирал"])
+        self.assertEqual(source_term, "first")
+        selected, source_term = _lessons_for_term([lessons[2]], terms, 2)
+        self.assertEqual([item["subject"] for item in selected], ["Хуучин хуваарь"])
+        self.assertEqual(source_term, "second")
+
+    def test_schedule_assignments_reuse_most_recent_previous_term(self):
+        year = {
+            "academic_year": "2026-2027",
+            "start_date": "2026-09-01",
+            "end_date": "2027-06-30",
+            "terms": [
+                {"id": "term-1", "start_date": "2026-09-01", "end_date": "2026-10-01"},
+                {"id": "term-2", "start_date": "2026-10-02", "end_date": "2026-11-01"},
+                {"id": "term-3", "start_date": "2026-11-02", "end_date": "2026-12-01"},
+            ],
+        }
+        schedule = {
+            "academic_year": "2026-2027",
+            "lessons": [
+                {
+                    "teacher_id": "teacher-1",
+                    "grade": 2,
+                    "section": "А",
+                    "subject": "Хуучин хуваарь",
+                    "weekday": 1,
+                    "week_type": "all",
+                    "lesson_number": 1,
+                },
+                {
+                    "teacher_id": "teacher-1",
+                    "term_id": "term-2",
+                    "grade": 3,
+                    "section": "Б",
+                    "subject": "Өмнөх улирлын хуваарь",
+                    "weekday": 2,
+                    "week_type": "all",
+                    "lesson_number": 2,
+                },
+            ],
+        }
+        with (
+            patch("services.school_schedule.mock_data_enabled", return_value=False),
+            patch("services.school_schedule._client"),
+            patch(
+                "services.school_schedule._execute",
+                side_effect=[
+                    SimpleNamespace(data=[year]),
+                    SimpleNamespace(data=[schedule]),
+                ],
+            ),
+        ):
+            assignments = get_teacher_schedule_assignments("teacher-1")
+
+        third_term = [item for item in assignments if item["start_date"] == "2026-11-02"]
+        self.assertEqual(len(third_term), 1)
+        self.assertEqual(third_term[0]["subject"], "Өмнөх улирлын хуваарь")
+        self.assertEqual(third_term[0]["weekday"], 2)
 
     def test_teacher_evaluation_must_match_scheduled_class_subject_and_date(self):
         assignment = {

@@ -19,11 +19,15 @@ export interface UserProfile {
 
 export interface TeachingScheduleAssignment {
   academic_year: string;
+  academic_year_start_date?: string;
   start_date: string;
   end_date: string;
   grade: number;
   section: string;
   subject: string;
+  weekday?: number;
+  week_type?: 'all' | 'even' | 'odd';
+  lesson_number?: number;
 }
 
 export interface DailyAttendance {
